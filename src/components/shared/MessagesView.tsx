@@ -171,25 +171,6 @@ export function MessagesView({ meInitials = "MC", meAvatar }: MessagesViewProps)
 
     try {
       await sendMessage(activeUserId, text);
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now(),
-          from: "me",
-          text,
-          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          created_at: new Date().toISOString(),
-        },
-      ]);
-
-      setConversations((prev) =>
-        prev.map((c) =>
-          c.user_id === activeUserId
-            ? { ...c, last_message: text, last_time: "Now" }
-            : c
-        )
-      );
     } catch (e) {
       setError("Could not send message");
       setMsg(text);
