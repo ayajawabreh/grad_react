@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import { C, F } from "../../constants/tokens";
 import { API } from "../../imports/api";
 
@@ -23,7 +23,7 @@ interface ShortlistedApplicant {
 export default function Shortlisted() {
 
   const { id } = useParams();
-
+const nav = useNavigate();
   const [applicants, setApplicants] = useState<ShortlistedApplicant[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -281,18 +281,19 @@ export default function Shortlisted() {
 
 
                 <button
-                  style={{
-                    background:C.accent,
-                    color:"white",
-                    border:"none",
-                    padding:"10px 22px",
-                    borderRadius:12,
-                    cursor:"pointer",
-                    fontWeight:600
-                  }}
-                >
-                  View Profile
-                </button>
+  onClick={() => nav(`/company/applicants/${applicant.id}`)}
+  style={{
+    background: C.accent,
+    color: "white",
+    border: "none",
+    padding: "10px 22px",
+    borderRadius: 12,
+    cursor: "pointer",
+    fontWeight: 600
+  }}
+>
+  View Profile
+</button>
 
               </div>
 

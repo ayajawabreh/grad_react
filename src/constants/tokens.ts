@@ -21,6 +21,8 @@ export const C = {
   infoBg: "#EFF6FF",
   purple: "#7C3AED",
   purpleBg: "#EDE9FE",
+  danger: "#ef4444",
+  dangerBg: "#fee2e2",
 } as const;
 
 export const F = "'Plus Jakarta Sans', sans-serif";

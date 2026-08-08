@@ -1,12 +1,24 @@
 import { useState, useEffect } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router";
 import {
-  LayoutDashboard, User, FileText, Search, BookmarkCheck, Sparkles,
-  ClipboardList, MessageSquare, Bell, Settings, LogOut, Bot, Menu, X
+  LayoutDashboard,
+  User,
+  FileText,
+  Search,
+  BookmarkCheck,
+  Sparkles,
+  ClipboardList,
+  MessageSquare,
+  Bell,
+  Settings,
+  LogOut,
+  Bot,
 } from "lucide-react";
 import { C, F } from "../constants/tokens";
 import { useAuth } from "../context/AuthContext";
 import { API } from "../imports/api";
+import { getConversations } from "../imports/messages";
+import { supabase } from "../lib/supabase";
 
 const NAV = [
   { to: "/student/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -15,429 +27,541 @@ const NAV = [
   null,
   { to: "/student/jobs", icon: Search, label: "Browse Jobs" },
   { to: "/student/saved", icon: BookmarkCheck, label: "Saved Jobs" },
-  { to: "/student/recommended", icon: Sparkles, label: "Suggested Jobs", badge: 5 },
-  { to: "/student/applications", icon: ClipboardList, label: "Applications", badge: 3 },
+  {
+    to: "/student/recommended",
+    icon: Sparkles,
+    label: "Suggested Jobs",
+    badge: 5,
+  },
+  {
+    to: "/student/applications",
+    icon: ClipboardList,
+    label: "Applications",
+    badge: 3,
+  },
   null,
-  { to: "/student/messages", icon: MessageSquare, label: "Messages", badge: 2 },
-  { to: "/student/notifications", icon: Bell, label: "Notifications", badge: 5 },
-  { to: "/student/ai", icon: Bot, label: "AI Assistant" },
+  {
+    to: "/student/messages",
+    icon: MessageSquare,
+    label: "Messages",
+  },
+  {
+    to: "/student/notifications",
+    icon: Bell,
+    label: "Notifications",
+    badge: 5,
+  },
+  {
+    to: "/student/ai",
+    icon: Bot,
+    label: "AI Assistant",
+  },
   null,
-  { to: "/student/settings", icon: Settings, label: "Settings" },
+  {
+    to: "/student/settings",
+    icon: Settings,
+    label: "Settings",
+  },
 ];
 
-
-function Sidebar({ student, onClose }: { student: any; onClose?: () => void }) {
-
+function Sidebar({
+  student,
+  unreadMessages,
+  onUnreadReset,
+}: {
+  student: any;
+  unreadMessages: number;
+  onUnreadReset: () => void;
+}) {
   const { logout } = useAuth();
   const nav = useNavigate();
 
   const handleLogout = () => {
     logout();
     nav("/login");
-    onClose?.();
   };
 
+  useEffect(() => {
+    const handleReset = () => {
+      onUnreadReset();
+    };
+
+    window.addEventListener(
+      "messages:unread-reset",
+      handleReset
+    );
+
+    return () => {
+      window.removeEventListener(
+        "messages:unread-reset",
+        handleReset
+      );
+    };
+  }, [onUnreadReset]);
 
   return (
-    <>
+    <aside
+      style={{
+        width: 240,
+        height: "100vh",
+        background: "#fff",
+        borderRight: `1px solid ${C.border}`,
+        display: "flex",
+        flexDirection: "column",
+        position: "fixed",
+        top: 0,
+        left: 0,
+        zIndex: 1000,
+        boxSizing: "border-box",
+      }}
+    >
       <div
         style={{
           padding: "20px 20px 16px",
           borderBottom: `1px solid ${C.border}`,
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between"
+          gap: 10,
         }}
       >
-        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-
-          <div style={{
-            width:36,
-            height:36,
-            borderRadius:10,
-            overflow:"hidden"
-          }}>
-            <img
-              src={
-                student?.avatar ||
-                `https://ui-avatars.com/api/?name=${student?.name || "User"}`
-              }
-              alt="Avatar"
-              style={{
-                width:"100%",
-                height:"100%",
-                objectFit:"cover"
-              }}
-            />
-          </div>
-
-
-          <div>
-            <p style={{
-              fontSize:13,
-              fontWeight:700,
-              color:C.text,
-              margin:0,
-              fontFamily:F
-            }}>
-              {student?.name || "Student"}
-            </p>
-
-            <p style={{
-              fontSize:11,
-              color:C.textSec,
-              margin:0,
-              fontFamily:F
-            }}>
-              {student?.univ || ""}
-            </p>
-          </div>
-
+        <div
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 10,
+            overflow: "hidden",
+            flexShrink: 0,
+          }}
+        >
+          <img
+            src={
+              student?.avatar ||
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                student?.name || "User"
+              )}`
+            }
+            alt="Avatar"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+            }}
+          />
         </div>
 
-
-        {onClose &&
-          <button
-            onClick={onClose}
+        <div style={{ minWidth: 0 }}>
+          <p
             style={{
-              background:"none",
-              border:"none",
-              cursor:"pointer",
-              color:C.textMuted
+              fontSize: 13,
+              fontWeight: 700,
+              color: C.text,
+              margin: 0,
+              fontFamily: F,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
             }}
           >
-            <X size={16}/>
-          </button>
-        }
+            {student?.name || "Student"}
+          </p>
 
+          <p
+            style={{
+              fontSize: 11,
+              color: C.textSec,
+              margin: 0,
+              fontFamily: F,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            {student?.univ || ""}
+          </p>
+        </div>
       </div>
 
-
-
-      <nav style={{
-        flex:1,
-        overflow:"auto",
-        padding:"12px 10px"
-      }}>
-
-        {NAV.map((item,i)=>{
-
-          if(!item)
+      <nav
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          overflowX: "hidden",
+          padding: "12px 10px",
+        }}
+      >
+        {NAV.map((item, i) => {
+          if (!item) {
             return (
               <div
                 key={i}
                 style={{
-                  height:1,
-                  background:C.divider,
-                  margin:"6px 8px"
+                  height: 1,
+                  background: C.divider,
+                  margin: "6px 8px",
                 }}
               />
             );
+          }
 
+          const {
+            to,
+            icon: Icon,
+            label,
+            badge,
+          } = item;
 
-          const {to,icon:Icon,label,badge}=item as any;
-
+          const isMessages = label === "Messages";
+          const currentBadge = isMessages
+            ? unreadMessages
+            : badge;
 
           return (
-
             <NavLink
               key={to}
               to={to}
-              end={to==="/student/dashboard"}
-              onClick={onClose}
-
-              style={({isActive})=>({
-                display:"flex",
-                alignItems:"center",
-                gap:10,
-                padding:"9px 12px",
-                borderRadius:12,
-                textDecoration:"none",
-                background:isActive ? C.accentLight:"transparent",
-                color:isActive ? C.accent:C.textSec,
-                fontFamily:F,
-                fontSize:13,
-                fontWeight:isActive ? 600:400,
-                marginBottom:2
+              end={to === "/student/dashboard"}
+              style={({ isActive }) => ({
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "9px 12px",
+                borderRadius: 12,
+                textDecoration: "none",
+                background: isActive
+                  ? C.accentLight
+                  : "transparent",
+                color: isActive
+                  ? C.accent
+                  : C.textSec,
+                fontFamily: F,
+                fontSize: 13,
+                fontWeight: isActive ? 600 : 400,
+                marginBottom: 2,
+                minWidth: 0,
               })}
             >
+              <Icon size={16} />
 
-              <Icon size={16}/>
-
-              <span style={{flex:1}}>
+              <span
+                style={{
+                  flex: 1,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
                 {label}
               </span>
 
-
-              {badge &&
-                <span style={{
-                  minWidth:20,
-                  height:18,
-                  padding:"0 5px",
-                  borderRadius:9,
-                  background:C.accent,
-                  color:"#fff",
-                  fontSize:10,
-                  fontWeight:700,
-                  display:"flex",
-                  alignItems:"center",
-                  justifyContent:"center"
-                }}>
-                  {badge}
-                </span>
-              }
-
+             {currentBadge !== undefined && currentBadge > 0 && (
+  <span
+    style={{
+      minWidth: 20,
+      height: 18,
+      padding: "0 5px",
+      borderRadius: 9,
+      background: C.accent,
+      color: "#fff",
+      fontSize: 10,
+      fontWeight: 700,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: 0,
+    }}
+  >
+    {currentBadge > 99 ? "99+" : currentBadge}
+  </span>
+)}
             </NavLink>
-
           );
-
         })}
-
       </nav>
 
-
-
-      <div style={{
-        padding:"10px 10px 16px",
-        borderTop:`1px solid ${C.border}`
-      }}>
-
+      <div
+        style={{
+          padding: "10px 10px 16px",
+          borderTop: `1px solid ${C.border}`,
+        }}
+      >
         <button
+          type="button"
           onClick={handleLogout}
           style={{
-            width:"100%",
-            display:"flex",
-            alignItems:"center",
-            gap:10,
-            padding:"9px 12px",
-            borderRadius:12,
-            border:"none",
-            cursor:"pointer",
-            background:"transparent",
-            color:C.error,
-            fontFamily:F,
-            fontSize:13
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "9px 12px",
+            borderRadius: 12,
+            border: "none",
+            cursor: "pointer",
+            background: "transparent",
+            color: C.error,
+            fontFamily: F,
+            fontSize: 13,
           }}
         >
-
-          <LogOut size={16}/>
+          <LogOut size={16} />
           Sign Out
-
         </button>
-
       </div>
-
-    </>
+    </aside>
   );
 }
 
+function TopBar({ student }: { student: any }) {
+  return (
+    <div
+      style={{
+        height: 68,
+        borderBottom: `1px solid ${C.border}`,
+        background: "#fff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "0 24px",
+        gap: 20,
+        flexShrink: 0,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          flex: 1,
+          minWidth: 0,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            background: C.bg || "#f8fafc",
+            border: `1px solid ${C.border}`,
+            borderRadius: 10,
+            padding: "8px 12px",
+            maxWidth: 400,
+            width: "100%",
+          }}
+        >
+          <input
+            placeholder="Search jobs, companies..."
+            style={{
+              border: "none",
+              outline: "none",
+              background: "transparent",
+              fontFamily: F,
+              width: "100%",
+              minWidth: 0,
+              fontSize: 13,
+              color: C.text,
+            }}
+          />
+        </div>
+      </div>
 
+      <NavLink
+        to="/student/profile"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          textDecoration: "none",
+          flexShrink: 0,
+        }}
+      >
+        <img
+          src={
+            student?.avatar ||
+            `https://ui-avatars.com/api/?name=${encodeURIComponent(
+              student?.name || "User"
+            )}`
+          }
+          alt="Profile"
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 10,
+            objectFit: "cover",
+          }}
+        />
 
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <span
+            style={{
+              fontFamily: F,
+              fontSize: 12,
+              fontWeight: 600,
+              color: C.text,
+            }}
+          >
+            {student?.name || "Student"}
+          </span>
 
-function TopBar({student}:{student:any}) {
-
-
-return (
-
-<div style={{
-height:60,
-background:C.surface,
-borderBottom:`1px solid ${C.border}`,
-display:"flex",
-alignItems:"center",
-padding:"0 28px"
-}}>
-
-
-<div style={{flex:1}}>
-
-<div style={{
-display:"flex",
-alignItems:"center",
-gap:8,
-padding:"8px 14px",
-borderRadius:12,
-background:C.bg,
-border:`1px solid ${C.border}`,
-maxWidth:400
-}}>
-
-<Search size={14}/>
-
-<input
-placeholder="Search jobs, companies..."
-style={{
-border:"none",
-outline:"none",
-background:"transparent",
-fontFamily:F
-}}
-/>
-
-</div>
-
-</div>
-
-
-
-<NavLink
-to="/student/profile"
-style={{
-display:"flex",
-alignItems:"center",
-gap:8,
-textDecoration:"none"
-}}
->
-
-
-<img
-src={
-student?.avatar ||
-`https://ui-avatars.com/api/?name=${student?.name}`
-}
-style={{
-width:32,
-height:32,
-borderRadius:10,
-objectFit:"cover"
-}}
-/>
-
-
-<div>
-
-<p style={{
-margin:0,
-fontSize:12,
-fontWeight:600,
-color:C.text
-}}>
-{student?.name}
-</p>
-
-
-<p style={{
-margin:0,
-fontSize:11,
-color:C.textSec
-}}>
-Student
-</p>
-
-
-</div>
-
-
-</NavLink>
-
-
-</div>
-
-)
-
-}
-
-
-
-
-
-export default function StudentLayout(){
-
-const [sidebarOpen,setSidebarOpen]=useState(false);
-
-const [student,setStudent]=useState<any>(null);
-
-
-const {role}=useAuth();
-
-const nav=useNavigate();
-
-
-
-useEffect(()=>{
-
-API.get("/student/profile")
-.then(res=>{
-setStudent(res.data);
-})
-.catch(err=>{
-console.log(err);
-});
-
-},[]);
-
-
-
-if(role!=="student"){
-nav("/login");
-return null;
+          <span
+            style={{
+              fontFamily: F,
+              fontSize: 10,
+              color: C.textSec,
+            }}
+          >
+            Student
+          </span>
+        </div>
+      </NavLink>
+    </div>
+  );
 }
 
+export default function StudentLayout() {
+  const [, setSidebarOpen] = useState(false);
+  const [student, setStudent] = useState<any>(null);
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
+  const { role } = useAuth();
+  const nav = useNavigate();
 
-return (
+  const loadUnreadMessages = async () => {
+    try {
+      const data = await getConversations();
 
-<div style={{
-display:"flex",
-height:"100vh",
-overflow:"hidden",
-background:C.bg,
-fontFamily:F
-}}>
+      const conversations = Array.isArray(data)
+        ? data
+        : (data as any)?.data ?? [];
 
+      const total = conversations.reduce(
+        (sum: number, conversation: any) =>
+          sum + Number(conversation.unread || 0),
+        0
+      );
 
-<div
-  style={{
-    width:256,
-    background:C.surface,
-    borderRight:`1px solid ${C.border}`,
-    flexDirection:"column",
-    flexShrink:0,
-    display:"flex"
-  }}
->
-  <Sidebar student={student}/>
-</div>
+      setUnreadMessages(total);
+    } catch (error) {
+      console.error(
+        "Failed to load unread messages:",
+        error
+      );
+    }
+  };
 
+  useEffect(() => {
+    API.get("/student/profile")
+      .then((res) => {
+        setStudent(res.data);
+      })
+      .catch((err) => {
+        console.error(
+          "Failed to load student profile:",
+          err
+        );
+      });
+  }, []);
 
+  useEffect(() => {
+    if (role && role !== "student") {
+      nav("/login");
+    }
+  }, [role, nav]);
 
-<div style={{
-flex:1,
-display:"flex",
-flexDirection:"column"
-}}>
+  useEffect(() => {
+    if (role !== "student") return;
 
+    loadUnreadMessages();
 
-<TopBar student={student}/>
+    const channel = supabase
+      .channel("student_sidebar_message_events")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "message_events",
+        },
+        (payload) => {
+          const newMessage = payload.new as any;
 
+          if (!newMessage?.receiver_id) return;
 
+          setUnreadMessages((prev) => prev + 1);
+        }
+      )
+      .subscribe();
 
-<main style={{
-flex:1,
-overflow:"auto",
-padding:32,
-background:C.bg
-}}>
+    const handleReset = () => {
+      loadUnreadMessages();
+    };
 
-<div style={{
-maxWidth:1200,
-margin:"auto"
-}}>
+    window.addEventListener(
+      "messages:unread-reset",
+      handleReset
+    );
 
-<Outlet/>
+    const interval = window.setInterval(() => {
+      loadUnreadMessages();
+    }, 5000);
 
-</div>
+    return () => {
+      supabase.removeChannel(channel);
+      window.removeEventListener(
+        "messages:unread-reset",
+        handleReset
+      );
+      window.clearInterval(interval);
+    };
+  }, [role]);
 
+  if (role !== "student") {
+    return null;
+  }
 
-</main>
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: C.bg || "#f8fafc",
+        fontFamily: F,
+        display: "flex",
+      }}
+    >
+      <Sidebar
+        student={student}
+        unreadMessages={unreadMessages}
+        onUnreadReset={loadUnreadMessages}
+      />
 
+      <div
+        style={{
+          marginLeft: 240,
+          width: "calc(100% - 240px)",
+          minWidth: 0,
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <TopBar student={student} />
 
-</div>
-
-
-</div>
-
-)
-
+        <main
+          style={{
+            flex: 1,
+            padding: "24px",
+            width: "100%",
+            minWidth: 0,
+            boxSizing: "border-box",
+            overflowX: "auto",
+          }}
+        >
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  );
 }

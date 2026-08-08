@@ -5,7 +5,6 @@ import { Btn } from "../../components/ui";
 import { ArrowLeft, Save, Sparkles, Plus, X, CheckCircle2, AlertCircle } from "lucide-react";
 import api, { generateJobDescription } from "../../imports/api";
 
-
 export default function CreateJob() {
   const nav = useNavigate();
   const [submitting, setSubmitting] = useState(false);
@@ -71,14 +70,19 @@ export default function CreateJob() {
   };
 
   const handleAiGenerate = async () => {
-    if (!formData.title) return;
+    if (!formData.title.trim()) {
+      setError("Please enter a job title first.");
+      return;
+    }
 
     setGeneratingAi(true);
+    setError(null);
+    setNotification(null);
 
     try {
       const res = await generateJobDescription({
-        title: formData.title,
-        department: formData.dept,
+        title: formData.title.trim(),
+        department: formData.dept.trim(),
         level: formData.level,
         work_mode: formData.workMode,
         skills: formData.skills,
@@ -89,9 +93,24 @@ export default function CreateJob() {
           ...prev,
           description: res.description,
         }));
+
+        setNotification({
+          type: "success",
+          message: "Job description generated successfully with AI ✨",
+        });
+      } else {
+        setError("AI returned an empty description.");
       }
-    } catch (e) {
-      console.log(e);
+    } catch (e: any) {
+      console.error(
+        "AI Generate Error:",
+        e.response?.data || e
+      );
+
+      setError(
+        e.response?.data?.message ||
+        "Failed to generate job description. Please try again."
+      );
     } finally {
       setGeneratingAi(false);
     }
@@ -103,8 +122,6 @@ export default function CreateJob() {
     setError(null);
     setNotification(null);
 
-    const salaryValue = formData.salary;
-
     const payload = {
       title: formData.title,
       department: formData.dept,
@@ -112,8 +129,10 @@ export default function CreateJob() {
       level: formData.level,
       work_mode: formData.workMode,
       location: formData.location,
-      salary: salaryValue ? Number(salaryValue.replace(/[^\d.]/g, "")) : null,
-      deadline: formData.deadline,
+      salary: formData.salary
+        ? Number(String(formData.salary).replace(/[^\d.]/g, ""))
+        : null,
+      deadline: formData.deadline || null,
       description: formData.description,
       skills: formData.skills,
       benefits: formData.benefits,
@@ -136,8 +155,8 @@ export default function CreateJob() {
 
       setError(
         error?.response?.data?.message ||
-          Object.values(error?.response?.data?.errors || {}).flat().join(" ") ||
-          "Failed to publish the job. Please check the entered information."
+        Object.values(error?.response?.data?.errors || {}).flat().join(" ") ||
+        "Failed to publish the job. Please check the entered information."
       );
     } finally {
       setSubmitting(false);
@@ -295,41 +314,126 @@ export default function CreateJob() {
           </div>
         </div>
 
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 20 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, marginTop: 0, marginBottom: 16 }}>Location & Salary</h3>
+        <div
+          style={{
+            background: C.surface,
+            border: `1px solid ${C.border}`,
+            borderRadius: 16,
+            padding: 20,
+          }}
+        >
+          <h3
+            style={{
+              fontSize: 15,
+              fontWeight: 700,
+              marginTop: 0,
+              marginBottom: 16,
+            }}
+          >
+            Location & Salary
+          </h3>
 
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 16 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gap: 16,
+            }}
+          >
             <div>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Location</label>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  marginBottom: 6,
+                }}
+              >
+                Location
+              </label>
+
               <input
                 name="location"
                 value={formData.location}
                 onChange={handleChange}
                 placeholder="Ramallah, Palestine"
-                style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontFamily: F, fontSize: 14, background: C.surface, color: C.text, boxSizing: "border-box" }}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  border: `1px solid ${C.border}`,
+                  fontFamily: F,
+                  fontSize: 14,
+                  background: C.surface,
+                  color: C.text,
+                  boxSizing: "border-box",
+                }}
               />
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Salary</label>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  marginBottom: 6,
+                }}
+              >
+                Salary
+              </label>
+
               <input
                 name="salary"
+                type="number"
+                min="0"
                 value={formData.salary}
                 onChange={handleChange}
-                placeholder="1000"
-                style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontFamily: F, fontSize: 14, background: C.surface, color: C.text, boxSizing: "border-box" }}
+                placeholder="e.g. 1200"
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  border: `1px solid ${C.border}`,
+                  fontFamily: F,
+                  fontSize: 14,
+                  background: C.surface,
+                  color: C.text,
+                  boxSizing: "border-box",
+                }}
               />
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Deadline</label>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  marginBottom: 6,
+                }}
+              >
+                Deadline
+              </label>
+
               <input
-                type="date"
                 name="deadline"
-                lang="en-US"
+                type="date"
                 value={formData.deadline}
                 onChange={handleChange}
-                style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontFamily: F, fontSize: 14, background: C.surface, color: C.text, boxSizing: "border-box" }}
+                required
+                min={new Date().toISOString().split("T")[0]}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  border: `1px solid ${C.border}`,
+                  fontFamily: F,
+                  fontSize: 14,
+                  background: C.surface,
+                  color: C.text,
+                  boxSizing: "border-box",
+                }}
               />
             </div>
           </div>

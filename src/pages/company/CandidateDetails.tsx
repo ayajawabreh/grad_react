@@ -16,11 +16,13 @@ import {
   FileText,
   Award,
   ExternalLink,
-  Download
+  Download,
+  Loader2
 } from "lucide-react";
 
 import {
   fetchApplicantDetails,
+  fetchApplicantAISummary,
   fetchApplicantNotes,
   addApplicantNote,
   deleteApplicantNote,
@@ -43,27 +45,84 @@ export default function CandidateDetails() {
   const [newNote, setNewNote] = useState("");
   const [status, setStatus] = useState<string>("Applied");
 
+  // حالات ملخص الذكاء الاصطناعي
+  const [showAISummary, setShowAISummary] = useState(false);
+  const [loadingAISummary, setLoadingAISummary] = useState(false);
+  const [aiSummaryError, setAiSummaryError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!id) return;
 
+    const applicantId = Number(id);
+
     Promise.all([
-      fetchApplicantDetails(Number(id)),
-      fetchApplicantNotes(Number(id))
+      fetchApplicantDetails(applicantId),
+      fetchApplicantNotes(applicantId).catch(() => []),
     ])
       .then(([applicant, notesData]) => {
         setCandidate(applicant);
-        setNotes(Array.isArray(notesData) ? notesData : notesData ? [notesData] : []);
+
+        setNotes(
+          Array.isArray(notesData)
+            ? notesData
+            : notesData
+            ? [notesData]
+            : []
+        );
+
         if (applicant?.status) {
           setStatus(applicant.status);
         }
       })
-      .catch((err) => console.error(err))
+      .catch((err) => {
+        console.error("Failed to load applicant details:", err);
+      })
       .finally(() => setLoading(false));
   }, [id]);
 
   const matchPercentage = candidate?.match?.percentage ?? 0;
   const matchReasons = candidate?.match?.reasons ?? [];
 
+  // دالة التعامل مع الضغط على زر الذكاء الاصطناعي مع معالجة أفضل للأخطاء وإعادة المحاولة
+ const handleToggleAISummary = async () => {
+  if (showAISummary) {
+    setShowAISummary(false);
+    return;
+  }
+
+  setShowAISummary(true);
+
+  if ((!candidate?.ai_summary || aiSummaryError) && id) {
+    setLoadingAISummary(true);
+    setAiSummaryError(null);
+
+    try {
+      const summaryText = await fetchApplicantAISummary(Number(id));
+
+      if (summaryText && summaryText.trim()) {
+        setCandidate((prev) =>
+          prev
+            ? {
+                ...prev,
+                ai_summary: summaryText,
+              }
+            : prev
+        );
+      } else {
+        setAiSummaryError(
+          "Failed to generate AI summary. Please try again."
+        );
+      }
+    } catch (err) {
+      console.error("Failed to fetch AI summary:", err);
+      setAiSummaryError(
+        "Failed to generate AI summary. Please try again."
+      );
+    } finally {
+      setLoadingAISummary(false);
+    }
+  }
+};
   const handleAddNote = async () => {
     if (!newNote.trim() || !id) return;
 
@@ -106,12 +165,8 @@ export default function CandidateDetails() {
             }
           : prev
       );
-
-      const timeline = await fetchApplicantDetails(candidate.application_id);
-      setCandidate(timeline);
-
     } catch (error) {
-      console.error(error);
+      console.error("Failed to update status:", error);
     }
   };
 
@@ -442,36 +497,67 @@ export default function CandidateDetails() {
             {tab === "Profile" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                 <div
+                  onClick={handleToggleAISummary}
                   style={{
                     background: "#F0EBF8",
                     padding: "16px 20px",
                     borderRadius: 16,
-                    border: "1px solid rgba(147, 51, 234, 0.08)"
+                    border: "1px solid rgba(147, 51, 234, 0.08)",
+                    cursor: "pointer",
+                    userSelect: "none"
                   }}
                 >
                   <div
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: 6,
+                      justifyContent: "space-between",
                       fontSize: 12,
                       fontWeight: 600,
-                      color: "#6B46C1",
-                      marginBottom: 8
+                      color: "#6B46C1"
                     }}
                   >
-                    <Sparkles size={14} /> AI Summary
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6
+                      }}
+                    >
+                      <Sparkles size={14} />
+                      AI Summary
+                    </div>
+
+                    <span style={{ fontSize: 11 }}>
+                      {showAISummary ? "Hide" : candidate?.ai_summary ? "View" : "Generate Summary"}
+                    </span>
                   </div>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 12.5,
-                      lineHeight: 1.6,
-                      color: "#4A5568"
-                    }}
-                  >
-                    {candidate.ai_summary || "No AI summary available yet."}
-                  </p>
+
+                  {showAISummary && (
+                    <div style={{ marginTop: 10 }}>
+                      {loadingAISummary ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#6B46C1", fontSize: 12.5 }}>
+                          <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} />
+                          Generating AI summary...
+                        </div>
+                      ) : aiSummaryError ? (
+                        <p style={{ margin: 0, fontSize: 12.5, color: "#E53E3E" }}>
+                          {aiSummaryError}
+                        </p>
+                      ) : (
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: 12.5,
+                            lineHeight: 1.6,
+                            color: "#4A5568"
+                          }}
+                        >
+                          {candidate.ai_summary}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div>

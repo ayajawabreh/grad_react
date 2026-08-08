@@ -11,7 +11,7 @@ import {
   Shield,
   Search,
   Layers,
-  Wrench
+  Wrench,
 } from "lucide-react";
 import { C, F } from "../constants/tokens";
 import { useAuth } from "../context/AuthContext";
@@ -28,7 +28,12 @@ const NAV = [
   { to: "/admin/skills", icon: Wrench, label: "Skills" },
   null,
   { to: "/admin/analytics", icon: BarChart2, label: "Reports & Analytics" },
-  { to: "/admin/notifications", icon: Bell, label: "Notifications", badge: 14 },
+  {
+    to: "/admin/notifications",
+    icon: Bell,
+    label: "Notifications",
+    badge: 14,
+  },
   { to: "/admin/settings", icon: Settings, label: "Settings" },
 ];
 
@@ -56,7 +61,6 @@ export default function AdminLayout() {
         fontFamily: F,
       }}
     >
-
       {/* Sidebar */}
       <div
         style={{
@@ -69,7 +73,6 @@ export default function AdminLayout() {
           height: "100vh",
         }}
       >
-
         {/* Logo */}
         <div
           style={{
@@ -93,9 +96,10 @@ export default function AdminLayout() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                flexShrink: 0,
               }}
             >
-              <Shield size={18} color="#fff" />
+              <Shield size={18} style={{ color: "#fff" }} />
             </div>
 
             <div>
@@ -105,6 +109,7 @@ export default function AdminLayout() {
                   fontWeight: 700,
                   color: "#E8E8EC",
                   margin: 0,
+                  fontFamily: F,
                 }}
               >
                 Admin Portal
@@ -115,6 +120,7 @@ export default function AdminLayout() {
                   fontSize: 11,
                   color: "#9090A0",
                   margin: 0,
+                  fontFamily: F,
                 }}
               >
                 CareerBridge Platform
@@ -122,7 +128,6 @@ export default function AdminLayout() {
             </div>
           </div>
         </div>
-
 
         {/* Navigation */}
         <nav
@@ -133,8 +138,7 @@ export default function AdminLayout() {
           }}
         >
           {NAV.map((item, i) => {
-
-            if (!item)
+            if (!item) {
               return (
                 <div
                   key={i}
@@ -145,171 +149,239 @@ export default function AdminLayout() {
                   }}
                 />
               );
+            }
 
-
-            const {to, icon: Icon, label, badge} = item as any;
-
+            const {
+              to,
+              icon: Icon,
+              label,
+              badge,
+            } = item as {
+              to: string;
+              icon: React.ElementType;
+              label: string;
+              badge?: number;
+            };
 
             return (
               <NavLink
                 key={to}
                 to={to}
-                style={({isActive}) => ({
-                  display:"flex",
-                  alignItems:"center",
-                  gap:10,
-                  padding:"9px 12px",
-                  borderRadius:10,
-                  textDecoration:"none",
-                  background:isActive ? `${C.error}20` : "transparent",
-                  color:isActive ? C.error : "#9090A0",
-                  fontSize:13,
-                  marginBottom:2,
+                end={to === "/admin/dashboard"}
+                style={({ isActive }) => ({
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "9px 12px",
+                  borderRadius: 10,
+                  textDecoration: "none",
+                  background: isActive
+                    ? `${C.error}20`
+                    : "transparent",
+                  color: isActive ? C.error : "#9090A0",
+                  fontFamily: F,
+                  fontSize: 13,
+                  fontWeight: isActive ? 600 : 400,
+                  marginBottom: 2,
+                  transition: "all 0.1s",
                 })}
               >
-                <Icon size={16}/>
-                <span style={{flex:1}}>
+                <Icon size={16} />
+
+                <span style={{ flex: 1 }}>
                   {label}
                 </span>
 
                 {badge && (
                   <span
                     style={{
-                      minWidth:20,
-                      height:18,
-                      borderRadius:9,
-                      background:C.error,
-                      color:"#fff",
-                      fontSize:10,
-                      display:"flex",
-                      alignItems:"center",
-                      justifyContent:"center"
+                      minWidth: 20,
+                      height: 18,
+                      padding: "0 5px",
+                      borderRadius: 9,
+                      background: C.error,
+                      color: "#fff",
+                      fontSize: 10,
+                      fontWeight: 700,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontFamily: F,
                     }}
                   >
                     {badge}
                   </span>
                 )}
-
               </NavLink>
             );
           })}
         </nav>
 
-
+        {/* Sign Out */}
         <div
           style={{
-            padding:"10px 10px 16px",
-            borderTop:"1px solid #2E2E38"
+            padding: "10px 10px 16px",
+            borderTop: "1px solid #2E2E38",
           }}
         >
           <button
             onClick={handleLogout}
             style={{
-              width:"100%",
-              display:"flex",
-              alignItems:"center",
-              gap:10,
-              padding:"9px 12px",
-              borderRadius:10,
-              border:"none",
-              cursor:"pointer",
-              background:"transparent",
-              color:C.error,
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              padding: "9px 12px",
+              borderRadius: 10,
+              border: "none",
+              cursor: "pointer",
+              background: "transparent",
+              color: C.error,
+              fontFamily: F,
+              fontSize: 13,
             }}
           >
-            <LogOut size={16}/>
+            <LogOut size={16} />
             Sign Out
           </button>
         </div>
-
       </div>
-
-
 
       {/* Main */}
       <div
         style={{
-          flex:1,
-          display:"flex",
-          flexDirection:"column",
-          overflow:"hidden",
-          minWidth:0
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          minWidth: 0,
         }}
       >
-
         {/* Top Bar */}
         <div
           style={{
-            height:60,
-            background:C.darker,
-            borderBottom:"1px solid #2E2E38",
-            display:"flex",
-            alignItems:"center",
-            gap:16,
-            padding:"0 28px",
+            height: 60,
+            background: C.darker,
+            borderBottom: "1px solid #2E2E38",
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+            padding: "0 28px",
+            flexShrink: 0,
           }}
         >
-
-          <div style={{flex:1}}>
+          <div
+            style={{
+              flex: 1,
+              maxWidth: 340,
+            }}
+          >
             <div
               style={{
-                display:"flex",
-                alignItems:"center",
-                gap:8,
-                padding:"8px 14px",
-                borderRadius:12,
-                background:"#ffffff08",
-                border:"1px solid #2E2E38"
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "8px 14px",
+                borderRadius: 12,
+                background: "#ffffff08",
+                border: "1px solid #2E2E38",
               }}
             >
-              <Search size={14} color="#9090A0"/>
+              <Search
+                size={14}
+                style={{
+                  color: "#9090A0",
+                }}
+              />
 
               <input
                 placeholder="Search platform..."
                 style={{
-                  flex:1,
-                  border:"none",
-                  outline:"none",
-                  background:"transparent",
-                  color:"#fff"
+                  flex: 1,
+                  border: "none",
+                  outline: "none",
+                  fontSize: 13,
+                  color: "#E8E8EC",
+                  background: "transparent",
+                  fontFamily: F,
                 }}
               />
             </div>
           </div>
 
-
           <div
             style={{
-              display:"flex",
-              alignItems:"center",
-              gap:10
+              marginLeft: "auto",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
             }}
           >
-            <Shield size={18} color="#fff"/>
-            <span style={{color:"#fff",fontSize:13}}>
-              Admin
-            </span>
-          </div>
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                background: C.error,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Shield
+                size={16}
+                style={{
+                  color: "#fff",
+                }}
+              />
+            </div>
 
+            <div>
+              <p
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: "#E8E8EC",
+                  margin: 0,
+                  fontFamily: F,
+                }}
+              >
+                Admin
+              </p>
+
+              <p
+                style={{
+                  fontSize: 11,
+                  color: "#9090A0",
+                  margin: 0,
+                  fontFamily: F,
+                }}
+              >
+                CareerBridge
+              </p>
+            </div>
+          </div>
         </div>
 
-
+        {/* Content */}
         <main
           style={{
-            flex:1,
-            overflow:"auto",
-            padding: 32,
-            background:C.bg
+            flex: 1,
+            overflow: "auto",
+            padding: "32px",
+            background: C.bg,
           }}
         >
-          <div style={{maxWidth:1200,margin:"0 auto"}}>
-            <Outlet/>
+          <div
+            style={{
+              maxWidth: 1200,
+              margin: "0 auto",
+            }}
+          >
+            <Outlet />
           </div>
         </main>
-
-
       </div>
-
     </div>
   );
 }

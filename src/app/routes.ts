@@ -11,7 +11,7 @@ import ForgotPassword from "../pages/public/ForgotPassword";
 
 import StudentDashboard from "../pages/student/Dashboard";
 import StudentProfile from "../pages/student/Profile";
-import StudentResume from "../pages/student/Resume";
+import StudentResume from "../pages/student/MyResume";
 import StudentResumeView from "../pages/student/ResumeView";
 import JobDiscovery from "../pages/student/JobDiscovery";
 import StudentJobDetails from "../pages/student/JobDetails";
@@ -48,6 +48,10 @@ import AdminNotifications from "../pages/admin/Notifications";
 import AdminSettings from "../pages/admin/Settings";
 import Shortlisted from "../pages/company/Shortlisted";
 import Reports from "../pages/company/Reports";
+import MyResume from "../pages/student/MyResume";
+import ResumeUpload from "../pages/student/ResumeUpload";
+import ResumeBuilder from "../pages/student/Resume";
+
 
 export const router = createBrowserRouter([
   { path: "/", Component: Landing },
@@ -55,27 +59,31 @@ export const router = createBrowserRouter([
   { path: "/register", Component: Register },
   { path: "/forgot-password", Component: ForgotPassword },
 
-  {
-    path: "/student",
-    Component: StudentLayout,
-    children: [
-      { index: true, loader: () => redirect("/student/dashboard") },
-      { path: "dashboard", Component: StudentDashboard },
-      { path: "profile", Component: StudentProfile },
-      { path: "resume", Component: StudentResume },
-      { path: "resume/view", Component: StudentResumeView },
-      { path: "jobs", Component: JobDiscovery },
-      { path: "jobs/:id", Component: StudentJobDetails },
-      { path: "applications", Component: Applications },
-      { path: "saved", Component: SavedJobs },
-      { path: "recommended", Component: RecommendedJobs },
-      { path: "messages", Component: StudentMessages },
-      { path: "notifications", Component: StudentNotifications },
-      { path: "settings", Component: StudentSettings },
-      { path: "ai", Component: AIAssistant },
-    ],
-  },
+  
+{
+  path: "/student",
+  Component: StudentLayout,
+  children: [
+    { index: true, loader: () => redirect("/student/dashboard") },
+    { path: "dashboard", Component: StudentDashboard },
+    { path: "profile", Component: StudentProfile },
 
+    { path: "resume", Component: StudentResume },
+    { path: "resume/create", Component: ResumeBuilder },
+    { path: "resume/upload", Component: ResumeUpload },
+    { path: "resume/view", Component: StudentResumeView },
+
+    { path: "jobs", Component: JobDiscovery },
+    { path: "jobs/:id", Component: StudentJobDetails },
+    { path: "applications", Component: Applications },
+    { path: "saved", Component: SavedJobs },
+    { path: "recommended", Component: RecommendedJobs },
+    { path: "messages", Component: StudentMessages },
+    { path: "notifications", Component: StudentNotifications },
+    { path: "settings", Component: StudentSettings },
+    { path: "ai", Component: AIAssistant },
+  ],
+},
   {
     path: "/company",
     Component: CompanyLayout,

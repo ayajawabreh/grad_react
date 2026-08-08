@@ -152,7 +152,7 @@ export async function fetchApplicantDetails(
 export async function fetchApplicantAISummary(
   id: number
 ): Promise<string> {
-  const res = await API.get(
+  const res = await API.get<{ summary: string }>(
     `/company/applicants/${id}/ai-summary`
   );
 

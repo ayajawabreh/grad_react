@@ -69,7 +69,9 @@ export default function EditJob() {
     fetchJob();
   }, [id]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
+  ) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
@@ -185,7 +187,16 @@ export default function EditJob() {
   }
 
   return (
-    <div style={{ fontFamily: F, color: C.text, maxWidth: 840, margin: "0 auto", paddingBottom: 40, position: "relative" }}>
+    <div
+      style={{
+        fontFamily: F,
+        color: C.text,
+        maxWidth: 840,
+        margin: "0 auto",
+        paddingBottom: 40,
+        position: "relative",
+      }}
+    >
       {notification && (
         <div
           style={{
@@ -200,7 +211,9 @@ export default function EditJob() {
             borderRadius: 12,
             boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)",
             background: notification.type === "success" ? "#ECFDF5" : "#FEF2F2",
-            border: `1px solid ${notification.type === "success" ? "#A7F3D0" : "#FCA5A5"}`,
+            border: `1px solid ${
+              notification.type === "success" ? "#A7F3D0" : "#FCA5A5"
+            }`,
             color: notification.type === "success" ? "#065F46" : "#991B1B",
             fontSize: 14,
             fontWeight: 600,
@@ -211,7 +224,9 @@ export default function EditJob() {
           ) : (
             <AlertCircle size={20} color="#EF4444" />
           )}
+
           <span>{notification.message}</span>
+
           <button
             type="button"
             onClick={() => setNotification(null)}
@@ -231,7 +246,14 @@ export default function EditJob() {
         </div>
       )}
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 24,
+        }}
+      >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <button
             type="button"
@@ -249,50 +271,145 @@ export default function EditJob() {
           >
             <ArrowLeft size={18} />
           </button>
+
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Edit Job Listing</h1>
-            <p style={{ color: C.textSec, fontSize: 13, marginTop: 4, margin: 0 }}>
+            <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>
+              Edit Job Listing
+            </h1>
+            <p
+              style={{
+                color: C.textSec,
+                fontSize: 13,
+                marginTop: 4,
+                margin: 0,
+              }}
+            >
               Update the details below to edit your job posting
             </p>
           </div>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 20 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, marginTop: 0, marginBottom: 16 }}>Basic Info</h3>
+      <form
+        onSubmit={handleSubmit}
+        style={{ display: "flex", flexDirection: "column", gap: 20 }}
+      >
+        <div
+          style={{
+            background: C.surface,
+            border: `1px solid ${C.border}`,
+            borderRadius: 16,
+            padding: 20,
+          }}
+        >
+          <h3
+            style={{
+              fontSize: 15,
+              fontWeight: 700,
+              marginTop: 0,
+              marginBottom: 16,
+            }}
+          >
+            Basic Info
+          </h3>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 16,
+            }}
+          >
             <div>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Job Title</label>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  marginBottom: 6,
+                }}
+              >
+                Job Title
+              </label>
+
               <input
                 name="title"
                 value={formData.title}
                 onChange={handleChange}
                 required
                 placeholder="e.g. Senior Product Designer"
-                style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontFamily: F, fontSize: 14, background: C.surface, color: C.text, boxSizing: "border-box" }}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  border: `1px solid ${C.border}`,
+                  fontFamily: F,
+                  fontSize: 14,
+                  background: C.surface,
+                  color: C.text,
+                  boxSizing: "border-box",
+                }}
               />
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Department</label>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  marginBottom: 6,
+                }}
+              >
+                Department
+              </label>
+
               <input
                 name="dept"
                 value={formData.dept}
                 onChange={handleChange}
                 placeholder="e.g. Engineering"
-                style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontFamily: F, fontSize: 14, background: C.surface, color: C.text, boxSizing: "border-box" }}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  border: `1px solid ${C.border}`,
+                  fontFamily: F,
+                  fontSize: 14,
+                  background: C.surface,
+                  color: C.text,
+                  boxSizing: "border-box",
+                }}
               />
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Job Type</label>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  marginBottom: 6,
+                }}
+              >
+                Job Type
+              </label>
+
               <select
                 name="type"
                 value={formData.type}
                 onChange={handleChange}
-                style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontFamily: F, fontSize: 14, background: C.surface, color: C.text, boxSizing: "border-box" }}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  border: `1px solid ${C.border}`,
+                  fontFamily: F,
+                  fontSize: 14,
+                  background: C.surface,
+                  color: C.text,
+                  boxSizing: "border-box",
+                }}
               >
                 <option value="Full-Time">Full-time</option>
                 <option value="Part-Time">Part-time</option>
@@ -302,12 +419,32 @@ export default function EditJob() {
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Level</label>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  marginBottom: 6,
+                }}
+              >
+                Level
+              </label>
+
               <select
                 name="level"
                 value={formData.level}
                 onChange={handleChange}
-                style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontFamily: F, fontSize: 14, background: C.surface, color: C.text, boxSizing: "border-box" }}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  border: `1px solid ${C.border}`,
+                  fontFamily: F,
+                  fontSize: 14,
+                  background: C.surface,
+                  color: C.text,
+                  boxSizing: "border-box",
+                }}
               >
                 <option value="Entry">Entry</option>
                 <option value="Mid">Mid</option>
@@ -317,12 +454,32 @@ export default function EditJob() {
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Work Mode</label>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  marginBottom: 6,
+                }}
+              >
+                Work Mode
+              </label>
+
               <select
                 name="workMode"
                 value={formData.workMode}
                 onChange={handleChange}
-                style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontFamily: F, fontSize: 14, background: C.surface, color: C.text, boxSizing: "border-box" }}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  border: `1px solid ${C.border}`,
+                  fontFamily: F,
+                  fontSize: 14,
+                  background: C.surface,
+                  color: C.text,
+                  boxSizing: "border-box",
+                }}
               >
                 <option value="Remote">Remote</option>
                 <option value="On-site">On-site</option>
@@ -332,25 +489,75 @@ export default function EditJob() {
           </div>
         </div>
 
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 20 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, marginTop: 0, marginBottom: 16 }}>Location & Details</h3>
+        <div
+          style={{
+            background: C.surface,
+            border: `1px solid ${C.border}`,
+            borderRadius: 16,
+            padding: 20,
+          }}
+        >
+          <h3
+            style={{
+              fontSize: 15,
+              fontWeight: 700,
+              marginTop: 0,
+              marginBottom: 16,
+            }}
+          >
+            Location & Details
+          </h3>
 
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 16 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "2fr 1fr 1fr",
+              gap: 16,
+            }}
+          >
             <div>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Location</label>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  marginBottom: 6,
+                }}
+              >
+                Location
+              </label>
+
               <input
                 name="location"
                 value={formData.location}
                 onChange={handleChange}
                 placeholder="Ramallah, Palestine"
-                style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontFamily: F, fontSize: 14, background: C.surface, color: C.text, boxSizing: "border-box" }}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  border: `1px solid ${C.border}`,
+                  fontFamily: F,
+                  fontSize: 14,
+                  background: C.surface,
+                  color: C.text,
+                  boxSizing: "border-box",
+                }}
               />
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  marginBottom: 6,
+                }}
+              >
                 Salary
               </label>
+
               <input
                 name="salary"
                 value={formData.salary}
@@ -371,9 +578,17 @@ export default function EditJob() {
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  marginBottom: 6,
+                }}
+              >
                 Deadline
               </label>
+
               <input
                 type="date"
                 name="deadline"
@@ -395,16 +610,44 @@ export default function EditJob() {
           </div>
         </div>
 
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 20 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-            <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>Job Description</h3>
+        <div
+          style={{
+            background: C.surface,
+            border: `1px solid ${C.border}`,
+            borderRadius: 16,
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 12,
+            }}
+          >
+            <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>
+              Job Description
+            </h3>
+
             <button
               type="button"
               onClick={handleAiGenerate}
               disabled={generatingAi}
-              style={{ background: "none", border: "none", cursor: "pointer", color: C.accent, fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: C.accent,
+                fontSize: 13,
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
             >
-              <Sparkles size={14} /> {generatingAi ? "Generating..." : "AI Generate"}
+              <Sparkles size={14} />
+              {generatingAi ? "Generating..." : "AI Generate"}
             </button>
           </div>
 
@@ -414,21 +657,69 @@ export default function EditJob() {
             value={formData.description}
             onChange={handleChange}
             placeholder="Describe the role, expectations, and what success looks like..."
-            style={{ width: "100%", padding: "12px", borderRadius: 8, border: `1px solid ${C.border}`, fontFamily: F, fontSize: 14, background: C.surface, color: C.text, boxSizing: "border-box", resize: "vertical" }}
+            style={{
+              width: "100%",
+              padding: "12px",
+              borderRadius: 8,
+              border: `1px solid ${C.border}`,
+              fontFamily: F,
+              fontSize: 14,
+              background: C.surface,
+              color: C.text,
+              boxSizing: "border-box",
+              resize: "vertical",
+            }}
           />
         </div>
 
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 20 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, marginTop: 0, marginBottom: 16 }}>Required Skills</h3>
+        <div
+          style={{
+            background: C.surface,
+            border: `1px solid ${C.border}`,
+            borderRadius: 16,
+            padding: 20,
+          }}
+        >
+          <h3
+            style={{
+              fontSize: 15,
+              fontWeight: 700,
+              marginTop: 0,
+              marginBottom: 16,
+            }}
+          >
+            Required Skills
+          </h3>
 
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 8,
+              marginBottom: 12,
+            }}
+          >
             {formData.skills.map((skill) => (
               <span
                 key={skill}
-                style={{ background: String(C.accent) + "18", color: C.accent, padding: "4px 10px", borderRadius: 20, fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}
+                style={{
+                  background: String(C.accent) + "18",
+                  color: C.accent,
+                  padding: "4px 10px",
+                  borderRadius: 20,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
               >
                 {skill}
-                <X size={14} style={{ cursor: "pointer" }} onClick={() => handleRemoveSkill(skill)} />
+                <X
+                  size={14}
+                  style={{ cursor: "pointer" }}
+                  onClick={() => handleRemoveSkill(skill)}
+                />
               </span>
             ))}
           </div>
@@ -438,27 +729,81 @@ export default function EditJob() {
               value={skillInput}
               onChange={(e) => setSkillInput(e.target.value)}
               placeholder="Add a skill..."
-              style={{ flex: 1, padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontFamily: F, fontSize: 14, background: C.surface, color: C.text, boxSizing: "border-box" }}
+              style={{
+                flex: 1,
+                padding: "10px 12px",
+                borderRadius: 8,
+                border: `1px solid ${C.border}`,
+                fontFamily: F,
+                fontSize: 14,
+                background: C.surface,
+                color: C.text,
+                boxSizing: "border-box",
+              }}
             />
+
             <button
               type="button"
               onClick={handleAddSkill}
-              style={{ background: C.surface, border: `1px solid ${C.border}`, padding: "0 16px", borderRadius: 8, cursor: "pointer", fontWeight: 600, fontSize: 13, display: "flex", alignItems: "center", gap: 4 }}
+              style={{
+                background: C.surface,
+                border: `1px solid ${C.border}`,
+                padding: "0 16px",
+                borderRadius: 8,
+                cursor: "pointer",
+                fontWeight: 600,
+                fontSize: 13,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
             >
-              <Plus size={16} /> Add
+              <Plus size={16} />
+              Add
             </button>
           </div>
         </div>
 
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 20 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, marginTop: 0, marginBottom: 16 }}>Benefits</h3>
+        <div
+          style={{
+            background: C.surface,
+            border: `1px solid ${C.border}`,
+            borderRadius: 16,
+            padding: 20,
+          }}
+        >
+          <h3
+            style={{
+              fontSize: 15,
+              fontWeight: 700,
+              marginTop: 0,
+              marginBottom: 16,
+            }}
+          >
+            Benefits
+          </h3>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gap: 12,
+            }}
+          >
             {availableBenefits.map((benefit) => {
               const isChecked = formData.benefits.includes(benefit);
 
               return (
-                <label key={benefit} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: 13 }}>
+                <label
+                  key={benefit}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    cursor: "pointer",
+                    fontSize: 13,
+                  }}
+                >
                   <input
                     type="checkbox"
                     checked={isChecked}
@@ -472,10 +817,18 @@ export default function EditJob() {
           </div>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 10 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 12,
+            marginTop: 10,
+          }}
+        >
           <Btn v="ghost" type="button" onClick={() => nav("/company/jobs")}>
             Cancel
           </Btn>
+
           <Btn v="primary" type="submit" icon={Save} disabled={submitting}>
             {submitting ? "Saving..." : "Save Changes"}
           </Btn>

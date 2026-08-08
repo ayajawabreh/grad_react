@@ -1,34 +1,100 @@
 import { useEffect, useState } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router";
 import {
-  LayoutDashboard, Building2, Plus, Briefcase, Users, BarChart2,
-  Calendar, MessageSquare, Bell, Settings, LogOut, Search
+  LayoutDashboard,
+  Building2,
+  Plus,
+  Briefcase,
+  Users,
+  Calendar,
+  BarChart2,
+  MessageSquare,
+  Bell,
+  Settings,
+  LogOut,
+  Search,
+  Menu,
+  X,
 } from "lucide-react";
+
 import { C, F } from "../constants/tokens";
 import { useAuth } from "../context/AuthContext";
 import { getCompanyProfile } from "../imports/api";
 
 const NAV = [
-  { to: "/company/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/company/profile", icon: Building2, label: "Company Profile" },
+  {
+    to: "/company/dashboard",
+    icon: LayoutDashboard,
+    label: "Dashboard",
+  },
+  {
+    to: "/company/profile",
+    icon: Building2,
+    label: "Company Profile",
+  },
   null,
-  { to: "/company/jobs/create", icon: Plus, label: "Create Job", accent: true },
-  { to: "/company/jobs", icon: Briefcase, label: "My Jobs" },
-  { to: "/company/applicants", icon: Users, label: "Applicants", badge: 12 },
-  { to: "/company/interviews", icon: Calendar, label: "Interviews", badge: 3 },
+  {
+    to: "/company/jobs/create",
+    icon: Plus,
+    label: "Create Job",
+    accent: true,
+  },
+  {
+    to: "/company/jobs",
+    icon: Briefcase,
+    label: "My Jobs",
+  },
+  {
+    to: "/company/applicants",
+    icon: Users,
+    label: "Applicants",
+    badge: 12,
+  },
+  {
+    to: "/company/interviews",
+    icon: Calendar,
+    label: "Interviews",
+    badge: 3,
+  },
   null,
-  { to: "/company/reports", icon: BarChart2, label: "Reports" },
-  { to: "/company/messages", icon: MessageSquare, label: "Messages", badge: 4 },
-  { to: "/company/notifications", icon: Bell, label: "Notifications", badge: 7 },
+  {
+    to: "/company/reports",
+    icon: BarChart2,
+    label: "Reports",
+  },
+  {
+    to: "/company/messages",
+    icon: MessageSquare,
+    label: "Messages",
+    badge: 4,
+  },
+  {
+    to: "/company/notifications",
+    icon: Bell,
+    label: "Notifications",
+    badge: 7,
+  },
   null,
-  { to: "/company/settings", icon: Settings, label: "Settings" },
+  {
+    to: "/company/settings",
+    icon: Settings,
+    label: "Settings",
+  },
 ];
 
-function Sidebar() {
+interface Company {
+  id?: number;
+  name?: string;
+  email?: string;
+  logo?: string | null;
+  industry?: string;
+}
+
+function Sidebar({ onClose }: { onClose?: () => void }) {
   const { logout } = useAuth();
   const nav = useNavigate();
 
-  const [company, setCompany] = useState<any>(null);
+  const [company, setCompany] = useState<Company | null>(null);
 
   useEffect(() => {
     getCompanyProfile()
@@ -41,6 +107,7 @@ function Sidebar() {
   const handleLogout = () => {
     logout();
     nav("/login");
+    onClose?.();
   };
 
   return (
@@ -54,7 +121,14 @@ function Sidebar() {
           justifyContent: "space-between",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            minWidth: 0,
+          }}
+        >
           <div
             style={{
               width: 36,
@@ -65,14 +139,34 @@ function Sidebar() {
               alignItems: "center",
               justifyContent: "center",
               flexShrink: 0,
+              overflow: "hidden",
             }}
           >
-            <span style={{ color: "#fff", fontSize: 12, fontWeight: 900, fontFamily: F }}>
-              {companyName.substring(0, 2).toUpperCase()}
-            </span>
+            {company?.logo ? (
+              <img
+                src={company.logo}
+                alt={companyName}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                }}
+              />
+            ) : (
+              <span
+                style={{
+                  color: "#fff",
+                  fontSize: 12,
+                  fontWeight: 900,
+                  fontFamily: F,
+                }}
+              >
+                {companyName.substring(0, 2).toUpperCase()}
+              </span>
+            )}
           </div>
 
-          <div>
+          <div style={{ minWidth: 0 }}>
             <p
               style={{
                 fontSize: 13,
@@ -80,6 +174,9 @@ function Sidebar() {
                 color: C.text,
                 margin: 0,
                 fontFamily: F,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
               }}
             >
               {companyName}
@@ -97,11 +194,34 @@ function Sidebar() {
             </p>
           </div>
         </div>
+
+        {onClose && (
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: C.textMuted,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <X size={16} />
+          </button>
+        )}
       </div>
 
-      <nav style={{ flex: 1, overflow: "auto", padding: "12px 10px" }}>
+      <nav
+        style={{
+          flex: 1,
+          overflow: "auto",
+          padding: "12px 10px",
+        }}
+      >
         {NAV.map((item, i) => {
-          if (!item)
+          if (!item) {
             return (
               <div
                 key={i}
@@ -112,14 +232,22 @@ function Sidebar() {
                 }}
               />
             );
+          }
 
-          const { to, icon: Icon, label, badge, accent } = item as any;
+          const {
+            to,
+            icon: Icon,
+            label,
+            badge,
+            accent,
+          } = item as any;
 
           return (
             <NavLink
               key={to}
               to={to}
               end={to.endsWith("/dashboard")}
+              onClick={onClose}
               style={({ isActive }) => ({
                 display: "flex",
                 alignItems: "center",
@@ -127,16 +255,19 @@ function Sidebar() {
                 padding: "9px 12px",
                 borderRadius: 12,
                 textDecoration: "none",
+
                 background: isActive
                   ? C.accentLight
                   : accent
                   ? C.dark + "08"
                   : "transparent",
+
                 color: isActive
                   ? C.accent
                   : accent
                   ? C.dark
                   : C.textSec,
+
                 fontFamily: F,
                 fontSize: 13,
                 fontWeight: isActive ? 600 : accent ? 600 : 400,
@@ -203,10 +334,10 @@ function Sidebar() {
   );
 }
 
-function TopBar() {
+function TopBar({ onMenu }: { onMenu: () => void }) {
   const nav = useNavigate();
 
-  const [company, setCompany] = useState<any>(null);
+  const [company, setCompany] = useState<Company | null>(null);
 
   useEffect(() => {
     getCompanyProfile()
@@ -219,17 +350,38 @@ function TopBar() {
   return (
     <div
       style={{
-        height: 60,
-        background: C.surface,
-        borderBottom: `1px solid ${C.border}`,
+        height: 64,
+        flexShrink: 0,
         display: "flex",
         alignItems: "center",
         gap: 16,
-        padding: "0 28px",
-        flexShrink: 0,
+        padding: "0 24px",
+        background: C.surface,
+        borderBottom: `1px solid ${C.border}`,
       }}
     >
-      <div style={{ flex: 1, maxWidth: 380 }}>
+      <button
+        onClick={onMenu}
+        className="lg:hidden"
+        style={{
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          color: C.textSec,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Menu size={20} />
+      </button>
+
+      <div
+        style={{
+          flex: 1,
+          maxWidth: 380,
+        }}
+      >
         <div
           style={{
             display: "flex",
@@ -241,7 +393,13 @@ function TopBar() {
             border: `1px solid ${C.border}`,
           }}
         >
-          <Search size={14} style={{ color: C.textMuted }} />
+          <Search
+            size={14}
+            style={{
+              color: C.textMuted,
+              flexShrink: 0,
+            }}
+          />
 
           <input
             placeholder="Search candidates, jobs..."
@@ -253,6 +411,7 @@ function TopBar() {
               color: C.text,
               background: "transparent",
               fontFamily: F,
+              minWidth: 0,
             }}
           />
         </div>
@@ -287,7 +446,12 @@ function TopBar() {
           Post a Job
         </button>
 
-        <NavLink to="/company/notifications" style={{ textDecoration: "none" }}>
+        <NavLink
+          to="/company/notifications"
+          style={{
+            textDecoration: "none",
+          }}
+        >
           <div
             style={{
               width: 36,
@@ -317,13 +481,15 @@ function TopBar() {
           </div>
         </NavLink>
 
-        <div
+        <NavLink
+          to="/company/profile"
           style={{
             display: "flex",
             alignItems: "center",
             gap: 8,
             padding: "4px 10px 4px 4px",
             borderRadius: 12,
+            textDecoration: "none",
           }}
         >
           <div
@@ -335,11 +501,31 @@ function TopBar() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              overflow: "hidden",
             }}
           >
-            <span style={{ fontSize: 11, fontWeight: 900, color: "#fff", fontFamily: F }}>
-              {companyName.substring(0, 2).toUpperCase()}
-            </span>
+            {company?.logo ? (
+              <img
+                src={company.logo}
+                alt={companyName}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                }}
+              />
+            ) : (
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 900,
+                  color: "#fff",
+                  fontFamily: F,
+                }}
+              >
+                {companyName.substring(0, 2).toUpperCase()}
+              </span>
+            )}
           </div>
 
           <div className="hidden sm:block">
@@ -366,45 +552,76 @@ function TopBar() {
               Recruiter
             </p>
           </div>
-        </div>
+        </NavLink>
       </div>
     </div>
   );
 }
 
 export default function CompanyLayout() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   const { role } = useAuth();
   const nav = useNavigate();
 
+  useEffect(() => {
+    if (role !== "company") {
+      nav("/login");
+    }
+  }, [role, nav]);
+
   if (role !== "company") {
-    nav("/login");
     return null;
   }
 
   return (
     <div
       style={{
+        minHeight: "100vh",
         display: "flex",
-        height: "100vh",
-        overflow: "hidden",
         background: C.bg,
-        fontFamily: F,
       }}
     >
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       <div
+        className="hidden lg:flex"
         style={{
           width: 256,
           flexShrink: 0,
           background: C.surface,
           borderRight: `1px solid ${C.border}`,
-          display: "flex",
           flexDirection: "column",
           overflow: "hidden",
           height: "100vh",
+          position: "sticky",
+          top: 0,
         }}
       >
         <Sidebar />
       </div>
+
+      {sidebarOpen && (
+        <div
+          className="fixed left-0 top-0 bottom-0 z-50 lg:hidden"
+          style={{
+            width: 272,
+            maxWidth: "85vw",
+            background: C.surface,
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "4px 0 24px rgba(0,0,0,0.12)",
+            overflow: "hidden",
+          }}
+        >
+          <Sidebar onClose={() => setSidebarOpen(false)} />
+        </div>
+      )}
 
       <div
         style={{
@@ -413,15 +630,16 @@ export default function CompanyLayout() {
           flexDirection: "column",
           overflow: "hidden",
           minWidth: 0,
+          minHeight: "100vh",
         }}
       >
-        <TopBar />
+        <TopBar onMenu={() => setSidebarOpen(true)} />
 
         <main
           style={{
             flex: 1,
             overflow: "auto",
-            padding: 32,
+            padding: "32px",
             background: C.bg,
           }}
         >
@@ -429,6 +647,7 @@ export default function CompanyLayout() {
             style={{
               maxWidth: 1200,
               margin: "0 auto",
+              width: "100%",
             }}
           >
             <Outlet />

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Briefcase, MapPin, Clock, Heart } from "lucide-react";
 import { C, F } from "../../constants/tokens";
-import { MatchRing, SBadge, Btn } from "../ui";
+import { SBadge, Btn } from "../ui";
 import { API } from "../../imports/api";
 
 interface JobCardProps {
@@ -11,8 +11,15 @@ interface JobCardProps {
   showMatch?: boolean;
 }
 
-export function JobCard({ job, onView, onSave, showMatch = true }: JobCardProps) {
-  const [isSaved, setIsSaved] = useState<boolean>(Boolean(job?.saved || job?.is_saved));
+export function JobCard({
+  job,
+  onView,
+  onSave,
+  showMatch = true,
+}: JobCardProps) {
+  const [isSaved, setIsSaved] = useState(
+    Boolean(job?.saved || job?.is_saved)
+  );
 
   const companyName =
     job?.company?.company_name ||
@@ -55,7 +62,13 @@ export function JobCard({ job, onView, onSave, showMatch = true }: JobCardProps)
   const tagsArray = Array.isArray(job?.tags)
     ? job.tags
     : typeof job?.tags === "string"
-    ? JSON.parse(job.tags)
+    ? (() => {
+        try {
+          return JSON.parse(job.tags);
+        } catch {
+          return [];
+        }
+      })()
     : ["Laravel", "Backend"];
 
   const handleToggleSave = async (e: React.MouseEvent) => {
@@ -75,10 +88,8 @@ export function JobCard({ job, onView, onSave, showMatch = true }: JobCardProps)
       }
 
       onSave?.(job.id, newState);
-
     } catch (error) {
       console.error("Save job error:", error);
-
       setIsSaved(!newState);
     }
   };
@@ -86,19 +97,21 @@ export function JobCard({ job, onView, onSave, showMatch = true }: JobCardProps)
   return (
     <div
       style={{
-        padding: 24,
-        borderRadius: 20,
+        padding: 20,
+        borderRadius: 16,
         border: `1px solid ${C.border}`,
         background: C.surface,
         cursor: "pointer",
-        transition: "all 0.15s"
+        transition: "all 0.15s ease",
+        minHeight: 0,
       }}
       onClick={onView}
-      onMouseEnter={e => {
-        e.currentTarget.style.boxShadow = "0 8px 28px rgba(0,0,0,0.08)";
+      onMouseEnter={(e) => {
+        e.currentTarget.style.boxShadow =
+          "0 8px 24px rgba(0,0,0,0.07)";
         e.currentTarget.style.borderColor = jobColor + "40";
       }}
-      onMouseLeave={e => {
+      onMouseLeave={(e) => {
         e.currentTarget.style.boxShadow = "none";
         e.currentTarget.style.borderColor = C.border;
       }}
@@ -107,23 +120,23 @@ export function JobCard({ job, onView, onSave, showMatch = true }: JobCardProps)
         style={{
           display: "flex",
           alignItems: "flex-start",
-          gap: 14,
-          marginBottom: 14
+          gap: 12,
+          marginBottom: 14,
         }}
       >
         <div
           style={{
-            width: 48,
-            height: 48,
-            borderRadius: 14,
+            width: 44,
+            height: 44,
+            borderRadius: 12,
             background: jobColor + "18",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            flexShrink: 0
+            flexShrink: 0,
           }}
         >
-          <Briefcase size={20} style={{ color: jobColor }} />
+          <Briefcase size={19} style={{ color: jobColor }} />
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -131,9 +144,9 @@ export function JobCard({ job, onView, onSave, showMatch = true }: JobCardProps)
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 8,
+              gap: 7,
               marginBottom: 3,
-              flexWrap: "wrap"
+              flexWrap: "wrap",
             }}
           >
             <p
@@ -142,7 +155,7 @@ export function JobCard({ job, onView, onSave, showMatch = true }: JobCardProps)
                 fontWeight: 700,
                 color: C.text,
                 margin: 0,
-                fontFamily: F
+                fontFamily: F,
               }}
             >
               {title}
@@ -156,7 +169,7 @@ export function JobCard({ job, onView, onSave, showMatch = true }: JobCardProps)
               fontSize: 13,
               color: C.textSec,
               margin: 0,
-              fontFamily: F
+              fontFamily: F,
             }}
           >
             {companyName}
@@ -165,19 +178,19 @@ export function JobCard({ job, onView, onSave, showMatch = true }: JobCardProps)
           <div
             style={{
               display: "flex",
-              gap: 12,
-              marginTop: 4,
-              flexWrap: "wrap"
+              gap: 10,
+              marginTop: 5,
+              flexWrap: "wrap",
             }}
           >
             <span
               style={{
-                fontSize: 12,
+                fontSize: 11.5,
                 color: C.textMuted,
                 display: "flex",
                 alignItems: "center",
                 gap: 3,
-                fontFamily: F
+                fontFamily: F,
               }}
             >
               <MapPin size={11} />
@@ -186,42 +199,35 @@ export function JobCard({ job, onView, onSave, showMatch = true }: JobCardProps)
 
             <span
               style={{
-                fontSize: 12,
+                fontSize: 11.5,
                 color: C.textMuted,
-                fontFamily: F
+                fontFamily: F,
               }}
             >
               {empType} · {workMode}
             </span>
           </div>
         </div>
-
-        {showMatch && (
-          <MatchRing
-            v={matchScore}
-            sz={50}
-          />
-        )}
       </div>
 
       <div
         style={{
           display: "flex",
-          gap: 6,
-          marginBottom: 14,
-          flexWrap: "wrap"
+          gap: 5,
+          marginBottom: 16,
+          flexWrap: "wrap",
         }}
       >
         {tagsArray.map((t: string) => (
           <span
             key={t}
             style={{
-              padding: "3px 10px",
+              padding: "4px 9px",
               borderRadius: 7,
               background: C.divider,
-              fontSize: 12,
+              fontSize: 11.5,
               color: C.textSec,
-              fontFamily: F
+              fontFamily: F,
             }}
           >
             {t}
@@ -233,15 +239,16 @@ export function JobCard({ job, onView, onSave, showMatch = true }: JobCardProps)
         style={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between"
+          justifyContent: "space-between",
+          gap: 10,
         }}
       >
         <span
           style={{
-            fontSize: 14,
+            fontSize: 13,
             fontWeight: 700,
             color: C.text,
-            fontFamily: F
+            fontFamily: F,
           }}
         >
           {salary}
@@ -250,18 +257,18 @@ export function JobCard({ job, onView, onSave, showMatch = true }: JobCardProps)
         <div
           style={{
             display: "flex",
-            gap: 8,
-            alignItems: "center"
+            gap: 7,
+            alignItems: "center",
           }}
         >
           <span
             style={{
-              fontSize: 11,
+              fontSize: 10.5,
               color: C.textMuted,
               display: "flex",
               alignItems: "center",
               gap: 3,
-              fontFamily: F
+              fontFamily: F,
             }}
           >
             <Clock size={11} />
@@ -272,11 +279,13 @@ export function JobCard({ job, onView, onSave, showMatch = true }: JobCardProps)
             <button
               onClick={handleToggleSave}
               style={{
-                padding: "5px 12px",
+                padding: "5px 10px",
                 borderRadius: 8,
-                fontSize: 12,
+                fontSize: 11.5,
                 fontWeight: 600,
-                border: `1px solid ${isSaved ? C.accent : C.border}`,
+                border: `1px solid ${
+                  isSaved ? C.accent : C.border
+                }`,
                 background: "transparent",
                 cursor: "pointer",
                 color: isSaved ? C.accent : C.textSec,
@@ -284,13 +293,13 @@ export function JobCard({ job, onView, onSave, showMatch = true }: JobCardProps)
                 display: "flex",
                 alignItems: "center",
                 gap: 5,
-                transition: "all 0.15s ease"
+                transition: "all 0.15s ease",
               }}
             >
-              <Heart 
-                size={12} 
-                fill={isSaved ? C.accent : "none"} 
-                color={isSaved ? C.accent : C.textSec} 
+              <Heart
+                size={12}
+                fill={isSaved ? C.accent : "none"}
+                color={isSaved ? C.accent : C.textSec}
               />
               {isSaved ? "Saved" : "Save"}
             </button>
@@ -298,7 +307,7 @@ export function JobCard({ job, onView, onSave, showMatch = true }: JobCardProps)
 
           <Btn
             size="sm"
-            onClick={e => {
+            onClick={(e) => {
               e.stopPropagation();
               onView();
             }}

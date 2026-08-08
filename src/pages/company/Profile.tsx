@@ -1,8 +1,18 @@
 import { useEffect, useState } from "react";
 import { C, F } from "../../constants/tokens";
 import { Btn, SBadge } from "../../components/ui";
-import { BadgeCheck, MapPin, Globe, Users, Building2 } from "lucide-react";
-import { getCompanyProfile, updateCompanyProfile, getCompanyJobs } from "../../imports/api";
+import {
+  BadgeCheck,
+  MapPin,
+  Globe,
+  Users,
+  Building2,
+} from "lucide-react";
+import {
+  getCompanyProfile,
+  updateCompanyProfile,
+  getCompanyJobs,
+} from "../../imports/api";
 
 const TABS = ["Overview", "Culture", "Open Roles"] as const;
 
@@ -11,7 +21,7 @@ export default function CompanyProfile() {
   const [editing, setEditing] = useState(false);
 
   const [company, setCompany] = useState<any>(null);
- const [jobs, setJobs] = useState<any[]>([]);
+  const [jobs, setJobs] = useState<any[]>([]);
   const [logo, setLogo] = useState<File | null>(null);
 
   const [form, setForm] = useState({
@@ -48,12 +58,10 @@ export default function CompanyProfile() {
         stage: data.stage || "",
         founded_year: data.founded || "",
       });
-
     } catch (error) {
       console.log(error);
     }
   };
-
 
   const loadJobs = async () => {
     try {
@@ -64,57 +72,53 @@ export default function CompanyProfile() {
     }
   };
 
-
   const handleChange = (e: any) => {
     setForm({
       ...form,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     });
   };
 
-
   const saveProfile = async () => {
-  console.log("SAVE CLICKED");
+    console.log("SAVE CLICKED");
 
-  try {
-    const formData = new FormData();
+    try {
+      const formData = new FormData();
 
-    Object.entries(form).forEach(([key, value]) => {
-      formData.append(key, value);
-    });
+      Object.entries(form).forEach(([key, value]) => {
+        formData.append(key, value);
+      });
 
-    if (logo) {
-      formData.append("logo", logo);
+      if (logo) {
+        formData.append("logo", logo);
+      }
+
+      console.log("FORM DATA:");
+
+      for (const pair of formData.entries()) {
+        console.log(pair[0], pair[1]);
+      }
+
+      const response = await updateCompanyProfile(formData);
+
+      console.log("RESPONSE:", response);
+      console.log("UPDATED COMPANY:", response.company);
+
+      await loadCompany();
+      setEditing(false);
+      setLogo(null);
+    } catch (error: any) {
+      console.log("ERROR:", error);
+      console.log("ERROR RESPONSE:", error.response?.data);
     }
-
-    console.log("FORM DATA:");
-    for (let pair of formData.entries()) {
-      console.log(pair[0], pair[1]);
-    }
-
-    const response = await updateCompanyProfile(formData);
-
-    console.log("RESPONSE:", response);
-console.log("UPDATED COMPANY:", response.company);
-
-   await loadCompany();
-    setEditing(false);
-
-  } catch (error: any) {
-    console.log("ERROR:", error);
-    console.log("ERROR RESPONSE:", error.response?.data);
-  }
-};
-
+  };
 
   if (!company) {
     return <div>Loading...</div>;
   }
 
-
   return (
     <div style={{ fontFamily: F, color: C.text }}>
-
       <div
         style={{
           background: C.surface,
@@ -122,19 +126,17 @@ console.log("UPDATED COMPANY:", response.company);
           overflow: "hidden",
           border: `1px solid ${C.border}`,
           marginBottom: 24,
-          padding: 24
+          padding: 24,
         }}
       >
-
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "flex-start",
-            marginBottom: 16
+            marginBottom: 16,
           }}
         >
-
           <div
             style={{
               width: 64,
@@ -144,14 +146,13 @@ console.log("UPDATED COMPANY:", response.company);
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              overflow: "hidden"
+              overflow: "hidden",
             }}
           >
-
-{company.logo ? (
+            {company.logo ? (
               <img
                 src={
-                  company.logo?.startsWith("http")
+                  company.logo.startsWith("http")
                     ? company.logo
                     : `http://127.0.0.1:8000/storage/${company.logo}`
                 }
@@ -159,7 +160,7 @@ console.log("UPDATED COMPANY:", response.company);
                 style={{
                   width: "100%",
                   height: "100%",
-                  objectFit: "cover"
+                  objectFit: "cover",
                 }}
               />
             ) : (
@@ -167,15 +168,13 @@ console.log("UPDATED COMPANY:", response.company);
                 style={{
                   fontWeight: 800,
                   fontSize: 24,
-                  color: C.accent
+                  color: C.accent,
                 }}
               >
                 {company.name?.substring(0, 1)}
               </span>
             )}
-
           </div>
-
 
           <Btn
             v="primary"
@@ -184,34 +183,28 @@ console.log("UPDATED COMPANY:", response.company);
           >
             {editing ? "Cancel" : "Edit Profile"}
           </Btn>
-
-
         </div>
 
-
         <div>
-
           <div
             style={{
               display: "flex",
               alignItems: "center",
               gap: 10,
-              marginBottom: 4
+              marginBottom: 4,
             }}
           >
-
             <h1
               style={{
                 fontSize: 22,
                 fontWeight: 700,
-                margin: 0
+                margin: 0,
               }}
             >
               {company.name}
             </h1>
 
             <BadgeCheck size={18} color={C.info} />
-
 
             <span
               style={{
@@ -220,121 +213,111 @@ console.log("UPDATED COMPANY:", response.company);
                 color: C.info,
                 background: C.infoBg,
                 padding: "2px 8px",
-                borderRadius: 99
+                borderRadius: 99,
               }}
             >
               Verified
             </span>
-
           </div>
-
 
           <p
             style={{
               color: C.textSec,
               margin: "0 0 10px",
-              fontSize: 14
+              fontSize: 14,
             }}
           >
             {company.industry} · {company.stage}
           </p>
 
-
           <div
             style={{
               display: "flex",
               gap: 16,
-              flexWrap: "wrap"
+              flexWrap: "wrap",
             }}
           >
-
             <span
               style={{
                 color: C.textSec,
-                fontSize: 13,
-                display: "flex",
-                alignItems: "center",
-                gap: 4
-              }}
-            >
-              <MapPin size={13} />
-              {company.location}
-            </span>
-
-
-            <span
-              style={{
-                color: C.textSec,
-                fontSize: 13,
-                display: "flex",
-                alignItems: "center",
-                gap: 4
-              }}
-            >
-              <Users size={13} />
-              {company.size}
-            </span>
-
-
-            <a
-              href={`https://${company.website}`}
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                color: C.accent,
                 fontSize: 13,
                 display: "flex",
                 alignItems: "center",
                 gap: 4,
-                textDecoration: "none"
               }}
             >
-              <Globe size={13} />
-              {company.website}
-            </a>
+              {company.location}
+            </span>
 
+            <span
+              style={{
+                color: C.textSec,
+                fontSize: 13,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              {company.size}
+            </span>
 
+            {company.website && (
+              <a
+                href={
+                  company.website.startsWith("http")
+                    ? company.website
+                    : `https://${company.website}`
+                }
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  color: C.accent,
+                  fontSize: 13,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  textDecoration: "none",
+                }}
+              >
+                {company.website}
+              </a>
+            )}
           </div>
-
         </div>
-
       </div>
-            {editing && (
+
+      {editing && (
         <div
           style={{
             background: C.surface,
             borderRadius: 20,
             padding: 24,
             border: `1px solid ${C.accent}`,
-            marginBottom: 24
+            marginBottom: 24,
           }}
         >
-
           <h3
             style={{
               fontSize: 14,
               fontWeight: 700,
-              margin: "0 0 16px"
+              margin: "0 0 16px",
             }}
           >
             Edit Company Info
           </h3>
 
-
           <div style={{ marginBottom: 14 }}>
-
             <label
               style={{
                 fontSize: 12,
                 fontWeight: 600,
                 color: C.textSec,
                 display: "block",
-                marginBottom: 6
+                marginBottom: 6,
               }}
             >
               Logo
             </label>
-
 
             <input
               type="file"
@@ -351,69 +334,58 @@ console.log("UPDATED COMPANY:", response.company);
                 border: `1px solid ${C.border}`,
                 fontFamily: F,
                 fontSize: 13,
-                background: C.bg
+                background: C.bg,
               }}
             />
-
           </div>
-
 
           <div
             style={{
               display: "grid",
               gridTemplateColumns: "1fr 1fr",
-              gap: 14
+              gap: 14,
             }}
           >
-
             {Object.keys(form).map((key) => (
-
               <div key={key}>
-
                 <label
                   style={{
                     fontSize: 12,
                     fontWeight: 600,
                     color: C.textSec,
                     display: "block",
-                    marginBottom: 6
+                    marginBottom: 6,
                   }}
                 >
                   {key.replaceAll("_", " ")}
+
+                  <input
+                    name={key}
+                    value={(form as any)[key] || ""}
+                    onChange={handleChange}
+                    style={{
+                      width: "100%",
+                      padding: "10px 14px",
+                      borderRadius: 10,
+                      border: `1px solid ${C.border}`,
+                      fontFamily: F,
+                      fontSize: 13,
+                      boxSizing: "border-box",
+                      background: C.bg,
+                    }}
+                  />
                 </label>
-
-
-                <input
-                  name={key}
-                  value={(form as any)[key] || ""}
-                  onChange={handleChange}
-                  style={{
-                    width: "100%",
-                    padding: "10px 14px",
-                    borderRadius: 10,
-                    border: `1px solid ${C.border}`,
-                    fontFamily: F,
-                    fontSize: 13,
-                    boxSizing: "border-box",
-                    background: C.bg
-                  }}
-                />
-
               </div>
-
             ))}
-
           </div>
-
 
           <div
             style={{
               marginTop: 14,
               display: "flex",
-              gap: 10
+              gap: 10,
             }}
           >
-
             <Btn
               v="primary"
               onClick={saveProfile}
@@ -421,40 +393,36 @@ console.log("UPDATED COMPANY:", response.company);
               Save Changes
             </Btn>
 
-
             <Btn
               v="outline"
-              onClick={() => setEditing(false)}
+              onClick={() => {
+                setEditing(false);
+                setLogo(null);
+              }}
             >
               Cancel
             </Btn>
-
           </div>
-
         </div>
       )}
-
 
       <div
         style={{
           background: C.surface,
           borderRadius: 20,
           border: `1px solid ${C.border}`,
-          overflow: "hidden"
+          overflow: "hidden",
         }}
       >
-
         <div
           style={{
             display: "flex",
             gap: 4,
             padding: "16px 20px",
-            borderBottom: `1px solid ${C.divider}`
+            borderBottom: `1px solid ${C.divider}`,
           }}
         >
-
           {TABS.map((t) => (
-
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -467,326 +435,301 @@ console.log("UPDATED COMPANY:", response.company);
                 cursor: "pointer",
                 border: "none",
                 background: tab === t ? C.accent : "transparent",
-                color: tab === t ? "#fff" : C.textSec
+                color: tab === t ? "#fff" : C.textSec,
               }}
             >
               {t}
             </button>
-
           ))}
-
         </div>
 
-
         <div style={{ padding: 24 }}>
-
-          {tab === "Overview" && (
-
+                    {tab === "Overview" && (
             <div>
-
               <h3
                 style={{
                   fontSize: 14,
                   fontWeight: 700,
-                  marginBottom: 10
+                  marginBottom: 10,
                 }}
               >
                 About
               </h3>
-
 
               <p
                 style={{
                   color: C.textSec,
                   fontSize: 14,
                   lineHeight: 1.75,
-                  marginBottom: 24
+                  marginBottom: 24,
                 }}
               >
                 {company.about}
               </p>
 
-
               <h3
                 style={{
                   fontSize: 14,
                   fontWeight: 700,
-                  marginBottom: 14
+                  marginBottom: 14,
                 }}
               >
                 Company Details
               </h3>
 
-
               <div
                 style={{
                   display: "grid",
                   gridTemplateColumns: "repeat(3,1fr)",
-                  gap: 14
+                  gap: 14,
                 }}
               >
-
                 {[
                   {
                     icon: Building2,
                     label: "Industry",
-                    value: company.industry
+                    value: company.industry,
                   },
                   {
                     icon: Users,
                     label: "Size",
-                    value: company.size
+                    value: company.size,
                   },
                   {
                     icon: MapPin,
                     label: "Location",
-                    value: company.location
+                    value: company.location,
                   },
                   {
                     icon: Globe,
                     label: "Website",
-                    value: company.website
+                    value: company.website,
                   },
                   {
                     icon: BadgeCheck,
                     label: "Stage",
-                    value: company.stage
+                    value: company.stage,
                   },
                   {
                     icon: Building2,
                     label: "Founded",
-                    value: company.founded
-                  }
-
+                    value: company.founded,
+                  },
                 ].map(({ icon: Icon, label, value }) => (
-
                   <div
                     key={label}
                     style={{
                       padding: 16,
                       border: `1px solid ${C.border}`,
-                      borderRadius: 12
+                      borderRadius: 12,
                     }}
                   >
-
                     <div
                       style={{
                         display: "flex",
                         gap: 8,
                         alignItems: "center",
-                        marginBottom: 4
+                        marginBottom: 4,
                       }}
                     >
-
                       <Icon size={13} color={C.textSec} />
 
                       <span
                         style={{
                           fontSize: 11,
                           color: C.textMuted,
-                          fontWeight: 600
+                          fontWeight: 600,
                         }}
                       >
                         {label}
                       </span>
-
                     </div>
-
 
                     <p
                       style={{
                         margin: 0,
                         fontSize: 13,
-                        fontWeight: 600
+                        fontWeight: 600,
                       }}
                     >
-                      {value}
+                      {value || "-"}
                     </p>
-
                   </div>
-
                 ))}
-
               </div>
-
             </div>
-
           )}
 
-
           {tab === "Culture" && (
-
             <div>
-
               <h3
                 style={{
                   fontSize: 14,
                   fontWeight: 700,
-                  marginBottom: 12
+                  marginBottom: 12,
                 }}
               >
                 Our Values
               </h3>
 
-
-              {(company.values || []).map((v: string) => (
-
-                <div
-                  key={v}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    marginBottom: 8,
-                    color: C.textSec
-                  }}
-                >
-
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                  marginBottom: 24,
+                }}
+              >
+                {(company.values || []).map((v: string) => (
                   <div
+                    key={v}
                     style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: "50%",
-                      background: C.accent
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      fontSize: 14,
+                      color: C.textSec,
                     }}
-                  />
+                  >
+                    <div
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        background: C.accent,
+                        flexShrink: 0,
+                      }}
+                    />
 
-                  {v}
-
-                </div>
-
-              ))}
-
+                    {v}
+                  </div>
+                ))}
+              </div>
 
               <h3
                 style={{
                   fontSize: 14,
                   fontWeight: 700,
-                  marginTop: 24,
-                  marginBottom: 12
+                  marginBottom: 12,
                 }}
               >
                 Benefits
               </h3>
 
-
-              {(company.benefits || []).map((b: string) => (
-
-                <div
-                  key={b}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                    marginBottom: 8,
-                    color: C.textSec
-                  }}
-                >
-
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
+                {(company.benefits || []).map((b: string) => (
                   <div
+                    key={b}
                     style={{
-                      width: 6,
-                      height: 6,
-                      borderRadius: "50%",
-                      background: C.accent
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      fontSize: 14,
+                      color: C.textSec,
                     }}
-                  />
+                  >
+                    <div
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: "50%",
+                        background: C.accent,
+                        flexShrink: 0,
+                      }}
+                    />
 
-                  {b}
-
-                </div>
-
-              ))}
-
+                    {b}
+                  </div>
+                ))}
+              </div>
             </div>
-
           )}
 
-
           {tab === "Open Roles" && (
-
             <div
               style={{
                 display: "flex",
                 flexDirection: "column",
-                gap: 10
+                gap: 10,
               }}
             >
-
-              {jobs.map((job: any) => (
-
-                <div
-                  key={job.id}
+              {jobs.length === 0 ? (
+                <p
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 14,
-                    padding: 16,
-                    border: `1px solid ${C.border}`,
-                    borderRadius: 14
+                    color: C.textSec,
+                    fontSize: 14,
+                    margin: 0,
                   }}
                 >
-
-                  <div>
-
-                    <p
-                      style={{
-                        margin: 0,
-                        fontWeight: 600,
-                        fontSize: 14
-                      }}
-                    >
-                      {job.title}
-                    </p>
-
-
-                    <p
-                      style={{
-                        margin: 0,
-                        fontSize: 12,
-                        color: C.textSec
-                      }}
-                    >
-                      {job.location} · {job.type} · {job.mode}
-                    </p>
-
-                  </div>
-
-
+                  No open roles available.
+                </p>
+              ) : (
+                jobs.map((job: any) => (
                   <div
+                    key={job.id}
                     style={{
-                      marginLeft: "auto",
                       display: "flex",
-                      gap: 10,
-                      alignItems: "center"
+                      alignItems: "center",
+                      gap: 14,
+                      padding: 16,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 14,
                     }}
                   >
+                    <div>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontWeight: 600,
+                          fontSize: 14,
+                        }}
+                      >
+                        {job.title}
+                      </p>
 
-                    <SBadge s={job.status} />
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 12,
+                          color: C.textSec,
+                        }}
+                      >
+                        {job.location} · {job.type} · {job.mode}
+                      </p>
+                    </div>
 
-                    <span
+                    <div
                       style={{
-                        fontSize: 12,
-                        color: C.textSec
+                        marginLeft: "auto",
+                        display: "flex",
+                        gap: 10,
+                        alignItems: "center",
                       }}
                     >
-                      {job.applicants} applicants
-                    </span>
+                      <SBadge s={job.status} />
 
+                      <span
+                        style={{
+                          fontSize: 12,
+                          color: C.textSec,
+                        }}
+                      >
+                        {job.applicants} applicants
+                      </span>
+                    </div>
                   </div>
-
-                </div>
-
-              ))}
-
+                ))
+              )}
             </div>
-
           )}
-
         </div>
-
       </div>
-
     </div>
   );
 }
