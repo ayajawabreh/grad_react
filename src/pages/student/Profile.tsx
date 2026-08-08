@@ -14,6 +14,7 @@ export default function StudentProfile() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [logo, setLogo] = useState<File | null>(null);
 
   useEffect(() => {
     fetchProfile();
@@ -93,48 +94,48 @@ export default function StudentProfile() {
       )}
 
       <div style={{ background: C.surface, borderRadius: 20, overflow: "hidden", border: `1px solid ${C.border}`, marginBottom: 24 }}>
-        <div style={{ height: 140, background: `linear-gradient(135deg, ${C.dark} 0%, ${C.darker} 100%)`, position: "relative" }}>
-          <Btn
-            v="outline"
-            size="sm"
-            style={{ position: "absolute", top: 16, right: 16, color: "#fff", border: "1px solid rgba(255,255,255,0.3)" }}
-            onClick={() => setShowEditModal(true)}
-          >
-            Edit Profile
-          </Btn>
-        </div>
-        <div style={{ padding: "0 28px 24px", position: "relative" }}>
-          <img
-            src={student.avatar || "https://via.placeholder.com/88"}
-            alt={student.name}
-            style={{ width: 88, height: 88, borderRadius: "50%", border: `4px solid ${C.surface}`, position: "absolute", top: -44, objectFit: "cover" }}
-          />
-          <div style={{ paddingTop: 52 }}>
-            <h1 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 4px" }}>{student.name}</h1>
-            <p style={{ color: C.textSec, margin: "0 0 8px", fontSize: 14 }}>{student.headline}</p>
-            <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-              <span style={{ color: C.textSec, fontSize: 13, display: "flex", alignItems: "center", gap: 4 }}>
-                <GraduationCap size={13} />
-                {student.univ}
-              </span>
-              <span style={{ color: C.textSec, fontSize: 13, display: "flex", alignItems: "center", gap: 4 }}>
-                <MapPin size={13} />
-                {student.location}
-              </span>
-              {student.portfolio && (
-                <a
-                  href={`https://${student.portfolio}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ color: C.accent, fontSize: 13, display: "flex", alignItems: "center", gap: 4, textDecoration: "none" }}
-                >
-                  <ExternalLink size={13} />
-                  {student.portfolio}
-                </a>
-              )}
-            </div>
-          </div>
-        </div>
+       <div style={{ background: C.surface, borderRadius: 20, border: `1px solid ${C.border}`, marginBottom: 24, padding: 28, position: "relative" }}>
+  <Btn
+    v="outline"
+    size="sm"
+    style={{ position: "absolute", top: 24, right: 28 }}
+    onClick={() => setShowEditModal(true)}
+  >
+    Edit Profile
+  </Btn>
+  
+  <img
+    src={student.avatar || "https://via.placeholder.com/88"}
+    alt={student.name}
+    style={{ width: 88, height: 88, borderRadius: "50%", objectFit: "cover", marginBottom: 16 }}
+  />
+  
+  <div>
+    <h1 style={{ fontSize: 22, fontWeight: 700, margin: "0 0 4px" }}>{student.name}</h1>
+    <p style={{ color: C.textSec, margin: "0 0 8px", fontSize: 14 }}>{student.headline}</p>
+    <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
+      <span style={{ color: C.textSec, fontSize: 13, display: "flex", alignItems: "center", gap: 4 }}>
+        <GraduationCap size={13} />
+        {student.univ}
+      </span>
+      <span style={{ color: C.textSec, fontSize: 13, display: "flex", alignItems: "center", gap: 4 }}>
+        <MapPin size={13} />
+        {student.location}
+      </span>
+      {student.portfolio && (
+        <a
+          href={`https://${student.portfolio}`}
+          target="_blank"
+          rel="noreferrer"
+          style={{ color: C.accent, fontSize: 13, display: "flex", alignItems: "center", gap: 4, textDecoration: "none" }}
+        >
+          <ExternalLink size={13} />
+          {student.portfolio}
+        </a>
+      )}
+    </div>
+  </div>
+</div>
       </div>
 
       <div style={{ background: C.surface, borderRadius: 16, padding: "16px 20px", border: `1px solid ${C.border}`, marginBottom: 24 }}>
@@ -173,52 +174,70 @@ export default function StudentProfile() {
 
         <div style={{ padding: 24 }}>
           {tab === "Overview" && (
-            <div>
-              <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>About</h3>
-              <p style={{ color: C.textSec, fontSize: 14, lineHeight: 1.7, marginBottom: 24 }}>{student.bio || "No bio available."}</p>
+  <div>
+    <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 10 }}>About</h3>
+    <p style={{ color: C.textSec, fontSize: 14, lineHeight: 1.7, marginBottom: 0 }}>{student.bio || "No bio available."}</p>
+  </div>
+)}
 
-              <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Experience</h3>
-              {Array.isArray(student.experiences) && student.experiences.length > 0 ? (<div style={{ display: "flex", gap: 14, marginBottom: 18 }}>
-                <div
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 10,
-                    background: C.accentLight,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexShrink: 0,
-                  }}
-                >
-                  <Briefcase size={16} color={C.accent} />
-                </div>
-                <p style={{ margin: 0, color: C.textSec, fontSize: 14, lineHeight: 1.6 }}>{student.experiences}</p>
-              </div>
-              ) : (
-                <p style={{ color: C.textSec, fontSize: 14 }}>No experiences listed.</p>
+        {tab === "Experience" && (
+  <div>
+    {Array.isArray(student.experiences) && student.experiences.length > 0 ? (
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {student.experiences.map((exp: any) => (
+          <div
+            key={exp.id}
+            style={{
+              display: "flex",
+              gap: 14,
+              padding: 18,
+              border: `1px solid ${C.border}`,
+              borderRadius: 14,
+            }}
+          >
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: 12,
+                background: C.accentLight,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <Briefcase size={18} color={C.accent} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: 15 }}>
+                {exp.position || exp.job_title || "Experience"}
+              </p>
+              <p style={{ margin: "3px 0 0", fontSize: 13, color: C.textSec, fontWeight: 600 }}>
+                {exp.company}
+                {(exp.start_date || exp.end_date) && (
+                  <span style={{ fontWeight: 400 }}>
+                    {" · "}
+                    {exp.start_date}
+                    {exp.start_date && exp.end_date ? " - " : ""}
+                    {exp.end_date}
+                  </span>
+                )}
+              </p>
+              {exp.description && (
+                <p style={{ margin: "10px 0 0", fontSize: 13.5, color: C.textSec, lineHeight: 1.7 }}>
+                  {exp.description}
+                </p>
               )}
             </div>
-          )}
-
-          {tab === "Experience" && (
-            <div>
-              {Array.isArray(student.experiences) && student.experiences.length > 0 ? (
-                <div style={{ padding: 20, border: `1px solid ${C.border}`, borderRadius: 14 }}>
-                  <>
-                    {student.experiences.map((exp: any) => (
-                      <div key={exp.id} style={{ marginBottom: 16 }}>
-                        <p><strong>{exp.job_title || exp.position || "Experience"}</strong></p>
-                        <p>{exp.company}</p>
-                        <p>{exp.description}</p>
-                      </div>
-                    ))}
-                  </>                </div>
-              ) : (
-                <p style={{ color: C.textSec, fontSize: 14 }}>No experiences listed.</p>
-              )}
-            </div>
-          )}
+          </div>
+        ))}
+      </div>
+    ) : (
+      <p style={{ color: C.textSec, fontSize: 14 }}>No experiences listed.</p>
+    )}
+  </div>
+)}
 
           {tab === "Education" && (
             <div style={{ padding: 20, border: `1px solid ${C.border}`, borderRadius: 14 }}>

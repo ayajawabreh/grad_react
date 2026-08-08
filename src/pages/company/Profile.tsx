@@ -11,9 +11,10 @@ export default function CompanyProfile() {
   const [editing, setEditing] = useState(false);
 
   const [company, setCompany] = useState<any>(null);
-  const [jobs, setJobs] = useState<any[]>([]);
+ const [jobs, setJobs] = useState<any[]>([]);
+  const [logo, setLogo] = useState<File | null>(null);
 
-  const [form, setForm] = useState<any>({
+  const [form, setForm] = useState({
     company_name: "",
     industry: "",
     description: "",
@@ -53,15 +54,16 @@ export default function CompanyProfile() {
     }
   };
 
+
   const loadJobs = async () => {
     try {
       const data = await getCompanyJobs();
       setJobs(data);
-
     } catch (error) {
       console.log(error);
     }
   };
+
 
   const handleChange = (e: any) => {
     setForm({
@@ -70,59 +72,110 @@ export default function CompanyProfile() {
     });
   };
 
+
   const saveProfile = async () => {
-    try {
-      const response = await updateCompanyProfile(form);
+  console.log("SAVE CLICKED");
 
-      setCompany(response.company);
+  try {
+    const formData = new FormData();
 
-      setEditing(false);
+    Object.entries(form).forEach(([key, value]) => {
+      formData.append(key, value);
+    });
 
-    } catch (error) {
-      console.log(error);
+    if (logo) {
+      formData.append("logo", logo);
     }
-  };
+
+    console.log("FORM DATA:");
+    for (let pair of formData.entries()) {
+      console.log(pair[0], pair[1]);
+    }
+
+    const response = await updateCompanyProfile(formData);
+
+    console.log("RESPONSE:", response);
+console.log("UPDATED COMPANY:", response.company);
+
+   await loadCompany();
+    setEditing(false);
+
+  } catch (error: any) {
+    console.log("ERROR:", error);
+    console.log("ERROR RESPONSE:", error.response?.data);
+  }
+};
+
 
   if (!company) {
     return <div>Loading...</div>;
   }
 
+
   return (
     <div style={{ fontFamily: F, color: C.text }}>
 
-      <div style={{
-        background: C.surface,
-        borderRadius: 20,
-        overflow: "hidden",
-        border: `1px solid ${C.border}`,
-        marginBottom: 24,
-        padding: 24
-      }}>
+      <div
+        style={{
+          background: C.surface,
+          borderRadius: 20,
+          overflow: "hidden",
+          border: `1px solid ${C.border}`,
+          marginBottom: 24,
+          padding: 24
+        }}
+      >
 
-        <div style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginBottom: 16
-        }}>
-
-          <div style={{
-            width: 64,
-            height: 64,
-            borderRadius: 16,
-            background: C.dark,
+        <div
+          style={{
             display: "flex",
-            alignItems: "center",
-            justifyContent: "center"
-          }}>
-            <span style={{
-              fontWeight: 800,
-              fontSize: 24,
-              color: C.accent
-            }}>
-              {company.name?.substring(0, 1)}
-            </span>
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            marginBottom: 16
+          }}
+        >
+
+          <div
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: 16,
+              background: C.dark,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              overflow: "hidden"
+            }}
+          >
+
+{company.logo ? (
+              <img
+                src={
+                  company.logo?.startsWith("http")
+                    ? company.logo
+                    : `http://127.0.0.1:8000/storage/${company.logo}`
+                }
+                alt={company.name}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover"
+                }}
+              />
+            ) : (
+              <span
+                style={{
+                  fontWeight: 800,
+                  fontSize: 24,
+                  color: C.accent
+                }}
+              >
+                {company.name?.substring(0, 1)}
+              </span>
+            )}
+
           </div>
+
 
           <Btn
             v="primary"
@@ -132,75 +185,96 @@ export default function CompanyProfile() {
             {editing ? "Cancel" : "Edit Profile"}
           </Btn>
 
+
         </div>
+
 
         <div>
 
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            marginBottom: 4
-          }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              marginBottom: 4
+            }}
+          >
 
-            <h1 style={{
-              fontSize: 22,
-              fontWeight: 700,
-              margin: 0
-            }}>
+            <h1
+              style={{
+                fontSize: 22,
+                fontWeight: 700,
+                margin: 0
+              }}
+            >
               {company.name}
             </h1>
 
             <BadgeCheck size={18} color={C.info} />
 
-            <span style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: C.info,
-              background: C.infoBg,
-              padding: "2px 8px",
-              borderRadius: 99
-            }}>
+
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                color: C.info,
+                background: C.infoBg,
+                padding: "2px 8px",
+                borderRadius: 99
+              }}
+            >
               Verified
             </span>
 
           </div>
 
-          <p style={{
-            color: C.textSec,
-            margin: "0 0 10px",
-            fontSize: 14
-          }}>
+
+          <p
+            style={{
+              color: C.textSec,
+              margin: "0 0 10px",
+              fontSize: 14
+            }}
+          >
             {company.industry} · {company.stage}
           </p>
 
-          <div style={{
-            display: "flex",
-            gap: 16,
-            flexWrap: "wrap"
-          }}>
 
-            <span style={{
-              color: C.textSec,
-              fontSize: 13,
+          <div
+            style={{
               display: "flex",
-              alignItems: "center",
-              gap: 4
-            }}>
+              gap: 16,
+              flexWrap: "wrap"
+            }}
+          >
+
+            <span
+              style={{
+                color: C.textSec,
+                fontSize: 13,
+                display: "flex",
+                alignItems: "center",
+                gap: 4
+              }}
+            >
               <MapPin size={13} />
               {company.location}
             </span>
 
-            <span style={{
-              color: C.textSec,
-              fontSize: 13,
-              display: "flex",
-              alignItems: "center",
-              gap: 4
-            }}>
+
+            <span
+              style={{
+                color: C.textSec,
+                fontSize: 13,
+                display: "flex",
+                alignItems: "center",
+                gap: 4
+              }}
+            >
               <Users size={13} />
               {company.size}
             </span>
+
 
             <a
               href={`https://${company.website}`}
@@ -219,52 +293,99 @@ export default function CompanyProfile() {
               {company.website}
             </a>
 
+
           </div>
 
         </div>
 
       </div>
+            {editing && (
+        <div
+          style={{
+            background: C.surface,
+            borderRadius: 20,
+            padding: 24,
+            border: `1px solid ${C.accent}`,
+            marginBottom: 24
+          }}
+        >
 
-      {editing && (
-        <div style={{
-          background: C.surface,
-          borderRadius: 20,
-          padding: 24,
-          border: `1px solid ${C.accent}`,
-          marginBottom: 24
-        }}>
-
-          <h3 style={{
-            fontSize: 14,
-            fontWeight: 700,
-            margin: "0 0 16px"
-          }}>
+          <h3
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              margin: "0 0 16px"
+            }}
+          >
             Edit Company Info
           </h3>
 
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 14
-          }}>
+
+          <div style={{ marginBottom: 14 }}>
+
+            <label
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: C.textSec,
+                display: "block",
+                marginBottom: 6
+              }}
+            >
+              Logo
+            </label>
+
+
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                if (e.target.files?.[0]) {
+                  setLogo(e.target.files[0]);
+                }
+              }}
+              style={{
+                width: "100%",
+                padding: "8px 14px",
+                borderRadius: 10,
+                border: `1px solid ${C.border}`,
+                fontFamily: F,
+                fontSize: 13,
+                background: C.bg
+              }}
+            />
+
+          </div>
+
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 14
+            }}
+          >
 
             {Object.keys(form).map((key) => (
 
               <div key={key}>
 
-                <label style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: C.textSec,
-                  display: "block",
-                  marginBottom: 6
-                }}>
+                <label
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: C.textSec,
+                    display: "block",
+                    marginBottom: 6
+                  }}
+                >
                   {key.replaceAll("_", " ")}
                 </label>
 
+
                 <input
                   name={key}
-                  value={form[key] || ""}
+                  value={(form as any)[key] || ""}
                   onChange={handleChange}
                   style={{
                     width: "100%",
@@ -284,11 +405,14 @@ export default function CompanyProfile() {
 
           </div>
 
-          <div style={{
-            marginTop: 14,
-            display: "flex",
-            gap: 10
-          }}>
+
+          <div
+            style={{
+              marginTop: 14,
+              display: "flex",
+              gap: 10
+            }}
+          >
 
             <Btn
               v="primary"
@@ -296,6 +420,7 @@ export default function CompanyProfile() {
             >
               Save Changes
             </Btn>
+
 
             <Btn
               v="outline"
@@ -309,19 +434,24 @@ export default function CompanyProfile() {
         </div>
       )}
 
-      <div style={{
-        background: C.surface,
-        borderRadius: 20,
-        border: `1px solid ${C.border}`,
-        overflow: "hidden"
-      }}>
 
-        <div style={{
-          display: "flex",
-          gap: 4,
-          padding: "16px 20px",
-          borderBottom: `1px solid ${C.divider}`
-        }}>
+      <div
+        style={{
+          background: C.surface,
+          borderRadius: 20,
+          border: `1px solid ${C.border}`,
+          overflow: "hidden"
+        }}
+      >
+
+        <div
+          style={{
+            display: "flex",
+            gap: 4,
+            padding: "16px 20px",
+            borderBottom: `1px solid ${C.divider}`
+          }}
+        >
 
           {TABS.map((t) => (
 
@@ -347,42 +477,54 @@ export default function CompanyProfile() {
 
         </div>
 
+
         <div style={{ padding: 24 }}>
 
           {tab === "Overview" && (
 
             <div>
 
-              <h3 style={{
-                fontSize: 14,
-                fontWeight: 700,
-                marginBottom: 10
-              }}>
+              <h3
+                style={{
+                  fontSize: 14,
+                  fontWeight: 700,
+                  marginBottom: 10
+                }}
+              >
                 About
               </h3>
 
-              <p style={{
-                color: C.textSec,
-                fontSize: 14,
-                lineHeight: 1.75,
-                marginBottom: 24
-              }}>
+
+              <p
+                style={{
+                  color: C.textSec,
+                  fontSize: 14,
+                  lineHeight: 1.75,
+                  marginBottom: 24
+                }}
+              >
                 {company.about}
               </p>
 
-              <h3 style={{
-                fontSize: 14,
-                fontWeight: 700,
-                marginBottom: 14
-              }}>
+
+              <h3
+                style={{
+                  fontSize: 14,
+                  fontWeight: 700,
+                  marginBottom: 14
+                }}
+              >
                 Company Details
               </h3>
 
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(3,1fr)",
-                gap: 14
-              }}>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3,1fr)",
+                  gap: 14
+                }}
+              >
 
                 {[
                   {
@@ -414,7 +556,7 @@ export default function CompanyProfile() {
                     icon: Building2,
                     label: "Founded",
                     value: company.founded
-                  },
+                  }
 
                 ].map(({ icon: Icon, label, value }) => (
 
@@ -427,30 +569,37 @@ export default function CompanyProfile() {
                     }}
                   >
 
-                    <div style={{
-                      display: "flex",
-                      gap: 8,
-                      alignItems: "center",
-                      marginBottom: 4
-                    }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 8,
+                        alignItems: "center",
+                        marginBottom: 4
+                      }}
+                    >
 
                       <Icon size={13} color={C.textSec} />
 
-                      <span style={{
-                        fontSize: 11,
-                        color: C.textMuted,
-                        fontWeight: 600
-                      }}>
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: C.textMuted,
+                          fontWeight: 600
+                        }}
+                      >
                         {label}
                       </span>
 
                     </div>
 
-                    <p style={{
-                      margin: 0,
-                      fontSize: 13,
-                      fontWeight: 600
-                    }}>
+
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 13,
+                        fontWeight: 600
+                      }}
+                    >
                       {value}
                     </p>
 
@@ -464,108 +613,105 @@ export default function CompanyProfile() {
 
           )}
 
+
           {tab === "Culture" && (
 
             <div>
 
-              <h3 style={{
-                fontSize: 14,
-                fontWeight: 700,
-                marginBottom: 12
-              }}>
+              <h3
+                style={{
+                  fontSize: 14,
+                  fontWeight: 700,
+                  marginBottom: 12
+                }}
+              >
                 Our Values
               </h3>
 
-              <div style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
-                marginBottom: 24
-              }}>
 
-                {(company.values || []).map((v: string) => (
+              {(company.values || []).map((v: string) => (
+
+                <div
+                  key={v}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    marginBottom: 8,
+                    color: C.textSec
+                  }}
+                >
 
                   <div
-                    key={v}
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      fontSize: 14,
-                      color: C.textSec
-                    }}
-                  >
-
-                    <div style={{
                       width: 6,
                       height: 6,
                       borderRadius: "50%",
-                      background: C.accent,
-                      flexShrink: 0
-                    }} />
+                      background: C.accent
+                    }}
+                  />
 
-                    {v}
+                  {v}
 
-                  </div>
+                </div>
 
-                ))}
+              ))}
 
-              </div>
 
-              <h3 style={{
-                fontSize: 14,
-                fontWeight: 700,
-                marginBottom: 12
-              }}>
+              <h3
+                style={{
+                  fontSize: 14,
+                  fontWeight: 700,
+                  marginTop: 24,
+                  marginBottom: 12
+                }}
+              >
                 Benefits
               </h3>
 
-              <div style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: 8
-              }}>
 
-                {(company.benefits || []).map((b: string) => (
+              {(company.benefits || []).map((b: string) => (
+
+                <div
+                  key={b}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    marginBottom: 8,
+                    color: C.textSec
+                  }}
+                >
 
                   <div
-                    key={b}
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      fontSize: 14,
-                      color: C.textSec
-                    }}
-                  >
-
-                    <div style={{
                       width: 6,
                       height: 6,
                       borderRadius: "50%",
-                      background: C.accent,
-                      flexShrink: 0
-                    }} />
+                      background: C.accent
+                    }}
+                  />
 
-                    {b}
+                  {b}
 
-                  </div>
+                </div>
 
-                ))}
-
-              </div>
+              ))}
 
             </div>
 
           )}
 
+
           {tab === "Open Roles" && (
 
-            <div style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 10
-            }}>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 10
+              }}
+            >
 
               {jobs.map((job: any) => (
 
@@ -583,37 +729,47 @@ export default function CompanyProfile() {
 
                   <div>
 
-                    <p style={{
-                      margin: 0,
-                      fontWeight: 600,
-                      fontSize: 14
-                    }}>
+                    <p
+                      style={{
+                        margin: 0,
+                        fontWeight: 600,
+                        fontSize: 14
+                      }}
+                    >
                       {job.title}
                     </p>
 
-                    <p style={{
-                      margin: 0,
-                      fontSize: 12,
-                      color: C.textSec
-                    }}>
+
+                    <p
+                      style={{
+                        margin: 0,
+                        fontSize: 12,
+                        color: C.textSec
+                      }}
+                    >
                       {job.location} · {job.type} · {job.mode}
                     </p>
 
                   </div>
 
-                  <div style={{
-                    marginLeft: "auto",
-                    display: "flex",
-                    gap: 10,
-                    alignItems: "center"
-                  }}>
+
+                  <div
+                    style={{
+                      marginLeft: "auto",
+                      display: "flex",
+                      gap: 10,
+                      alignItems: "center"
+                    }}
+                  >
 
                     <SBadge s={job.status} />
 
-                    <span style={{
-                      fontSize: 12,
-                      color: C.textSec
-                    }}>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        color: C.textSec
+                      }}
+                    >
                       {job.applicants} applicants
                     </span>
 

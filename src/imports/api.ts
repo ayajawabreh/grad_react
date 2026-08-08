@@ -50,6 +50,8 @@ export const updateStudentProfile = async (data: any) => {
     });
 };
 
+
+
 export const reviewCV = async () => {
     return apiRequest("/ai/cv-review", {
         method: "POST",
@@ -134,11 +136,14 @@ export const getCompanyProfile = async () => {
     });
 };
 
-export const updateCompanyProfile = async (data: any) => {
-    return apiRequest("/company/profile", {
-        method: "PUT",
-        data,
-    });
+export const updateCompanyProfile = async (data:any)=>{
+ return apiRequest("/company/profile",{
+   method:"POST",
+   data,
+   headers:{
+     "Content-Type":"multipart/form-data",
+   },
+ });
 };
 
 export const getInterviewFeedback = async (

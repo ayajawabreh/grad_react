@@ -20,8 +20,8 @@ export default function EditJob() {
     level: "Entry",
     workMode: "Remote",
     location: "",
-    minSalary: "",
-    maxSalary: "",
+    salary: "",
+    deadline: "",
     description: "",
     skills: [] as string[],
     benefits: [] as string[],
@@ -52,8 +52,8 @@ export default function EditJob() {
             level: currentJob.level || "Entry",
             workMode: currentJob.mode || currentJob.workMode || currentJob.work_mode || "Remote",
             location: currentJob.location || "",
-            minSalary: currentJob.minSalary || "",
-            maxSalary: currentJob.maxSalary || currentJob.salary?.toString() || "",
+            salary: currentJob.salary?.toString() || "",
+            deadline: currentJob.deadline || "",
             description: currentJob.description || "",
             skills: Array.isArray(currentJob.skills) ? currentJob.skills : [],
             benefits: Array.isArray(currentJob.benefits) ? currentJob.benefits : [],
@@ -133,7 +133,7 @@ export default function EditJob() {
     setSubmitting(true);
     setNotification(null);
 
-    const salaryValue = formData.maxSalary || formData.minSalary;
+    const salaryValue = formData.salary;
 
     const payload = {
       title: formData.title,
@@ -143,6 +143,7 @@ export default function EditJob() {
       work_mode: formData.workMode,
       location: formData.location,
       salary: salaryValue ? Number(salaryValue.replace(/[^\d.]/g, "")) : null,
+      deadline: formData.deadline,
       description: formData.description,
       skills: formData.skills,
       benefits: formData.benefits,
@@ -332,7 +333,7 @@ export default function EditJob() {
         </div>
 
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 20 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 700, marginTop: 0, marginBottom: 16 }}>Location & Salary</h3>
+          <h3 style={{ fontSize: 15, fontWeight: 700, marginTop: 0, marginBottom: 16 }}>Location & Details</h3>
 
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 16 }}>
             <div>
@@ -347,24 +348,48 @@ export default function EditJob() {
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Min Salary</label>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                Salary
+              </label>
               <input
-                name="minSalary"
-                value={formData.minSalary}
+                name="salary"
+                value={formData.salary}
                 onChange={handleChange}
                 placeholder="1000"
-                style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontFamily: F, fontSize: 14, background: C.surface, color: C.text, boxSizing: "border-box" }}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  border: `1px solid ${C.border}`,
+                  fontFamily: F,
+                  fontSize: 14,
+                  background: C.surface,
+                  color: C.text,
+                  boxSizing: "border-box",
+                }}
               />
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Max Salary</label>
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+                Deadline
+              </label>
               <input
-                name="maxSalary"
-                value={formData.maxSalary}
+                type="date"
+                name="deadline"
+                value={formData.deadline}
                 onChange={handleChange}
-                placeholder="1200"
-                style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontFamily: F, fontSize: 14, background: C.surface, color: C.text, boxSizing: "border-box" }}
+                style={{
+                  width: "100%",
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  border: `1px solid ${C.border}`,
+                  fontFamily: F,
+                  fontSize: 14,
+                  background: C.surface,
+                  color: C.text,
+                  boxSizing: "border-box",
+                }}
               />
             </div>
           </div>

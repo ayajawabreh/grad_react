@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Outlet, NavLink, useNavigate } from "react-router";
 import {
   LayoutDashboard, Building2, Plus, Briefcase, Users, BarChart2,
-  Calendar, MessageSquare, Bell, Settings, LogOut, Search, Menu, X
+  Calendar, MessageSquare, Bell, Settings, LogOut, Search
 } from "lucide-react";
 import { C, F } from "../constants/tokens";
 import { useAuth } from "../context/AuthContext";
@@ -24,7 +24,7 @@ const NAV = [
   { to: "/company/settings", icon: Settings, label: "Settings" },
 ];
 
-function Sidebar({ onClose }: { onClose?: () => void }) {
+function Sidebar() {
   const { logout } = useAuth();
   const nav = useNavigate();
 
@@ -41,7 +41,6 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
   const handleLogout = () => {
     logout();
     nav("/login");
-    onClose?.();
   };
 
   return (
@@ -98,20 +97,6 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
             </p>
           </div>
         </div>
-
-        {onClose && (
-          <button
-            onClick={onClose}
-            style={{
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: C.textMuted,
-            }}
-          >
-            <X size={16} />
-          </button>
-        )}
       </div>
 
       <nav style={{ flex: 1, overflow: "auto", padding: "12px 10px" }}>
@@ -135,7 +120,6 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
               key={to}
               to={to}
               end={to.endsWith("/dashboard")}
-              onClick={onClose}
               style={({ isActive }) => ({
                 display: "flex",
                 alignItems: "center",
@@ -219,7 +203,7 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
   );
 }
 
-function TopBar({ onMenu }: { onMenu: () => void }) {
+function TopBar() {
   const nav = useNavigate();
 
   const [company, setCompany] = useState<any>(null);
@@ -245,19 +229,6 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
         flexShrink: 0,
       }}
     >
-      <button
-        onClick={onMenu}
-        className="lg:hidden"
-        style={{
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          color: C.textSec,
-        }}
-      >
-        <Menu size={20} />
-      </button>
-
       <div style={{ flex: 1, maxWidth: 380 }}>
         <div
           style={{
@@ -402,7 +373,6 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
 }
 
 export default function CompanyLayout() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const { role } = useAuth();
   const nav = useNavigate();
 
@@ -421,42 +391,20 @@ export default function CompanyLayout() {
         fontFamily: F,
       }}
     >
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/40 z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
       <div
-        className="hidden lg:flex"
         style={{
           width: 256,
           flexShrink: 0,
           background: C.surface,
           borderRight: `1px solid ${C.border}`,
+          display: "flex",
           flexDirection: "column",
           overflow: "hidden",
+          height: "100vh",
         }}
       >
         <Sidebar />
       </div>
-
-      {sidebarOpen && (
-        <div
-          className="fixed left-0 top-0 bottom-0 z-50 lg:hidden"
-          style={{
-            width: 272,
-            background: C.surface,
-            display: "flex",
-            flexDirection: "column",
-            boxShadow: "4px 0 24px rgba(0,0,0,0.12)",
-            overflow: "hidden",
-          }}
-        >
-          <Sidebar onClose={() => setSidebarOpen(false)} />
-        </div>
-      )}
 
       <div
         style={{
@@ -467,17 +415,22 @@ export default function CompanyLayout() {
           minWidth: 0,
         }}
       >
-        <TopBar onMenu={() => setSidebarOpen(true)} />
+        <TopBar />
 
         <main
           style={{
             flex: 1,
             overflow: "auto",
-            padding: "32px",
+            padding: 32,
             background: C.bg,
           }}
         >
-          <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+          <div
+            style={{
+              maxWidth: 1200,
+              margin: "0 auto",
+            }}
+          >
             <Outlet />
           </div>
         </main>

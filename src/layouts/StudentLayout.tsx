@@ -388,17 +388,16 @@ fontFamily:F
 
 
 <div
-className="hidden lg:flex"
-style={{
-width:256,
-background:C.surface,
-borderRight:`1px solid ${C.border}`,
-flexDirection:"column"
-}}
+  style={{
+    width:256,
+    background:C.surface,
+    borderRight:`1px solid ${C.border}`,
+    flexDirection:"column",
+    flexShrink:0,
+    display:"flex"
+  }}
 >
-
-<Sidebar student={student}/>
-
+  <Sidebar student={student}/>
 </div>
 
 

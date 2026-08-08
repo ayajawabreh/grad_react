@@ -59,7 +59,6 @@ interface LanguageItem {
 
 const genId = () => Math.random().toString(36).slice(2, 9);
 
-// هوك عام لإدارة أي قائمة ديناميكية (إضافة / تعديل / حذف عنصر) بشكل موحّد
 function useListState<T extends { id: string }>(initial: T[] = []) {
   const [items, setItems] = useState<T[]>(initial);
 
@@ -78,7 +77,6 @@ function useListState<T extends { id: string }>(initial: T[] = []) {
   return { items, setItems, add, update, remove };
 }
 
-// ستايلات مشتركة
 const smallInputStyle: React.CSSProperties = {
   width: "100%",
   padding: "9px 12px",
@@ -238,12 +236,9 @@ export default function ResumeBuilder() {
   const certificates = useListState<CertificateItem>([]);
   const languages = useListState<LanguageItem>([]);
 
-  // حالة التحكم في رسائل التنبيه المخصصة
   const [toast, setToast] = useState<ToastState>({ show: false, type: "success", message: "" });
-  // حالة التحكم في مودال تأكيد الحذف
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  // دالة مساعدة لإظهار التنبيهات وتختفي تلقائياً بعد 4 ثواني
   const showToast = (type: "success" | "error" | "warning", message: string) => {
     setToast({ show: true, type, message });
     if (type !== "warning") {
@@ -257,15 +252,19 @@ export default function ResumeBuilder() {
     loadResume();
   }, []);
 
-  // يضيف id محلي لأي عنصر راجع من السيرفر بدون id (تحسباً)
-  const withLocalIds = <T,>(arr: any[]): (T & { id: string })[] =>
-    (Array.isArray(arr) ? arr : []).map((item) => ({ ...item, id: item?.id ? String(item.id) : genId() }));
+  const withLocalIds = <T,>(arr: any[]): (T & { id: string })[] => {
+    if (!Array.isArray(arr)) return [];
+    return arr.map((item) => {
+      if (typeof item === "string") {
+        return { id: genId(), name: item } as unknown as (T & { id: string });
+      }
+      return { ...item, id: item?.id ? String(item.id) : genId() };
+    });
+  };
 
   const loadResume = async () => {
     try {
       const response = await API.get("/student/resume");
-
-      console.log("Loaded Resume:", response.data);
 
       setResumeId(response.data?.id ?? null);
       setFullName(response.data?.full_name ?? "");
@@ -284,45 +283,56 @@ export default function ResumeBuilder() {
     }
   };
 
-  // بترجع id السيرة الذاتية بعد الحفظ (لازم لزر Download PDF لو لسا ما انحفظت)
-  const saveResume = async (): Promise<number | null> => {
-    try {
-      const data = {
-        title: "My Resume",
-        template: tpl,
-        full_name: fullName,
-        professional_title: professionalTitle,
-        summary: summary,
-        education: education.items,
-        skills: skills.items,
-        experience: experience.items,
-        projects: projects.items,
-        certificates: certificates.items,
-        languages: languages.items,
-        is_public: false
-      };
-
-      let savedId: number = resumeId as number;
-
-      if (resumeId) {
-        const response = await API.put(`/student/resume/${resumeId}`, data);
-        savedId = response.data.resume.id;
-      } else {
-        const response = await API.post("/student/resume", data);
-        savedId = response.data.resume.id;
-      }
-
-      setResumeId(savedId);
-      showToast("success", "Resume saved successfully 🎉");
-      return savedId;
-    } catch (error: any) {
-      console.error("Save error details:", error.response?.data || error);
-      showToast("error", "Error saving resume. Please check your connection.");
-      return null;
-    }
+ const saveResume = async (): Promise<number | null> => {
+  const data = {
+    title: "My Resume",
+    template: tpl || "executive",
+    full_name: fullName || "",
+    professional_title: professionalTitle || "",
+    summary: summary || "",
+    education: education.items,
+    skills: skills.items,
+    experience: experience.items,
+    projects: projects.items,
+    certificates: certificates.items,
+    languages: languages.items,
+    is_public: false,
   };
 
-  // تنزيل ملف PDF: بتحفظ أول شي لو في تعديلات غير محفوظة، وبعدين بتجيب الملف كـ blob وتنزّله
+  try {
+    console.log("Sending data:", data);
+
+    let savedId: number;
+
+    if (resumeId) {
+      const response = await API.put(`/student/resume/${resumeId}`, data);
+      savedId = response.data.resume.id;
+    } else {
+      const response = await API.post("/student/resume", data);
+      savedId = response.data.resume.id;
+    }
+
+    setResumeId(savedId);
+    showToast("success", "Resume saved successfully 🎉");
+    return savedId;
+  } catch (error: any) {
+    console.log("========== REQUEST ==========");
+    console.log(data);
+
+    console.log("========== STATUS ==========");
+    console.log(error.response?.status);
+
+    console.log("========== RESPONSE ==========");
+    console.log(error.response?.data);
+
+    console.log("========== ERRORS ==========");
+    console.log(error.response?.data?.errors);
+
+    showToast("error", "Error saving resume.");
+    return null;
+  }
+};
+
   const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   const handleDownloadPdf = async () => {
@@ -377,7 +387,6 @@ export default function ResumeBuilder() {
       setShowDeleteModal(false);
 
     } catch (error: any) {
-      console.log(error.response?.data);
       showToast("error", "Delete failed");
     }
   };
@@ -414,7 +423,6 @@ export default function ResumeBuilder() {
     display: "block"
   };
 
-  // إعدادات ألوان لوحة التنبيهات (Toast Colors)
   const getToastStyles = () => {
     switch (toast.type) {
       case "success":
@@ -431,7 +439,6 @@ export default function ResumeBuilder() {
   return (
     <div style={{ fontFamily: F, color: C.text, padding: "24px", maxWidth: "1200px", margin: "0 auto", position: "relative" }}>
 
-      {/* المكون المخصص للتنبيهات (Custom Alert Toast) */}
       {toast.show && (
         <div style={{
           position: "fixed",
@@ -461,7 +468,6 @@ export default function ResumeBuilder() {
         </div>
       )}
 
-      {/* مودال مخصص لتأكيد الحذف (Warning Confirmation Modal) */}
       {showDeleteModal && (
         <div style={{
           position: "fixed",
@@ -529,7 +535,6 @@ export default function ResumeBuilder() {
         </div>
       )}
 
-      {/* الهيدر العلوي */}
       <div style={{
         display: "flex",
         alignItems: "center",
@@ -561,10 +566,8 @@ export default function ResumeBuilder() {
         </div>
       </div>
 
-      {/* نموذج الإدخال الرئيسي */}
       <div style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: "800px", margin: "0 auto" }}>
 
-        {/* البيانات الأساسية + الملخص المهني */}
         <div style={{
           background: "#fff",
           borderRadius: 20,
@@ -640,7 +643,6 @@ export default function ResumeBuilder() {
 
         </div>
 
-        {/* Education */}
         <DynamicSection
           title="Education"
           Icon={GraduationCap}
@@ -688,7 +690,6 @@ export default function ResumeBuilder() {
           )}
         />
 
-        {/* Skills */}
         <DynamicSection
           title="Skills"
           Icon={Code2}
@@ -706,7 +707,6 @@ export default function ResumeBuilder() {
           )}
         />
 
-        {/* Experience */}
         <DynamicSection
           title="Experience"
           Icon={Briefcase}
@@ -754,7 +754,6 @@ export default function ResumeBuilder() {
           )}
         />
 
-        {/* Projects */}
         <DynamicSection
           title="Projects"
           Icon={FolderGit2}
@@ -786,7 +785,6 @@ export default function ResumeBuilder() {
           )}
         />
 
-        {/* Certificates */}
         <DynamicSection
           title="Certificates"
           Icon={Award}
@@ -818,7 +816,6 @@ export default function ResumeBuilder() {
           )}
         />
 
-        {/* Languages */}
         <DynamicSection
           title="Languages"
           Icon={LanguagesIcon}
@@ -851,7 +848,6 @@ export default function ResumeBuilder() {
           )}
         />
 
-        {/* زر الحذف */}
         {resumeId && (
           <div style={{
             display: "flex",
