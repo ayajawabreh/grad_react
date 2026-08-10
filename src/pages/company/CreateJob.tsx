@@ -232,7 +232,7 @@ export default function CreateJob() {
             <ArrowLeft size={18} />
           </button>
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>Create Job Listing</h1>
+            <h1 style={{ fontSize: 24, fontWeight: 900, margin: 0 }}>Create Job Listing</h1>
             <p style={{ color: C.textSec, fontSize: 13, marginTop: 4, margin: 0 }}>
               Fill in the details below to publish a new job position
             </p>

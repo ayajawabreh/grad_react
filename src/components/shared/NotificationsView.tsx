@@ -30,11 +30,16 @@ interface Notif {
   color: string;
 }
 
-const iconFor = (title: string): { icon: LucideIcon; color: string } => {
+const iconFor = (
+  title: string
+): { icon: LucideIcon; color: string } => {
   const t = title.toLowerCase();
 
   if (t.includes("interview")) {
-    return { icon: Calendar, color: C.purple };
+    return {
+      icon: Calendar,
+      color: C.purple,
+    };
   }
 
   if (
@@ -42,7 +47,10 @@ const iconFor = (title: string): { icon: LucideIcon; color: string } => {
     t.includes("published") ||
     t.includes("confirmed")
   ) {
-    return { icon: CheckCircle2, color: C.success };
+    return {
+      icon: CheckCircle2,
+      color: C.success,
+    };
   }
 
   if (
@@ -50,7 +58,10 @@ const iconFor = (title: string): { icon: LucideIcon; color: string } => {
     t.includes("awaiting") ||
     t.includes("alert")
   ) {
-    return { icon: AlertCircle, color: C.warning };
+    return {
+      icon: AlertCircle,
+      color: C.warning,
+    };
   }
 
   if (
@@ -58,24 +69,38 @@ const iconFor = (title: string): { icon: LucideIcon; color: string } => {
     t.includes("milestone") ||
     t.includes("report")
   ) {
-    return { icon: TrendingUp, color: C.accent };
+    return {
+      icon: TrendingUp,
+      color: C.accent,
+    };
   }
 
   if (
     t.includes("registration") ||
     t.includes("application")
   ) {
-    return { icon: UserPlus, color: C.info };
+    return {
+      icon: UserPlus,
+      color: C.info,
+    };
   }
 
   if (t.includes("view")) {
-    return { icon: Star, color: C.warning };
+    return {
+      icon: Star,
+      color: C.warning,
+    };
   }
 
-  return { icon: Bell, color: C.accent };
+  return {
+    icon: Bell,
+    color: C.accent,
+  };
 };
 
-const mapToNotif = (n: NotificationDTO): Notif => {
+const mapToNotif = (
+  n: NotificationDTO
+): Notif => {
   const { icon, color } = iconFor(n.title);
 
   return {
@@ -100,7 +125,9 @@ export function NotificationsView() {
 
       const data = await getNotifications();
 
-      setItems(data.notifications.map(mapToNotif));
+      setItems(
+        data.notifications.map(mapToNotif)
+      );
     } catch (err) {
       console.error(err);
       setError("Failed to load notifications");
@@ -113,54 +140,71 @@ export function NotificationsView() {
     loadNotifications();
   }, []);
 
- useEffect(() => {
-  const channel = supabase
-    .channel("notifications-realtime")
-    .on(
-      "postgres_changes",
-      {
-        event: "INSERT",
-        schema: "public",
-        table: "notifications",
-      },
-      (payload) => {
-        console.log("🔥 NOTIFICATION REALTIME EVENT:", payload);
+  useEffect(() => {
+    const channel = supabase
+      .channel("notifications-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+        },
+        (payload) => {
+          console.log(
+            "🔥 NOTIFICATION REALTIME EVENT:",
+            payload
+          );
 
-        const newNotification = payload.new as NotificationDTO;
+          const newNotification =
+            payload.new as NotificationDTO;
 
-        const notification = mapToNotif({
-          id: newNotification.id,
-          title: newNotification.title,
-          message: newNotification.message,
-          is_read: newNotification.is_read,
-          time: "Just now",
-          created_at: newNotification.created_at,
-        });
+          const notification = mapToNotif({
+            id: newNotification.id,
+            title: newNotification.title,
+            message: newNotification.message,
+            is_read: newNotification.is_read,
+            time: "Just now",
+            created_at:
+              newNotification.created_at,
+          });
 
-        setItems((prev) => {
-          if (prev.some((item) => item.id === notification.id)) {
-            return prev;
-          }
+          setItems((prev) => {
+            if (
+              prev.some(
+                (item) =>
+                  item.id === notification.id
+              )
+            ) {
+              return prev;
+            }
 
-          return [notification, ...prev];
-        });
-      }
-    )
-    .subscribe((status) => {
-      console.log("NOTIFICATION REALTIME STATUS:", status);
-    });
+            return [notification, ...prev];
+          });
+        }
+      )
+      .subscribe((status) => {
+        console.log(
+          "NOTIFICATION REALTIME STATUS:",
+          status
+        );
+      });
 
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}, []);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
-  const unreadCount = items.filter((n) => !n.read).length;
+  const unreadCount = items.filter(
+    (n) => !n.read
+  ).length;
 
   const handleRead = async (id: number) => {
     setItems((prev) =>
       prev.map((n) =>
-        n.id === id ? { ...n, read: true } : n
+        n.id === id
+          ? { ...n, read: true }
+          : n
       )
     );
 
@@ -209,10 +253,14 @@ export function NotificationsView() {
     return (
       <div
         style={{
+          width: "100%",
+          maxWidth: 1180,
+          margin: "0 auto",
           padding: 40,
           textAlign: "center",
           color: C.textSec,
           fontFamily: F,
+          boxSizing: "border-box",
         }}
       >
         Loading notifications...
@@ -221,7 +269,16 @@ export function NotificationsView() {
   }
 
   return (
-    <div>
+    <div
+      style={{
+        width: "100%",
+        maxWidth: 1180,
+        margin: "0 auto",
+        fontFamily: F,
+        color: C.text,
+        paddingBottom: 40,
+      }}
+    >
       <div
         style={{
           display: "flex",
@@ -233,11 +290,10 @@ export function NotificationsView() {
         <div>
           <h1
             style={{
+              margin: 0,
               fontSize: 24,
               fontWeight: 900,
-              color: C.text,
-              margin: "0 0 4px",
-              fontFamily: F,
+              color: C.text as any,
             }}
           >
             Notifications
@@ -313,12 +369,16 @@ export function NotificationsView() {
         {items.map((n) => (
           <div
             key={n.id}
-            onClick={() => !n.read && handleRead(n.id)}
+            onClick={() =>
+              !n.read && handleRead(n.id)
+            }
             style={{
               padding: "18px 24px",
               borderRadius: 16,
               border: `1px solid ${
-                n.read ? C.border : C.accent + "40"
+                n.read
+                  ? C.border
+                  : C.accent + "40"
               }`,
               background: C.surface,
               display: "flex",
@@ -331,7 +391,8 @@ export function NotificationsView() {
                 "0 4px 14px rgba(0,0,0,0.06)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = "none";
+              e.currentTarget.style.boxShadow =
+                "none";
             }}
           >
             <div
@@ -348,11 +409,18 @@ export function NotificationsView() {
             >
               <n.icon
                 size={16}
-                style={{ color: n.color }}
+                style={{
+                  color: n.color,
+                }}
               />
             </div>
 
-            <div style={{ flex: 1 }}>
+            <div
+              style={{
+                flex: 1,
+                minWidth: 0,
+              }}
+            >
               <div
                 style={{
                   display: "flex",
@@ -417,7 +485,9 @@ export function NotificationsView() {
                   >
                     <Trash2
                       size={13}
-                      style={{ color: C.textMuted }}
+                      style={{
+                        color: C.textMuted,
+                      }}
                     />
                   </button>
                 </div>
@@ -441,4 +511,3 @@ export function NotificationsView() {
     </div>
   );
 }
-

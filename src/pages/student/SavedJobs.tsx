@@ -20,6 +20,7 @@ export default function SavedJobs() {
 
     try {
       const res = await API.get("/student/saved-jobs");
+
       const data = Array.isArray(res.data)
         ? res.data
         : res.data?.jobs || [];
@@ -69,117 +70,113 @@ export default function SavedJobs() {
             marginBottom: 26,
           }}
         >
-        <h1
+          <h1
+            style={{
+              margin: 0,
+              fontSize: 24,
+              fontWeight: 900,
+              color: C.text,
+            }}
+          >
+            Saved Jobs
+          </h1>
+
+          {loading ? (
+            <div
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                padding: 50,
+                background: C.surface,
+                borderRadius: 16,
+                border: `1px solid ${C.border}`,
+                textAlign: "center",
+                marginTop: 24,
+              }}
+            >
+              <p
+                style={{
+                  color: C.textMuted,
+                  fontSize: 14,
+                  margin: 0,
+                }}
+              >
+                Loading...
+              </p>
+            </div>
+          ) : error ? (
+            <div
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                padding: 50,
+                background: C.surface,
+                borderRadius: 16,
+                border: `1px solid ${C.border}`,
+                textAlign: "center",
+                marginTop: 24,
+              }}
+            >
+              <p
+                style={{
+                  color: C.error,
+                  fontSize: 14,
+                  margin: 0,
+                }}
+              >
+                {error}
+              </p>
+            </div>
+          ) : jobs.length === 0 ? (
+            <div
+              style={{
+                width: "100%",
+                boxSizing: "border-box",
+                padding: 50,
+                background: C.surface,
+                borderRadius: 16,
+                border: `1px solid ${C.border}`,
+                textAlign: "center",
+                marginTop: 24,
+              }}
+            >
+              <p
+                style={{
+                  color: C.textMuted,
+                  fontSize: 14,
+                  margin: 0,
+                }}
+              >
+                No saved jobs yet. Browse jobs and save ones you like!
+              </p>
+            </div>
+          ) : (
+            <div
   style={{
-    margin: 0,
-    fontSize: 26,
-    fontWeight: 700,
-    color: C.text,
+    width: "100%",
+    maxWidth: 1000,
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: 18,
+    marginTop: 24,
   }}
 >
-  Saved Jobs
-</h1>
-          <p
-            style={{
-              margin: "7px 0 0",
-              fontSize: 14,
-              color: C.textSec,
-            }}
-          >
-            {jobs.length} saved{" "}
-            {jobs.length === 1 ? "opportunity" : "opportunities"}
-          </p>
+              {jobs.map((job) => (
+                <JobCard
+                  key={job.id}
+                  job={job}
+                  showMatch={false}
+                  onView={() =>
+                    nav(`/student/jobs/${job.id}`)
+                  }
+                  onSave={(id, isSavedNow) =>
+                    handleToggleSave(id, isSavedNow)
+                  }
+                />
+              ))}
+            </div>
+          )}
         </div>
-
-        {loading ? (
-          <div
-            style={{
-              maxWidth: 820,
-              padding: 50,
-              background: C.surface,
-              borderRadius: 16,
-              border: `1px solid ${C.border}`,
-              textAlign: "center",
-            }}
-          >
-            <p
-              style={{
-                color: C.textMuted,
-                fontSize: 14,
-                margin: 0,
-              }}
-            >
-              Loading...
-            </p>
-          </div>
-        ) : error ? (
-          <div
-            style={{
-              maxWidth: 820,
-              padding: 50,
-              background: C.surface,
-              borderRadius: 16,
-              border: `1px solid ${C.border}`,
-              textAlign: "center",
-            }}
-          >
-            <p
-              style={{
-                color: C.error,
-                fontSize: 14,
-                margin: 0,
-              }}
-            >
-              {error}
-            </p>
-          </div>
-        ) : jobs.length === 0 ? (
-          <div
-            style={{
-              maxWidth: 820,
-              padding: 50,
-              background: C.surface,
-              borderRadius: 16,
-              border: `1px solid ${C.border}`,
-              textAlign: "center",
-            }}
-          >
-            <p
-              style={{
-                color: C.textMuted,
-                fontSize: 14,
-                margin: 0,
-              }}
-            >
-              No saved jobs yet. Browse jobs and save ones you like!
-            </p>
-          </div>
-        ) : (
-          <div
-            style={{
-              width: "100%",
-              maxWidth: 820,
-              display: "grid",
-              gridTemplateColumns:
-                "repeat(2, minmax(0, 1fr))",
-              gap: 18,
-            }}
-          >
-            {jobs.map((job) => (
-              <JobCard
-                key={job.id}
-                job={job}
-                showMatch={false}
-                onView={() =>
-                  nav(`/student/jobs/${job.id}`)
-                }
-                onSave={(id, isSavedNow) =>
-                  handleToggleSave(id, isSavedNow)
-                }
-              />
-            ))}
-          </div>
-        )}
       </div>
     </div>
   );

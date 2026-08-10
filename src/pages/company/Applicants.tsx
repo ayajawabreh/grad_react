@@ -228,7 +228,7 @@ export default function Applicants() {
         <h1
           style={{
             fontSize:24,
-            fontWeight:700,
+            fontWeight:900,
             margin:0
           }}
         >

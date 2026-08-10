@@ -46,9 +46,17 @@ export default function CompanyDashboard() {
     <div style={{ fontFamily: F, color: C.text }}>
 
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0 }}>
-          Good morning, {companyName} 👋
-        </h1>
+       <h1
+  style={{
+    fontSize: 24,
+    fontWeight: 900,
+    margin: 0,
+    color: C.text,
+    fontFamily: F,
+  }}
+>
+  Good morning, {companyName} 👋
+</h1>
 
         <p style={{ color: C.textSec, marginTop: 6, fontSize: 14 }}>
           Here's your hiring overview for today.

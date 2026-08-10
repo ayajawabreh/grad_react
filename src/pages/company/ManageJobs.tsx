@@ -86,7 +86,7 @@ export default function ManageJobs() {
     <div style={{ fontFamily: F, color: C.text, position: "relative" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 28 }}>
         <div>
-          <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>Manage Jobs</h1>
+          <h1 style={{ fontSize: 24, fontWeight: 900, margin: 0 }}>Manage Jobs</h1>
           <p style={{ color: C.textSec, fontSize: 14, marginTop: 6 }}>View and manage your job listings</p>
         </div>
         <Btn v="primary" icon={Plus} onClick={() => nav("/company/jobs/create")}>Post New Job</Btn>

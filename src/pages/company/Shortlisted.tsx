@@ -3,6 +3,11 @@ import { useNavigate, useParams } from "react-router";
 import { C, F } from "../../constants/tokens";
 import { API } from "../../imports/api";
 
+interface Skill {
+  id?: number;
+  name: string;
+}
+
 interface ShortlistedApplicant {
   id: number;
   status: string;
@@ -17,51 +22,68 @@ interface ShortlistedApplicant {
     gpa?: number;
     location?: string;
   };
-  skills: string[];
+  skills: (string | Skill)[];
 }
 
 export default function Shortlisted() {
-
   const { id } = useParams();
-const nav = useNavigate();
+  const nav = useNavigate();
   const [applicants, setApplicants] = useState<ShortlistedApplicant[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!id) return;
+
     API.get(`/company/jobs/${id}/shortlisted`)
       .then((res) => {
-        setApplicants(res.data);
+        setApplicants(res.data || []);
       })
       .catch((err) => {
-        console.error(err);
+        console.error("Error fetching shortlisted applicants:", err);
+        setApplicants([]);
       })
       .finally(() => {
         setLoading(false);
       });
   }, [id]);
 
-
   if (loading) {
-    return <p>Loading...</p>;
+    return (
+      <div
+        style={{
+          fontFamily: F,
+          color: C.text,
+          padding: 40,
+          textAlign: "center",
+        }}
+      >
+        Loading...
+      </div>
+    );
   }
-
 
   return (
     <div style={{ fontFamily: F, color: C.text }}>
-
-      <h1
+      <div
         style={{
-          fontSize: 30,
-          fontWeight: 700,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
           marginBottom: 28,
         }}
       >
-        Shortlisted Candidates
-      </h1>
-
+        <h1
+          style={{
+            fontSize: 30,
+            fontWeight: 700,
+            margin: 0,
+          }}
+        >
+          Shortlisted Candidates
+        </h1>
+      </div>
 
       {applicants.length === 0 ? (
-
         <div
           style={{
             background: C.surface,
@@ -69,24 +91,20 @@ const nav = useNavigate();
             borderRadius: 18,
             padding: 35,
             color: C.textSec,
-            textAlign: "center"
+            textAlign: "center",
           }}
         >
           No shortlisted candidates yet.
         </div>
-
       ) : (
-
         <div
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(auto-fill,minmax(350px,1fr))",
-            gap: 24
+            gap: 24,
           }}
         >
-
           {applicants.map((applicant) => (
-
             <div
               key={applicant.id}
               style={{
@@ -94,56 +112,54 @@ const nav = useNavigate();
                 border: `1px solid ${C.border}`,
                 borderRadius: 22,
                 padding: 24,
-                boxShadow: "0 10px 30px rgba(0,0,0,0.06)"
+                boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
               }}
             >
-
               <div
                 style={{
-                  display:"flex",
-                  alignItems:"center",
-                  gap:16,
-                  marginBottom:20
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 16,
+                  marginBottom: 20,
                 }}
               >
-
                 <div
                   style={{
-                    width:65,
-                    height:65,
-                    borderRadius:"50%",
-                    background:C.accentLight,
-                    display:"flex",
-                    alignItems:"center",
-                    justifyContent:"center",
-                    fontSize:26,
-                    fontWeight:700,
-                    color:C.accentHover,
-                    overflow:"hidden"
+                    width: 65,
+                    height: 65,
+                    borderRadius: "50%",
+                    background: C.accentLight,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 26,
+                    fontWeight: 700,
+                    color: C.accentHover,
+                    overflow: "hidden",
+                    flexShrink: 0,
                   }}
                 >
                   {applicant.student.avatar ? (
                     <img
                       src={applicant.student.avatar}
+                      alt={applicant.student.name}
                       style={{
-                        width:"100%",
-                        height:"100%",
-                        objectFit:"cover"
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
                       }}
                     />
                   ) : (
-                    applicant.student.name.charAt(0)
+                    applicant.student.name?.charAt(0).toUpperCase()
                   )}
                 </div>
 
-
-                <div>
-
+                <div style={{ minWidth: 0 }}>
                   <h3
                     style={{
-                      margin:0,
-                      fontSize:20,
-                      fontWeight:700
+                      margin: 0,
+                      fontSize: 20,
+                      fontWeight: 700,
                     }}
                   >
                     {applicant.student.name}
@@ -151,161 +167,131 @@ const nav = useNavigate();
 
                   <p
                     style={{
-                      margin:"5px 0 0",
-                      color:C.textSec,
-                      fontSize:14
+                      margin: "5px 0 0",
+                      color: C.textSec,
+                      fontSize: 14,
                     }}
                   >
                     {applicant.student.headline || "Software Developer"}
                   </p>
-
                 </div>
-
               </div>
-
 
               <div
                 style={{
-                  display:"flex",
-                  flexDirection:"column",
-                  gap:10,
-                  marginBottom:20,
-                  color:C.textSec,
-                  fontSize:14
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 10,
+                  marginBottom: 20,
+                  color: C.textSec,
+                  fontSize: 14,
                 }}
               >
-
-                <div>
-                  ✉ {applicant.student.email}
-                </div>
+                <div>✉ {applicant.student.email}</div>
 
                 {applicant.student.major && (
-                  <div>
-                    🎓 {applicant.student.major}
-                  </div>
+                  <div>🎓 {applicant.student.major}</div>
                 )}
 
                 {applicant.student.university && (
-                  <div>
-                    🏫 {applicant.student.university}
-                  </div>
+                  <div>🏫 {applicant.student.university}</div>
                 )}
 
                 {applicant.student.location && (
-                  <div>
-                    📍 {applicant.student.location}
-                  </div>
+                  <div>📍 {applicant.student.location}</div>
                 )}
 
-                {applicant.student.gpa && (
-                  <div>
-                    ⭐ GPA: {applicant.student.gpa}
-                  </div>
-                )}
-
+                {applicant.student.gpa !== undefined &&
+                  applicant.student.gpa !== null && (
+                    <div>⭐ GPA: {applicant.student.gpa}</div>
+                  )}
               </div>
 
-
               {applicant.skills?.length > 0 && (
-
-                <div
-                  style={{
-                    marginBottom:20
-                  }}
-                >
-
+                <div style={{ marginBottom: 20 }}>
                   <p
                     style={{
-                      margin:"0 0 10px",
-                      fontWeight:600,
-                      fontSize:14
+                      margin: "0 0 10px",
+                      fontWeight: 600,
+                      fontSize: 14,
                     }}
                   >
                     Skills
                   </p>
 
-
                   <div
                     style={{
-                      display:"flex",
-                      flexWrap:"wrap",
-                      gap:8
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 8,
                     }}
                   >
+                    {applicant.skills.map((skill, index) => {
+                      const skillName =
+                        typeof skill === "string" ? skill : skill?.name;
 
-                    {applicant.skills.map((skill,index)=>(
-
-                      <span
-                        key={index}
-                        style={{
-                          background:C.accentLight,
-                          color:C.accentHover,
-                          padding:"6px 12px",
-                          borderRadius:20,
-                          fontSize:12,
-                          fontWeight:600
-                        }}
-                      >
-                        {skill}
-                      </span>
-
-                    ))}
-
+                      return (
+                        <span
+                          key={skillName || index}
+                          style={{
+                            background: C.accentLight,
+                            color: C.accentHover,
+                            padding: "6px 12px",
+                            borderRadius: 20,
+                            fontSize: 12,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {skillName}
+                        </span>
+                      );
+                    })}
                   </div>
-
                 </div>
-
               )}
-
 
               <div
                 style={{
-                  display:"flex",
-                  justifyContent:"space-between",
-                  alignItems:"center"
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 12,
                 }}
               >
-
                 <span
                   style={{
-                    background:"#DCFCE7",
-                    color:"#15803D",
-                    padding:"7px 15px",
-                    borderRadius:20,
-                    fontSize:13,
-                    fontWeight:600
+                    background: "#DCFCE7",
+                    color: "#15803D",
+                    padding: "7px 15px",
+                    borderRadius: 20,
+                    fontSize: 13,
+                    fontWeight: 600,
                   }}
                 >
                   ✓ Shortlisted
                 </span>
 
-
                 <button
-  onClick={() => nav(`/company/applicants/${applicant.id}`)}
-  style={{
-    background: C.accent,
-    color: "white",
-    border: "none",
-    padding: "10px 22px",
-    borderRadius: 12,
-    cursor: "pointer",
-    fontWeight: 600
-  }}
->
-  View Profile
-</button>
-
+                  onClick={() =>
+                    nav(`/company/applicants/${applicant.id}`)
+                  }
+                  style={{
+                    background: C.accent,
+                    color: "white",
+                    border: "none",
+                    padding: "10px 22px",
+                    borderRadius: 12,
+                    cursor: "pointer",
+                    fontWeight: 600,
+                  }}
+                >
+                  View Profile
+                </button>
               </div>
-
-
             </div>
-
           ))}
-
         </div>
-
       )}
-
     </div>
   );
 }

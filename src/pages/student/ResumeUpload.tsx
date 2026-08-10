@@ -1,24 +1,62 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import {
   Upload,
-  ArrowLeft,
   FileText,
   Briefcase,
   Sparkles,
   PenLine,
+  Trash2,
+  Loader2,
+  ArrowLeft,
 } from "lucide-react";
 import { C, F } from "../../constants/tokens";
 import { API } from "../../imports/api";
+
+interface ExistingResume {
+  id: number;
+  file_path: string | null;
+  file_url: string | null;
+  file_name: string | null;
+}
 
 export default function ResumeUpload() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [file, setFile] = useState<File | null>(null);
+  const [existingResume, setExistingResume] =
+    useState<ExistingResume | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingResume, setLoadingResume] = useState(true);
+  const [deleting, setDeleting] = useState(false);
   const [uploaded, setUploaded] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const loadResume = async () => {
+      try {
+        setLoadingResume(true);
+
+        const response = await API.get("/student/resume");
+
+        console.log("Existing resume:", response.data);
+
+        if (response.data?.file_path) {
+          setExistingResume(response.data);
+        } else {
+          setExistingResume(null);
+        }
+      } catch (err) {
+        console.error("Failed to load resume:", err);
+        setExistingResume(null);
+      } finally {
+        setLoadingResume(false);
+      }
+    };
+
+    loadResume();
+  }, []);
 
   const handleUpload = async () => {
     if (!file) {
@@ -45,6 +83,22 @@ export default function ResumeUpload() {
 
       console.log("Uploaded Resume:", response.data);
 
+      if (response.data?.resume) {
+        setExistingResume({
+          ...response.data.resume,
+          file_path: response.data.file_path,
+          file_url: response.data.file_url,
+          file_name:
+            response.data.file_name || file.name,
+        });
+      }
+
+      setFile(null);
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+
       setUploaded(true);
     } catch (err: any) {
       console.error("Upload CV error:", err);
@@ -58,6 +112,42 @@ export default function ResumeUpload() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!existingResume?.id) return;
+
+    try {
+      setDeleting(true);
+      setError("");
+
+      await API.delete(
+        `/student/resume/${existingResume.id}`
+      );
+
+      setExistingResume(null);
+      setFile(null);
+      setUploaded(false);
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } catch (err: any) {
+      console.error("Delete CV error:", err);
+
+      setError(
+        err?.response?.data?.message ||
+          "Could not delete the CV."
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  /*
+   * =========================
+   * Upload Success Screen
+   * =========================
+   */
+
   if (uploaded) {
     return (
       <div
@@ -68,9 +158,12 @@ export default function ResumeUpload() {
           padding: "20px 0 50px",
         }}
       >
+        {/* Back to Resume */}
         <button
           type="button"
-          onClick={() => navigate("/student/resume")}
+          onClick={() =>
+            navigate("/student/resume")
+          }
           style={{
             display: "flex",
             alignItems: "center",
@@ -83,9 +176,10 @@ export default function ResumeUpload() {
             fontSize: 13,
             fontWeight: 600,
             marginBottom: 30,
+            padding: 0,
           }}
         >
-          <ArrowLeft size={17} />
+          <ArrowLeft size={16} />
           Back to My Resume
         </button>
 
@@ -96,9 +190,11 @@ export default function ResumeUpload() {
             borderRadius: 20,
             padding: "42px 32px",
             textAlign: "center",
-            boxShadow: "0 8px 30px rgba(0,0,0,0.04)",
+            boxShadow:
+              "0 8px 30px rgba(0,0,0,0.04)",
           }}
         >
+          {/* Success Icon */}
           <div
             style={{
               width: 64,
@@ -137,11 +233,13 @@ export default function ResumeUpload() {
               lineHeight: 1.7,
             }}
           >
-            Your CV has been uploaded and your information has
-            been extracted successfully. You can now explore
-            available jobs or view jobs matched to your skills.
+            Your CV has been uploaded and your
+            information has been extracted successfully.
+            You can now explore available jobs or view
+            jobs matched to your skills.
           </p>
 
+          {/* Action Buttons */}
           <div
             style={{
               display: "flex",
@@ -152,7 +250,9 @@ export default function ResumeUpload() {
           >
             <button
               type="button"
-              onClick={() => navigate("/student/jobs")}
+              onClick={() =>
+                navigate("/student/jobs")
+              }
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -199,6 +299,7 @@ export default function ResumeUpload() {
             </button>
           </div>
 
+          {/* Edit Resume */}
           <button
             type="button"
             onClick={() =>
@@ -229,6 +330,12 @@ export default function ResumeUpload() {
     );
   }
 
+  /*
+   * =========================
+   * Upload Screen
+   * =========================
+   */
+
   return (
     <div
       style={{
@@ -238,9 +345,12 @@ export default function ResumeUpload() {
         padding: "20px 0 50px",
       }}
     >
+      {/* Back Button */}
       <button
         type="button"
-        onClick={() => navigate("/student/resume")}
+        onClick={() =>
+          navigate("/student/resume")
+        }
         style={{
           display: "flex",
           alignItems: "center",
@@ -253,12 +363,14 @@ export default function ResumeUpload() {
           fontSize: 13,
           fontWeight: 600,
           marginBottom: 24,
+          padding: 0,
         }}
       >
-        <ArrowLeft size={17} />
+        <ArrowLeft size={16} />
         Back
       </button>
 
+      {/* Page Title */}
       <h1
         style={{
           margin: 0,
@@ -278,12 +390,15 @@ export default function ResumeUpload() {
           lineHeight: 1.6,
         }}
       >
-        Upload your existing CV and CareerBridge will extract
-        your information automatically.
+        Upload your existing CV and CareerBridge will
+        extract your information automatically.
       </p>
 
+      {/* Upload Area */}
       <div
-        onClick={() => fileInputRef.current?.click()}
+        onClick={() =>
+          fileInputRef.current?.click()
+        }
         style={{
           border: `2px dashed ${C.border}`,
           borderRadius: 18,
@@ -334,6 +449,150 @@ export default function ResumeUpload() {
         />
       </div>
 
+      {/* Loading Existing Resume */}
+      {loadingResume && (
+        <div
+          style={{
+            marginTop: 20,
+            padding: 16,
+            borderRadius: 14,
+            border: `1px solid ${C.border}`,
+            background: "#fff",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            color: C.textSec,
+            fontSize: 13,
+          }}
+        >
+          <Loader2
+            size={18}
+            style={{
+              animation:
+                "spin 1s linear infinite",
+            }}
+          />
+
+          Loading uploaded CV...
+        </div>
+      )}
+
+      {/* Existing Resume */}
+      {existingResume && !loadingResume && (
+        <div
+          style={{
+            marginTop: 20,
+            padding: 16,
+            borderRadius: 14,
+            border: `1px solid ${C.border}`,
+            background: "#fff",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          <FileText
+            size={22}
+            color={C.accent}
+          />
+
+          <div
+            style={{
+              flex: 1,
+              minWidth: 0,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 600,
+                color: C.text,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {existingResume.file_name ||
+                existingResume.file_path
+                  ?.split("/")
+                  .pop() ||
+                "Uploaded CV"}
+            </div>
+
+            <div
+              style={{
+                fontSize: 12,
+                color: C.textSec,
+                marginTop: 3,
+              }}
+            >
+              Uploaded CV
+            </div>
+          </div>
+
+          {/* View */}
+          {existingResume.file_url && (
+            <button
+              type="button"
+              onClick={() =>
+                window.open(
+                  existingResume.file_url!,
+                  "_blank",
+                  "noopener,noreferrer"
+                )
+              }
+              style={{
+                padding: "8px 12px",
+                borderRadius: 8,
+                border: `1px solid ${C.border}`,
+                background: "#fff",
+                color: C.text,
+                cursor: "pointer",
+                fontFamily: F,
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+            >
+              View
+            </button>
+          )}
+
+          {/* Delete */}
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "8px 12px",
+              borderRadius: 8,
+              border: "none",
+              background: "#fee2e2",
+              color: "#dc2626",
+              cursor: deleting
+                ? "not-allowed"
+                : "pointer",
+              fontFamily: F,
+              fontSize: 12,
+              fontWeight: 700,
+            }}
+          >
+            {deleting ? (
+              <Loader2 size={15} />
+            ) : (
+              <Trash2 size={15} />
+            )}
+
+            {deleting
+              ? "Deleting..."
+              : "Delete"}
+          </button>
+        </div>
+      )}
+
+      {/* Selected File */}
       {file && (
         <div
           style={{
@@ -347,7 +606,10 @@ export default function ResumeUpload() {
             gap: 12,
           }}
         >
-          <FileText size={22} color={C.accent} />
+          <FileText
+            size={22}
+            color={C.accent}
+          />
 
           <div style={{ flex: 1 }}>
             <div
@@ -373,6 +635,7 @@ export default function ResumeUpload() {
         </div>
       )}
 
+      {/* Error */}
       {error && (
         <div
           style={{
@@ -388,6 +651,7 @@ export default function ResumeUpload() {
         </div>
       )}
 
+      {/* Upload Button */}
       <button
         type="button"
         onClick={handleUpload}
@@ -399,7 +663,9 @@ export default function ResumeUpload() {
           borderRadius: 14,
           border: "none",
           background:
-            !file || loading ? C.textMuted : C.accent,
+            !file || loading
+              ? C.textMuted
+              : C.accent,
           color: "#fff",
           fontSize: 14,
           fontWeight: 700,

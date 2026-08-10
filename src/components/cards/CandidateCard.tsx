@@ -46,146 +46,167 @@ export function CandidateCard({
         flexDirection: "column",
         justifyContent: "space-between"
       }}
-      onMouseEnter={e => {
-        e.currentTarget.style.boxShadow = "0 8px 20px rgba(0, 0, 0, 0.06)";
+      onMouseEnter={(e) => {
+        e.currentTarget.style.boxShadow =
+          "0 8px 20px rgba(0, 0, 0, 0.06)";
         if (!selected) {
           e.currentTarget.style.borderColor = C.accent + "50";
         }
       }}
-      onMouseLeave={e => {
+      onMouseLeave={(e) => {
         e.currentTarget.style.boxShadow = "none";
-        e.currentTarget.style.borderColor = selected ? C.accent : C.border;
+        e.currentTarget.style.borderColor = selected
+          ? C.accent
+          : C.border;
       }}
     >
-      <div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            gap: 12,
-            marginBottom: 14
-          }}
-        >
-          {onToggleSelect && (
-            <input
-              type="checkbox"
-              checked={!!selected}
-              onChange={onToggleSelect}
-              onClick={e => e.stopPropagation()}
-              style={{
-                width: 16,
-                height: 16,
-                marginTop: 4,
-                flexShrink: 0,
-                cursor: "pointer",
-                accentColor: C.accent
-              }}
-            />
-          )}
-
-          <img
-            src={avatar}
-            alt={name}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 12,
+          marginBottom: 14
+        }}
+      >
+        {onToggleSelect && (
+          <input
+            type="checkbox"
+            checked={!!selected}
+            onChange={onToggleSelect}
+            onClick={(e) => e.stopPropagation()}
             style={{
-              width: 44,
-              height: 44,
-              borderRadius: 12,
-              objectFit: "cover",
-              flexShrink: 0
+              width: 16,
+              height: 16,
+              marginTop: 4,
+              flexShrink: 0,
+              cursor: "pointer",
+              accentColor: C.accent
             }}
           />
+        )}
 
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 2,
-                flexWrap: "wrap"
-              }}
-            >
-              <p
-                style={{
-                  fontSize: 15,
-                  fontWeight: 700,
-                  color: C.text,
-                  margin: 0,
-                  fontFamily: F
-                }}
-              >
-                {name}
-              </p>
+        <img
+          src={avatar}
+          alt={name}
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 12,
+            objectFit: "cover",
+            flexShrink: 0
+          }}
+        />
 
-              <SBadge s={status} />
-            </div>
-
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: 2,
+              flexWrap: "wrap"
+            }}
+          >
             <p
               style={{
-                fontSize: 12,
-                color: C.textSec,
+                fontSize: 15,
+                fontWeight: 700,
+                color: C.text,
                 margin: 0,
-                fontFamily: F,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis"
+                fontFamily: F
               }}
             >
-              {title}{title && university ? " · " : ""}{university}
+              {name}
             </p>
 
-            {location && (
-              <p
-                style={{
-                  fontSize: 11,
-                  color: C.textMuted,
-                  margin: "3px 0 0",
-                  fontFamily: F,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 3
-                }}
-              >
-                <MapPin size={11} />
-                {location}
-              </p>
-            )}
+            <SBadge s={status} />
           </div>
 
-          <MatchRing
-            v={Number(match)}
-            sz={46}
-          />
+          <p
+            style={{
+              fontSize: 12,
+              color: C.textSec,
+              margin: 0,
+              fontFamily: F,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis"
+            }}
+          >
+            {title}
+            {title && university ? " · " : ""}
+            {university}
+          </p>
+
+          {location && (
+            <p
+              style={{
+                fontSize: 11,
+                color: C.textMuted,
+                margin: "3px 0 0",
+                fontFamily: F,
+                display: "flex",
+                alignItems: "center",
+                gap: 3
+              }}
+            >
+              <MapPin size={11} />
+              {location}
+            </p>
+          )}
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            gap: 6,
-            marginBottom: 16,
-            flexWrap: "wrap"
-          }}
-        >
-          {skills.slice(0, 3).map((skill: any) => {
-            const skillName = typeof skill === "string" ? skill : skill.name;
-            return (
-              <span
-                key={skillName}
-                style={{
-                  padding: "3px 9px",
-                  borderRadius: 6,
-                  background: C.divider || "#f3f4f6",
-                  fontSize: 11,
-                  fontWeight: 500,
-                  color: C.textSec,
-                  fontFamily: F
-                }}
-              >
-                {skillName}
-              </span>
-            );
-          })}
-        </div>
+        <MatchRing
+          v={Number(match)}
+          sz={46}
+        />
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          gap: 6,
+          marginBottom: 16,
+          flexWrap: "wrap"
+        }}
+      >
+        {skills.slice(0, 3).map((skill: any, index: number) => {
+          const skillName =
+            typeof skill === "string" ? skill : skill.name;
+
+          return (
+            <span
+              key={`${skillName}-${index}`}
+              style={{
+                padding: "3px 9px",
+                borderRadius: 6,
+                background: C.divider || "#f3f4f6",
+                fontSize: 11,
+                fontWeight: 500,
+                color: C.textSec,
+                fontFamily: F
+              }}
+            >
+              {skillName}
+            </span>
+          );
+        })}
+
+        {skills.length > 3 && (
+          <span
+            style={{
+              padding: "3px 9px",
+              borderRadius: 6,
+              background: C.divider || "#f3f4f6",
+              fontSize: 11,
+              fontWeight: 600,
+              color: C.textSec,
+              fontFamily: F
+            }}
+          >
+            +{skills.length - 3}
+          </span>
+        )}
       </div>
 
       <div
@@ -248,8 +269,13 @@ export function CandidateCard({
             fontWeight: 600,
             background: isShortlisted ? "#ecfdf5" : "#ffffff",
             color: isShortlisted ? "#059669" : C.text,
-            border: `1px solid ${isShortlisted ? "#a7f3d0" : "#e5e7eb"}`,
-            cursor: onShortlist && !isShortlisted && !isFinished ? "pointer" : "default",
+            border: `1px solid ${
+              isShortlisted ? "#a7f3d0" : "#e5e7eb"
+            }`,
+            cursor:
+              onShortlist && !isShortlisted && !isFinished
+                ? "pointer"
+                : "default",
             fontFamily: F,
             display: "flex",
             alignItems: "center",
@@ -261,14 +287,12 @@ export function CandidateCard({
         >
           <UserCheck size={13} />
           <span>
-  {
-    isFinished
-      ? status
-      : isShortlisted
-      ? "Shortlisted"
-      : "Shortlist"
-  }
-</span>
+            {isFinished
+              ? status
+              : isShortlisted
+              ? "Shortlisted"
+              : "Shortlist"}
+          </span>
         </button>
 
         <button

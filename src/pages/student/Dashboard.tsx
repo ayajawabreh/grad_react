@@ -100,7 +100,7 @@ export default function StudentDashboard() {
   return (
     <div style={{ fontFamily: F, color: C.text }}>
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 26, fontWeight: 700, margin: 0 }}>Welcome back, {userName} 👋</h1>
+        <h1 style={{ fontSize: 24, fontWeight: 900, margin: 0 }}>Welcome back, {userName} 👋</h1>
         <p style={{ color: C.textSec, marginTop: 6, fontSize: 14 }}>Here's what's happening with your job search today.</p>
       </div>
 

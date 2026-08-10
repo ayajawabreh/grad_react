@@ -416,7 +416,7 @@ action
       `}</style>
 
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 700, margin: 0 }}>
+        <h1 style={{ fontSize: 24, fontWeight: 900, margin: 0 }}>
           Interviews
         </h1>
         <p style={{ color: C.textSec, fontSize: 14, marginTop: 6 }}>

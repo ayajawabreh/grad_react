@@ -13,6 +13,8 @@ import {
   Settings,
   LogOut,
   Bot,
+  Menu,
+  X,
 } from "lucide-react";
 import { C, F } from "../constants/tokens";
 import { useAuth } from "../context/AuthContext";
@@ -21,23 +23,41 @@ import { getConversations } from "../imports/messages";
 import { supabase } from "../lib/supabase";
 
 const NAV = [
-  { to: "/student/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/student/profile", icon: User, label: "Profile" },
-  { to: "/student/resume", icon: FileText, label: "Resume Builder" },
+  {
+    to: "/student/dashboard",
+    icon: LayoutDashboard,
+    label: "Dashboard",
+  },
+  {
+    to: "/student/profile",
+    icon: User,
+    label: "Profile",
+  },
+  {
+    to: "/student/resume",
+    icon: FileText,
+    label: "Resume Builder",
+  },
   null,
-  { to: "/student/jobs", icon: Search, label: "Browse Jobs" },
-  { to: "/student/saved", icon: BookmarkCheck, label: "Saved Jobs" },
+  {
+    to: "/student/jobs",
+    icon: Search,
+    label: "Browse Jobs",
+  },
+  {
+    to: "/student/saved",
+    icon: BookmarkCheck,
+    label: "Saved Jobs",
+  },
   {
     to: "/student/recommended",
     icon: Sparkles,
     label: "Suggested Jobs",
-    badge: 5,
   },
   {
     to: "/student/applications",
     icon: ClipboardList,
     label: "Applications",
-    badge: 3,
   },
   null,
   {
@@ -49,7 +69,6 @@ const NAV = [
     to: "/student/notifications",
     icon: Bell,
     label: "Notifications",
-    badge: 5,
   },
   {
     to: "/student/ai",
@@ -68,10 +87,12 @@ function Sidebar({
   student,
   unreadMessages,
   onUnreadReset,
+  onClose,
 }: {
   student: any;
   unreadMessages: number;
   onUnreadReset: () => void;
+  onClose?: () => void;
 }) {
   const { logout } = useAuth();
   const nav = useNavigate();
@@ -79,6 +100,7 @@ function Sidebar({
   const handleLogout = () => {
     logout();
     nav("/login");
+    onClose?.();
   };
 
   useEffect(() => {
@@ -86,10 +108,7 @@ function Sidebar({
       onUnreadReset();
     };
 
-    window.addEventListener(
-      "messages:unread-reset",
-      handleReset
-    );
+    window.addEventListener("messages:unread-reset", handleReset);
 
     return () => {
       window.removeEventListener(
@@ -100,87 +119,106 @@ function Sidebar({
   }, [onUnreadReset]);
 
   return (
-    <aside
-      style={{
-        width: 240,
-        height: "100vh",
-        background: "#fff",
-        borderRight: `1px solid ${C.border}`,
-        display: "flex",
-        flexDirection: "column",
-        position: "fixed",
-        top: 0,
-        left: 0,
-        zIndex: 1000,
-        boxSizing: "border-box",
-      }}
-    >
+    <>
+      {/* Sidebar Header */}
       <div
         style={{
           padding: "20px 20px 16px",
           borderBottom: `1px solid ${C.border}`,
           display: "flex",
           alignItems: "center",
+          justifyContent: "space-between",
           gap: 10,
         }}
       >
         <div
           style={{
-            width: 36,
-            height: 36,
-            borderRadius: 10,
-            overflow: "hidden",
-            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            minWidth: 0,
           }}
         >
-          <img
-            src={
-              student?.avatar ||
-              `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                student?.name || "User"
-              )}`
-            }
-            alt="Avatar"
+          <div
             style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-            }}
-          />
-        </div>
-
-        <div style={{ minWidth: 0 }}>
-          <p
-            style={{
-              fontSize: 13,
-              fontWeight: 700,
-              color: C.text,
-              margin: 0,
-              fontFamily: F,
-              whiteSpace: "nowrap",
+              width: 36,
+              height: 36,
+              borderRadius: 10,
               overflow: "hidden",
-              textOverflow: "ellipsis",
+              flexShrink: 0,
             }}
           >
-            {student?.name || "Student"}
-          </p>
+            <img
+              src={
+                student?.avatar ||
+                `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                  student?.name || "User"
+                )}`
+              }
+              alt="Avatar"
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+              }}
+            />
+          </div>
 
-          <p
+          <div style={{ minWidth: 0 }}>
+            <p
+              style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: C.text,
+                margin: 0,
+                fontFamily: F,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {student?.name || "Student"}
+            </p>
+
+            <p
+              style={{
+                fontSize: 11,
+                color: C.textSec,
+                margin: 0,
+                fontFamily: F,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
+              {student?.univ || ""}
+            </p>
+          </div>
+        </div>
+
+        {/* Close button - mobile only */}
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
             style={{
-              fontSize: 11,
-              color: C.textSec,
-              margin: 0,
-              fontFamily: F,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: C.textMuted,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 4,
+              flexShrink: 0,
             }}
           >
-            {student?.univ || ""}
-          </p>
-        </div>
+            <X size={18} />
+          </button>
+        )}
       </div>
 
+      {/* Navigation */}
       <nav
         style={{
           flex: 1,
@@ -207,19 +245,20 @@ function Sidebar({
             to,
             icon: Icon,
             label,
-            badge,
           } = item;
 
           const isMessages = label === "Messages";
+
           const currentBadge = isMessages
             ? unreadMessages
-            : badge;
+            : 0;
 
           return (
             <NavLink
               key={to}
               to={to}
               end={to === "/student/dashboard"}
+              onClick={onClose}
               style={({ isActive }) => ({
                 display: "flex",
                 alignItems: "center",
@@ -253,31 +292,34 @@ function Sidebar({
                 {label}
               </span>
 
-             {currentBadge !== undefined && currentBadge > 0 && (
-  <span
-    style={{
-      minWidth: 20,
-      height: 18,
-      padding: "0 5px",
-      borderRadius: 9,
-      background: C.accent,
-      color: "#fff",
-      fontSize: 10,
-      fontWeight: 700,
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      flexShrink: 0,
-    }}
-  >
-    {currentBadge > 99 ? "99+" : currentBadge}
-  </span>
-)}
+              {isMessages && currentBadge > 0 && (
+                <span
+                  style={{
+                    minWidth: 20,
+                    height: 18,
+                    padding: "0 5px",
+                    borderRadius: 9,
+                    background: C.accent,
+                    color: "#fff",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  {currentBadge > 99
+                    ? "99+"
+                    : currentBadge}
+                </span>
+              )}
             </NavLink>
           );
         })}
       </nav>
 
+      {/* Sign Out */}
       <div
         style={{
           padding: "10px 10px 16px",
@@ -306,11 +348,17 @@ function Sidebar({
           Sign Out
         </button>
       </div>
-    </aside>
+    </>
   );
 }
 
-function TopBar({ student }: { student: any }) {
+function TopBar({
+  student,
+  onMenu,
+}: {
+  student: any;
+  onMenu: () => void;
+}) {
   return (
     <div
       style={{
@@ -319,17 +367,36 @@ function TopBar({ student }: { student: any }) {
         background: "#fff",
         display: "flex",
         alignItems: "center",
-        justifyContent: "space-between",
         padding: "0 24px",
-        gap: 20,
+        gap: 16,
         flexShrink: 0,
       }}
     >
+      {/* Mobile Menu Button */}
+      <button
+        onClick={onMenu}
+        className="lg:hidden"
+        type="button"
+        style={{
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          color: C.textSec,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 4,
+          flexShrink: 0,
+        }}
+      >
+        <Menu size={21} />
+      </button>
+
+      {/* Search */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 12,
           flex: 1,
           minWidth: 0,
         }}
@@ -347,6 +414,14 @@ function TopBar({ student }: { student: any }) {
             width: "100%",
           }}
         >
+          <Search
+            size={14}
+            style={{
+              color: C.textMuted,
+              flexShrink: 0,
+            }}
+          />
+
           <input
             placeholder="Search jobs, companies..."
             style={{
@@ -363,6 +438,7 @@ function TopBar({ student }: { student: any }) {
         </div>
       </div>
 
+      {/* Profile */}
       <NavLink
         to="/student/profile"
         style={{
@@ -389,32 +465,34 @@ function TopBar({ student }: { student: any }) {
           }}
         />
 
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-          }}
-        >
-          <span
+        <div className="hidden sm:flex">
+          <div
             style={{
-              fontFamily: F,
-              fontSize: 12,
-              fontWeight: 600,
-              color: C.text,
+              display: "flex",
+              flexDirection: "column",
             }}
           >
-            {student?.name || "Student"}
-          </span>
+            <span
+              style={{
+                fontFamily: F,
+                fontSize: 12,
+                fontWeight: 600,
+                color: C.text,
+              }}
+            >
+              {student?.name || "Student"}
+            </span>
 
-          <span
-            style={{
-              fontFamily: F,
-              fontSize: 10,
-              color: C.textSec,
-            }}
-          >
-            Student
-          </span>
+            <span
+              style={{
+                fontFamily: F,
+                fontSize: 10,
+                color: C.textSec,
+              }}
+            >
+              Student
+            </span>
+          </div>
         </div>
       </NavLink>
     </div>
@@ -422,8 +500,8 @@ function TopBar({ student }: { student: any }) {
 }
 
 export default function StudentLayout() {
-  const [, setSidebarOpen] = useState(false);
-  const [student, setStudent] = useState<any>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [student, setStudent] = useState(null);
   const [unreadMessages, setUnreadMessages] = useState(0);
 
   const { role } = useAuth();
@@ -510,10 +588,12 @@ export default function StudentLayout() {
 
     return () => {
       supabase.removeChannel(channel);
+
       window.removeEventListener(
         "messages:unread-reset",
         handleReset
       );
+
       window.clearInterval(interval);
     };
   }, [role]);
@@ -531,32 +611,83 @@ export default function StudentLayout() {
         display: "flex",
       }}
     >
-      <Sidebar
-        student={student}
-        unreadMessages={unreadMessages}
-        onUnreadReset={loadUnreadMessages}
-      />
+      {/* Dark overlay on mobile */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
+      {/* Desktop Sidebar */}
+      <div
+        className="hidden lg:flex"
+        style={{
+          width: 240,
+          flexShrink: 0,
+          background: "#fff",
+          borderRight: `1px solid ${C.border}`,
+          flexDirection: "column",
+          overflow: "hidden",
+          height: "100vh",
+          position: "sticky",
+          top: 0,
+        }}
+      >
+        <Sidebar
+          student={student}
+          unreadMessages={unreadMessages}
+          onUnreadReset={loadUnreadMessages}
+        />
+      </div>
+
+      {/* Mobile Sidebar */}
+      {sidebarOpen && (
+        <div
+          className="fixed left-0 top-0 bottom-0 z-50 lg:hidden"
+          style={{
+            width: 272,
+            maxWidth: "85vw",
+            background: "#fff",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow:
+              "4px 0 24px rgba(0,0,0,0.12)",
+            overflow: "hidden",
+          }}
+        >
+          <Sidebar
+            student={student}
+            unreadMessages={unreadMessages}
+            onUnreadReset={loadUnreadMessages}
+            onClose={() => setSidebarOpen(false)}
+          />
+        </div>
+      )}
+
+      {/* Main Content */}
       <div
         style={{
-          marginLeft: 240,
-          width: "calc(100% - 240px)",
+          flex: 1,
           minWidth: 0,
           minHeight: "100vh",
           display: "flex",
           flexDirection: "column",
         }}
       >
-        <TopBar student={student} />
+        <TopBar
+          student={student}
+          onMenu={() => setSidebarOpen(true)}
+        />
 
         <main
           style={{
             flex: 1,
-            padding: "24px",
+            overflow: "auto",
+            padding: "32px",
             width: "100%",
             minWidth: 0,
             boxSizing: "border-box",
-            overflowX: "auto",
           }}
         >
           <Outlet />

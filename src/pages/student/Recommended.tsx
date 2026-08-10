@@ -109,8 +109,8 @@ export default function Recommended() {
           <h1
             style={{
               margin: 0,
-              fontSize: 26,
-              fontWeight: 700,
+              fontSize: 24,
+              fontWeight: 900,
               color: C.text,
             }}
           >

@@ -124,15 +124,15 @@ export default function JobDiscovery() {
           }}
         >
           <h1
-  style={{
-    margin: 0,
-    fontSize: 26,
-    fontWeight: 700,
-    color: C.text,
-  }}
->
-  Find Jobs
-</h1>
+            style={{
+              margin: 0,
+              fontSize: 24,
+              fontWeight: 900,
+              color: C.text,
+            }}
+          >
+            Find Jobs
+          </h1>
 
           <p
             style={{
@@ -161,6 +161,7 @@ export default function JobDiscovery() {
             display: "flex",
             gap: 12,
             marginBottom: 24,
+            width: "100%",
           }}
         >
           <div
@@ -223,10 +224,9 @@ export default function JobDiscovery() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "180px minmax(0, 820px)",
+            gridTemplateColumns: "180px minmax(0, 1fr)",
             gap: 28,
             alignItems: "start",
-            justifyContent: "start",
           }}
         >
           <div
@@ -345,12 +345,14 @@ export default function JobDiscovery() {
           <div
             style={{
               width: "100%",
-              maxWidth: 820,
+              minWidth: 0,
             }}
           >
             {loading ? (
               <div
                 style={{
+                  width: "100%",
+                  boxSizing: "border-box",
                   padding: 50,
                   textAlign: "center",
                   background: C.surface,
@@ -365,6 +367,8 @@ export default function JobDiscovery() {
             ) : error ? (
               <div
                 style={{
+                  width: "100%",
+                  boxSizing: "border-box",
                   padding: 50,
                   textAlign: "center",
                   background: C.surface,
@@ -379,6 +383,8 @@ export default function JobDiscovery() {
             ) : jobs.length === 0 ? (
               <div
                 style={{
+                  width: "100%",
+                  boxSizing: "border-box",
                   padding: 50,
                   textAlign: "center",
                   background: C.surface,
@@ -397,6 +403,7 @@ export default function JobDiscovery() {
                   gridTemplateColumns:
                     "repeat(2, minmax(0, 1fr))",
                   gap: 18,
+                  width: "100%",
                 }}
               >
                 {jobs.map((job) => (

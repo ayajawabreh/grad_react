@@ -16,7 +16,6 @@ import {
   Menu,
   X,
 } from "lucide-react";
-
 import { C, F } from "../constants/tokens";
 import { useAuth } from "../context/AuthContext";
 import { getCompanyProfile } from "../imports/api";
@@ -48,13 +47,11 @@ const NAV = [
     to: "/company/applicants",
     icon: Users,
     label: "Applicants",
-    badge: 12,
   },
   {
     to: "/company/interviews",
     icon: Calendar,
     label: "Interviews",
-    badge: 3,
   },
   null,
   {
@@ -66,13 +63,11 @@ const NAV = [
     to: "/company/messages",
     icon: MessageSquare,
     label: "Messages",
-    badge: 4,
   },
   {
     to: "/company/notifications",
     icon: Bell,
     label: "Notifications",
-    badge: 7,
   },
   null,
   {
@@ -93,7 +88,6 @@ interface Company {
 function Sidebar({ onClose }: { onClose?: () => void }) {
   const { logout } = useAuth();
   const nav = useNavigate();
-
   const [company, setCompany] = useState<Company | null>(null);
 
   useEffect(() => {
@@ -238,9 +232,8 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
             to,
             icon: Icon,
             label,
-            badge,
             accent,
-          } = item as any;
+          } = item;
 
           return (
             <NavLink
@@ -255,19 +248,16 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
                 padding: "9px 12px",
                 borderRadius: 12,
                 textDecoration: "none",
-
                 background: isActive
                   ? C.accentLight
                   : accent
                   ? C.dark + "08"
                   : "transparent",
-
                 color: isActive
                   ? C.accent
                   : accent
                   ? C.dark
                   : C.textSec,
-
                 fontFamily: F,
                 fontSize: 13,
                 fontWeight: isActive ? 600 : accent ? 600 : 400,
@@ -276,28 +266,13 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
             >
               <Icon size={16} />
 
-              <span style={{ flex: 1 }}>{label}</span>
-
-              {badge && (
-                <span
-                  style={{
-                    minWidth: 20,
-                    height: 18,
-                    padding: "0 5px",
-                    borderRadius: 9,
-                    background: C.accent,
-                    color: "#fff",
-                    fontSize: 10,
-                    fontWeight: 700,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontFamily: F,
-                  }}
-                >
-                  {badge}
-                </span>
-              )}
+              <span
+                style={{
+                  flex: 1,
+                }}
+              >
+                {label}
+              </span>
             </NavLink>
           );
         })}
@@ -336,7 +311,6 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
 
 function TopBar({ onMenu }: { onMenu: () => void }) {
   const nav = useNavigate();
-
   const [company, setCompany] = useState<Company | null>(null);
 
   useEffect(() => {
@@ -465,19 +439,6 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
             }}
           >
             <Bell size={17} />
-
-            <span
-              style={{
-                position: "absolute",
-                top: 6,
-                right: 6,
-                width: 7,
-                height: 7,
-                borderRadius: "50%",
-                background: C.error,
-                border: "1.5px solid white",
-              }}
-            />
           </div>
         </NavLink>
 
@@ -560,7 +521,6 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
 
 export default function CompanyLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
   const { role } = useAuth();
   const nav = useNavigate();
 

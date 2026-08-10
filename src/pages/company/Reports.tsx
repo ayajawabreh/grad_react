@@ -130,9 +130,9 @@ export default function Reports() {
   return (
     <div className="max-w-7xl mx-auto px-6 pb-6 md:px-10 md:pb-10 space-y-10 bg-slate-50 min-h-screen text-slate-900 leading-normal">
       <div className="pb-6 border-b border-slate-200">
-        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-          Reports & Analytics
-        </h1>
+       <h1 className="text-[24px] font-black text-slate-900 tracking-tight">
+  Reports & Analytics
+</h1>
         <p className="text-sm text-slate-500 mt-1">
           Track hiring performance and key metrics.
         </p>

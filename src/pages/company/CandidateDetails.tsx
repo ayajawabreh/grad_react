@@ -17,7 +17,8 @@ import {
   Award,
   ExternalLink,
   Download,
-  Loader2
+  Loader2,
+  Languages
 } from "lucide-react";
 
 import {
@@ -32,7 +33,14 @@ import {
 import { API } from "../../imports/api";
 
 const TABS = ["Profile", "Resume", "Notes"] as const;
-const STATUS_OPTIONS = ["Applied", "Screening", "Interview", "Offer", "Hired", "Rejected"] as const;
+const STATUS_OPTIONS = [
+  "Applied",
+  "Screening",
+  "Interview",
+  "Offer",
+  "Hired",
+  "Rejected"
+] as const;
 
 export default function CandidateDetails() {
   const nav = useNavigate();
@@ -43,9 +51,8 @@ export default function CandidateDetails() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<(typeof TABS)[number]>("Profile");
   const [newNote, setNewNote] = useState("");
-  const [status, setStatus] = useState<string>("Applied");
+  const [status, setStatus] = useState("Applied");
 
-  // حالات ملخص الذكاء الاصطناعي
   const [showAISummary, setShowAISummary] = useState(false);
   const [loadingAISummary, setLoadingAISummary] = useState(false);
   const [aiSummaryError, setAiSummaryError] = useState<string | null>(null);
@@ -57,7 +64,7 @@ export default function CandidateDetails() {
 
     Promise.all([
       fetchApplicantDetails(applicantId),
-      fetchApplicantNotes(applicantId).catch(() => []),
+      fetchApplicantNotes(applicantId).catch(() => [])
     ])
       .then(([applicant, notesData]) => {
         setCandidate(applicant);
@@ -80,49 +87,75 @@ export default function CandidateDetails() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  const resume = (candidate as any)?.resume || null;
+
+  const parseResumeField = <T,>(value: any, fallback: T): T => {
+    if (Array.isArray(value)) {
+      return value as T;
+    }
+
+    if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value);
+        return parsed ?? fallback;
+      } catch {
+        return fallback;
+      }
+    }
+
+    return value ?? fallback;
+  };
+
+  const resumeSkills = parseResumeField<any[]>(resume?.skills, []);
+  const resumeExperience = parseResumeField<any[]>(resume?.experience, []);
+  const resumeEducation = parseResumeField<any[]>(resume?.education, []);
+  const resumeProjects = parseResumeField<any[]>(resume?.projects, []);
+  const resumeCertificates = parseResumeField<any[]>(resume?.certificates, []);
+  const resumeLanguages = parseResumeField<any[]>(resume?.languages, []);
+
   const matchPercentage = candidate?.match?.percentage ?? 0;
   const matchReasons = candidate?.match?.reasons ?? [];
 
-  // دالة التعامل مع الضغط على زر الذكاء الاصطناعي مع معالجة أفضل للأخطاء وإعادة المحاولة
- const handleToggleAISummary = async () => {
-  if (showAISummary) {
-    setShowAISummary(false);
-    return;
-  }
+  const handleToggleAISummary = async () => {
+    if (showAISummary) {
+      setShowAISummary(false);
+      return;
+    }
 
-  setShowAISummary(true);
+    setShowAISummary(true);
 
-  if ((!candidate?.ai_summary || aiSummaryError) && id) {
-    setLoadingAISummary(true);
-    setAiSummaryError(null);
+    if ((!candidate?.ai_summary || aiSummaryError) && id) {
+      setLoadingAISummary(true);
+      setAiSummaryError(null);
 
-    try {
-      const summaryText = await fetchApplicantAISummary(Number(id));
+      try {
+        const summaryText = await fetchApplicantAISummary(Number(id));
 
-      if (summaryText && summaryText.trim()) {
-        setCandidate((prev) =>
-          prev
-            ? {
-                ...prev,
-                ai_summary: summaryText,
-              }
-            : prev
-        );
-      } else {
+        if (summaryText && summaryText.trim()) {
+          setCandidate((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  ai_summary: summaryText
+                }
+              : prev
+          );
+        } else {
+          setAiSummaryError(
+            "Failed to generate AI summary. Please try again."
+          );
+        }
+      } catch (err) {
+        console.error("Failed to fetch AI summary:", err);
         setAiSummaryError(
           "Failed to generate AI summary. Please try again."
         );
+      } finally {
+        setLoadingAISummary(false);
       }
-    } catch (err) {
-      console.error("Failed to fetch AI summary:", err);
-      setAiSummaryError(
-        "Failed to generate AI summary. Please try again."
-      );
-    } finally {
-      setLoadingAISummary(false);
     }
-  }
-};
+  };
+
   const handleAddNote = async () => {
     if (!newNote.trim() || !id) return;
 
@@ -151,7 +184,7 @@ export default function CandidateDetails() {
       await API.put(
         `/company/applicants/${candidate.application_id}/status`,
         {
-          status: newStatus,
+          status: newStatus
         }
       );
 
@@ -161,7 +194,7 @@ export default function CandidateDetails() {
         prev
           ? {
               ...prev,
-              status: newStatus,
+              status: newStatus
             }
           : prev
       );
@@ -183,16 +216,28 @@ export default function CandidateDetails() {
       >
         <Clock
           size={24}
-          style={{ animation: "spin 1s linear infinite", marginBottom: 8 }}
+          style={{
+            animation: "spin 1s linear infinite",
+            marginBottom: 8
+          }}
         />
-        <p style={{ margin: 0, fontSize: 14 }}>Loading candidate profile...</p>
+        <p style={{ margin: 0, fontSize: 14 }}>
+          Loading candidate profile...
+        </p>
       </div>
     );
   }
 
   if (!candidate) {
     return (
-      <div style={{ fontFamily: F, color: C.text, padding: 24, maxWidth: 600 }}>
+      <div
+        style={{
+          fontFamily: F,
+          color: C.text,
+          padding: 24,
+          maxWidth: 600
+        }}
+      >
         <Btn
           v="ghost"
           icon={ArrowLeft}
@@ -201,6 +246,7 @@ export default function CandidateDetails() {
         >
           Back to Applicants
         </Btn>
+
         <div
           style={{
             background: C.surface,
@@ -210,10 +256,27 @@ export default function CandidateDetails() {
             textAlign: "center"
           }}
         >
-          <UserCheck size={40} style={{ opacity: 0.3, marginBottom: 12 }} />
-          <h3 style={{ margin: "0 0 8px" }}>Candidate Not Found</h3>
-          <p style={{ color: C.textSec, fontSize: 14, margin: 0 }}>
-            The applicant profile you are looking for does not exist or has been removed.
+          <UserCheck
+            size={40}
+            style={{
+              opacity: 0.3,
+              marginBottom: 12
+            }}
+          />
+
+          <h3 style={{ margin: "0 0 8px" }}>
+            Candidate Not Found
+          </h3>
+
+          <p
+            style={{
+              color: C.textSec,
+              fontSize: 14,
+              margin: 0
+            }}
+          >
+            The applicant profile you are looking for does not exist or has
+            been removed.
           </p>
         </div>
       </div>
@@ -221,10 +284,11 @@ export default function CandidateDetails() {
   }
 
   const resumeFilePath =
-    (candidate as any)?.resume?.file_path ||
+    resume?.file_path ||
+    resume?.resume_url ||
     (candidate as any)?.resume_url ||
-    (candidate?.student as any)?.resume_url ||
-    (candidate?.student as any)?.resume;
+    (candidate.student as any)?.resume_url ||
+    (candidate.student as any)?.resume;
 
   const resumeUrl = resumeFilePath
     ? resumeFilePath.startsWith("http")
@@ -232,14 +296,40 @@ export default function CandidateDetails() {
       : `http://127.0.0.1:8000/storage/${resumeFilePath}`
     : null;
 
-  const experiencesList = Array.isArray(candidate.experience)
-    ? candidate.experience
-    : Array.isArray((candidate as any).experiences)
-    ? (candidate as any).experiences
+  const studentSkills = Array.isArray((candidate as any)?.skills)
+    ? (candidate as any).skills
     : [];
 
+  const displaySkills =
+    candidate.match?.matching_skills?.length
+      ? candidate.match.matching_skills
+      : resumeSkills.length
+      ? resumeSkills
+          .map((skill: any) =>
+            typeof skill === "string" ? skill : skill?.name
+          )
+          .filter(Boolean)
+      : studentSkills;
+
+  const experiencesList =
+    resumeExperience.length > 0
+      ? resumeExperience
+      : Array.isArray((candidate as any)?.experience)
+      ? (candidate as any).experience
+      : Array.isArray((candidate as any)?.experiences)
+      ? (candidate as any).experiences
+      : [];
+
   return (
-    <div style={{ fontFamily: F, color: C.text, maxWidth: 1100, margin: "0 auto", padding: "0 16px" }}>
+    <div
+      style={{
+        fontFamily: F,
+        color: C.text,
+        maxWidth: 1100,
+        margin: "0 auto",
+        padding: "0 16px"
+      }}
+    >
       <div style={{ marginBottom: 16 }}>
         <button
           onClick={() => nav("/company/applicants")}
@@ -256,7 +346,8 @@ export default function CandidateDetails() {
             padding: 0
           }}
         >
-          <ArrowLeft size={14} /> Back to Applicants
+          <ArrowLeft size={15} />
+          Back to Applicants
         </button>
       </div>
 
@@ -268,7 +359,13 @@ export default function CandidateDetails() {
           alignItems: "start"
         }}
       >
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 16
+          }}
+        >
           <div
             style={{
               background: C.surface,
@@ -278,7 +375,13 @@ export default function CandidateDetails() {
               textAlign: "center"
             }}
           >
-            <div style={{ position: "relative", display: "inline-block", marginBottom: 12 }}>
+            <div
+              style={{
+                position: "relative",
+                display: "inline-block",
+                marginBottom: 12
+              }}
+            >
               <img
                 src={
                   candidate.student.avatar ||
@@ -315,7 +418,13 @@ export default function CandidateDetails() {
               {candidate.student.headline || "No headline provided"}
             </p>
 
-            <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "center",
+                marginBottom: 20
+              }}
+            >
               <MatchRing v={matchPercentage} />
             </div>
 
@@ -330,6 +439,7 @@ export default function CandidateDetails() {
             >
               {STATUS_OPTIONS.map((st) => {
                 const isActive = status === st;
+
                 return (
                   <Btn
                     key={st}
@@ -359,24 +469,51 @@ export default function CandidateDetails() {
                 marginTop: 16
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 8, color: C.textSec }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  color: C.textSec
+                }}
+              >
                 <Mail size={14} style={{ flexShrink: 0 }} />
-                <span style={{ color: C.textSec, overflow: "hidden", textOverflow: "ellipsis" }}>
+                <span
+                  style={{
+                    color: C.textSec,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis"
+                  }}
+                >
                   {candidate.student.email}
                 </span>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 8, color: C.textSec }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  color: C.textSec
+                }}
+              >
                 <MapPin size={14} style={{ flexShrink: 0 }} />
-                <span>{candidate.student.location || "Not specified"}</span>
+                <span>
+                  {candidate.student.location || "Not specified"}
+                </span>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 8, color: C.textSec }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  color: C.textSec
+                }}
+              >
                 <Briefcase size={14} style={{ flexShrink: 0 }} />
                 <span>
-                  {typeof candidate.experience === "string"
-                    ? candidate.experience
-                    : experiencesList.length > 0
+                  {experiencesList.length > 0
                     ? `${experiencesList.length} experience record(s)`
                     : "Not specified"}
                 </span>
@@ -404,7 +541,13 @@ export default function CandidateDetails() {
             </h3>
 
             {candidate.timeline && candidate.timeline.length > 0 ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 16
+                }}
+              >
                 {candidate.timeline.map((item, idx, arr) => (
                   <div
                     key={item.id ?? idx}
@@ -458,18 +601,26 @@ export default function CandidateDetails() {
                           marginTop: 2
                         }}
                       >
-                        {new Date(item.changed_at).toLocaleDateString("en-US", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
+                        {new Date(item.changed_at).toLocaleDateString(
+                          "en-US",
+                          {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric"
+                          }
+                        )}
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div style={{ fontSize: 12, color: C.textSec }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: C.textSec
+                }}
+              >
                 No timeline data available yet.
               </div>
             )}
@@ -477,9 +628,16 @@ export default function CandidateDetails() {
         </div>
 
         <div>
-          <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              marginBottom: 20
+            }}
+          >
             {TABS.map((t) => {
               const active = tab === t;
+
               return (
                 <Btn
                   key={t}
@@ -493,9 +651,21 @@ export default function CandidateDetails() {
             })}
           </div>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 20
+            }}
+          >
             {tab === "Profile" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 20
+                }}
+              >
                 <div
                   onClick={handleToggleAISummary}
                   style={{
@@ -529,19 +699,42 @@ export default function CandidateDetails() {
                     </div>
 
                     <span style={{ fontSize: 11 }}>
-                      {showAISummary ? "Hide" : candidate?.ai_summary ? "View" : "Generate Summary"}
+                      {showAISummary
+                        ? "Hide"
+                        : candidate?.ai_summary
+                        ? "View"
+                        : "Generate Summary"}
                     </span>
                   </div>
 
                   {showAISummary && (
                     <div style={{ marginTop: 10 }}>
                       {loadingAISummary ? (
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#6B46C1", fontSize: 12.5 }}>
-                          <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} />
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            color: "#6B46C1",
+                            fontSize: 12.5
+                          }}
+                        >
+                          <Loader2
+                            size={14}
+                            style={{
+                              animation: "spin 1s linear infinite"
+                            }}
+                          />
                           Generating AI summary...
                         </div>
                       ) : aiSummaryError ? (
-                        <p style={{ margin: 0, fontSize: 12.5, color: "#E53E3E" }}>
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: 12.5,
+                            color: "#E53E3E"
+                          }}
+                        >
                           {aiSummaryError}
                         </p>
                       ) : (
@@ -571,26 +764,48 @@ export default function CandidateDetails() {
                   >
                     Skills
                   </h3>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {(candidate.match?.matching_skills?.length
-                      ? candidate.match.matching_skills
-                      : candidate.skills || []
-                    ).map((skill) => (
-                      <span
-                        key={skill}
-                        style={{
-                          background: "#F2EBE1",
-                          color: "#524538",
-                          padding: "5px 14px",
-                          borderRadius: 16,
-                          fontSize: 12,
-                          fontWeight: 500
-                        }}
-                      >
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
+
+                  {displaySkills.length > 0 ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 8
+                      }}
+                    >
+                      {displaySkills.map((skill: any, index: number) => {
+                        const skillName =
+                          typeof skill === "string"
+                            ? skill
+                            : skill?.name;
+
+                        return (
+                          <span
+                            key={`${skillName}-${index}`}
+                            style={{
+                              background: "#F2EBE1",
+                              color: "#524538",
+                              padding: "5px 14px",
+                              borderRadius: 16,
+                              fontSize: 12,
+                              fontWeight: 500
+                            }}
+                          >
+                            {skillName}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        fontSize: 12.5,
+                        color: C.textSec
+                      }}
+                    >
+                      No skills provided.
+                    </div>
+                  )}
 
                   {(candidate.match?.missing_skills ?? []).length > 0 && (
                     <>
@@ -604,22 +819,31 @@ export default function CandidateDetails() {
                       >
                         Missing Skills
                       </h3>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                        {(candidate.match?.missing_skills || []).map((skill) => (
-                          <span
-                            key={skill}
-                            style={{
-                              background: "#FEE2E2",
-                              color: "#991B1B",
-                              padding: "5px 14px",
-                              borderRadius: 16,
-                              fontSize: 12,
-                              fontWeight: 500
-                            }}
-                          >
-                            {skill}
-                          </span>
-                        ))}
+
+                      <div
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 8
+                        }}
+                      >
+                        {(candidate.match?.missing_skills || []).map(
+                          (skill) => (
+                            <span
+                              key={skill}
+                              style={{
+                                background: "#FEE2E2",
+                                color: "#991B1B",
+                                padding: "5px 14px",
+                                borderRadius: 16,
+                                fontSize: 12,
+                                fontWeight: 500
+                              }}
+                            >
+                              {skill}
+                            </span>
+                          )
+                        )}
                       </div>
                     </>
                   )}
@@ -636,8 +860,15 @@ export default function CandidateDetails() {
                   >
                     Why This Match
                   </h3>
+
                   {matchReasons.length > 0 ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 8
+                      }}
+                    >
                       {matchReasons.map((reason, idx) => (
                         <div
                           key={idx}
@@ -652,7 +883,12 @@ export default function CandidateDetails() {
                       ))}
                     </div>
                   ) : (
-                    <div style={{ fontSize: 12.5, color: C.textSec }}>
+                    <div
+                      style={{
+                        fontSize: 12.5,
+                        color: C.textSec
+                      }}
+                    >
                       No match details available.
                     </div>
                   )}
@@ -661,7 +897,13 @@ export default function CandidateDetails() {
             )}
 
             {tab === "Resume" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 20
+                }}
+              >
                 {resumeUrl ? (
                   <div
                     style={{
@@ -674,7 +916,13 @@ export default function CandidateDetails() {
                       border: `1px solid ${C.border}`
                     }}
                   >
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12
+                      }}
+                    >
                       <div
                         style={{
                           width: 40,
@@ -689,32 +937,60 @@ export default function CandidateDetails() {
                       >
                         <FileText size={20} />
                       </div>
+
                       <div>
-                        <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>
-                          Resume Document (PDF)
+                        <div
+                          style={{
+                            fontWeight: 600,
+                            fontSize: 14,
+                            color: C.text
+                          }}
+                        >
+                          {resume?.title || "Resume Document"}
                         </div>
-                        <div style={{ fontSize: 12, color: C.textSec }}>
-                          Click to open or download official CV
+
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: C.textSec
+                          }}
+                        >
+                          Official CV PDF
                         </div>
                       </div>
                     </div>
-                    <div style={{ display: "flex", gap: 8 }}>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 8
+                      }}
+                    >
                       <a
                         href={resumeUrl}
                         target="_blank"
                         rel="noreferrer"
                         style={{ textDecoration: "none" }}
                       >
-                        <Btn v="primary" size="sm" icon={ExternalLink}>
+                        <Btn
+                          v="primary"
+                          size="sm"
+                          icon={ExternalLink}
+                        >
                           View Resume
                         </Btn>
                       </a>
+
                       <a
                         href={resumeUrl}
                         download
                         style={{ textDecoration: "none" }}
                       >
-                        <Btn v="ghost" size="sm" icon={Download}>
+                        <Btn
+                          v="ghost"
+                          size="sm"
+                          icon={Download}
+                        >
                           Download
                         </Btn>
                       </a>
@@ -735,83 +1011,565 @@ export default function CandidateDetails() {
                   </div>
                 )}
 
-                <div style={{ padding: 16, border: `1px solid ${C.border}`, borderRadius: 16, background: C.surface }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, color: C.textSec, marginBottom: 8, fontSize: 12 }}>
-                    <GraduationCap size={16} /> Education
+                <div
+                  style={{
+                    padding: 20,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 16,
+                    background: C.surface
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      color: C.text,
+                      marginBottom: 14,
+                      fontSize: 14,
+                      fontWeight: 600
+                    }}
+                  >
+                    <GraduationCap size={17} />
+                    Education
                   </div>
-                  <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>
-                    {candidate?.student?.university || "Not specified"}
-                  </div>
-                  {candidate?.student?.major && (
-                    <div style={{ fontSize: 12, color: C.textSec, marginTop: 2 }}>
-                      {candidate.student.major}
+
+                  {resumeEducation.length > 0 ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 14
+                      }}
+                    >
+                      {resumeEducation.map(
+                        (education: any, index: number) => (
+                          <div key={index}>
+                            <div
+                              style={{
+                                fontWeight: 600,
+                                fontSize: 14,
+                                color: C.text
+                              }}
+                            >
+                              {education.degree || "Education"}
+                            </div>
+
+                            {education.university && (
+                              <div
+                                style={{
+                                  fontSize: 12.5,
+                                  color: C.textSec,
+                                  marginTop: 3
+                                }}
+                              >
+                                {education.university}
+                              </div>
+                            )}
+
+                            {education.field_of_study && (
+                              <div
+                                style={{
+                                  fontSize: 12,
+                                  color: C.textSec,
+                                  marginTop: 2
+                                }}
+                              >
+                                {education.field_of_study}
+                              </div>
+                            )}
+
+                            {(education.start_date ||
+                              education.end_date) && (
+                              <div
+                                style={{
+                                  fontSize: 11.5,
+                                  color: C.textSec,
+                                  marginTop: 4
+                                }}
+                              >
+                                {education.start_date || ""}
+                                {education.start_date &&
+                                education.end_date
+                                  ? " - "
+                                  : ""}
+                                {education.end_date || ""}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      )}
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        fontSize: 12.5,
+                        color: C.textSec
+                      }}
+                    >
+                      No education information provided.
                     </div>
                   )}
                 </div>
 
-                <div style={{ padding: 20, border: `1px solid ${C.border}`, borderRadius: 16, background: C.surface }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, color: C.text, marginBottom: 12, fontSize: 14, fontWeight: 600 }}>
-                    <Briefcase size={16} /> Work Experience
+                <div
+                  style={{
+                    padding: 20,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 16,
+                    background: C.surface
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      color: C.text,
+                      marginBottom: 14,
+                      fontSize: 14,
+                      fontWeight: 600
+                    }}
+                  >
+                    <Briefcase size={16} />
+                    Work Experience
                   </div>
-                  {experiencesList.length > 0 ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                      {experiencesList.map((exp: any, i: number) => (
-                        <div key={i} style={{ borderBottom: i !== experiencesList.length - 1 ? `1px solid ${C.border}` : "none", paddingBottom: 10 }}>
-                          <div style={{ fontWeight: 600, fontSize: 13, color: C.text }}>{exp.title || exp.role || "Position"}</div>
-                          <div style={{ fontSize: 12, color: C.textSec }}>
-                            {exp.company || ""} {exp.duration || exp.dates ? `• ${exp.duration || exp.dates}` : ""}
+
+                  {resumeExperience.length > 0 ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 14
+                      }}
+                    >
+                      {resumeExperience.map(
+                        (exp: any, index: number) => (
+                          <div
+                            key={index}
+                            style={{
+                              borderBottom:
+                                index !== resumeExperience.length - 1
+                                  ? `1px solid ${C.border}`
+                                  : "none",
+                              paddingBottom: 12
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontWeight: 600,
+                                fontSize: 13,
+                                color: C.text
+                              }}
+                            >
+                              {exp.title ||
+                                exp.role ||
+                                "Position"}
+                            </div>
+
+                            {exp.company && (
+                              <div
+                                style={{
+                                  fontSize: 12,
+                                  color: C.textSec,
+                                  marginTop: 2
+                                }}
+                              >
+                                {exp.company}
+                              </div>
+                            )}
+
+                            {(exp.start_date ||
+                              exp.end_date) && (
+                              <div
+                                style={{
+                                  fontSize: 11.5,
+                                  color: C.textSec,
+                                  marginTop: 3
+                                }}
+                              >
+                                {exp.start_date || ""}
+                                {exp.start_date &&
+                                exp.end_date
+                                  ? " - "
+                                  : ""}
+                                {exp.end_date || ""}
+                              </div>
+                            )}
+
+                            {exp.description && (
+                              <p
+                                style={{
+                                  fontSize: 12,
+                                  color: C.textSec,
+                                  margin: "5px 0 0",
+                                  lineHeight: 1.5
+                                }}
+                              >
+                                {exp.description}
+                              </p>
+                            )}
                           </div>
-                          {exp.description && <p style={{ fontSize: 12, color: C.textSec, margin: "4px 0 0" }}>{exp.description}</p>}
-                        </div>
-                      ))}
-                    </div>
-                  ) : typeof candidate?.experience === "string" && candidate.experience.trim() !== "" ? (
-                    <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>
-                      {candidate.experience}
+                        )
+                      )}
                     </div>
                   ) : (
-                    <div style={{ fontSize: 12.5, color: C.textSec }}>
+                    <div
+                      style={{
+                        fontSize: 12.5,
+                        color: C.textSec
+                      }}
+                    >
                       No work experience provided.
                     </div>
                   )}
                 </div>
 
-                <div style={{ padding: 20, border: `1px solid ${C.border}`, borderRadius: 16, background: C.surface }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, color: C.text, marginBottom: 12, fontSize: 14, fontWeight: 600 }}>
-                    <FileText size={16} /> Projects
+                <div
+                  style={{
+                    padding: 20,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 16,
+                    background: C.surface
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      color: C.text,
+                      marginBottom: 14,
+                      fontSize: 14,
+                      fontWeight: 600
+                    }}
+                  >
+                    <FileText size={16} />
+                    Skills
                   </div>
-                  {((candidate as any).projects && (candidate as any).projects.length > 0) ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                      {(candidate as any).projects.map((proj: any, i: number) => (
-                        <div key={i} style={{ borderBottom: i !== (candidate as any).projects.length - 1 ? `1px solid ${C.border}` : "none", paddingBottom: 10 }}>
-                          <div style={{ fontWeight: 600, fontSize: 13, color: C.text }}>{proj.title || proj.name}</div>
-                          {proj.description && <p style={{ fontSize: 12, color: C.textSec, margin: "4px 0 0" }}>{proj.description}</p>}
-                        </div>
-                      ))}
+
+                  {resumeSkills.length > 0 ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 8
+                      }}
+                    >
+                      {resumeSkills.map(
+                        (skill: any, index: number) => {
+                          const skillName =
+                            typeof skill === "string"
+                              ? skill
+                              : skill?.name;
+
+                          return (
+                            <span
+                              key={`${skillName}-${index}`}
+                              style={{
+                                background: "#F2EBE1",
+                                color: "#524538",
+                                padding: "6px 14px",
+                                borderRadius: 16,
+                                fontSize: 12,
+                                fontWeight: 500
+                              }}
+                            >
+                              {skillName}
+                            </span>
+                          );
+                        }
+                      )}
                     </div>
                   ) : (
-                    <div style={{ fontSize: 12.5, color: C.textSec }}>
+                    <div
+                      style={{
+                        fontSize: 12.5,
+                        color: C.textSec
+                      }}
+                    >
+                      No skills listed in this resume.
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  style={{
+                    padding: 20,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 16,
+                    background: C.surface
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      color: C.text,
+                      marginBottom: 14,
+                      fontSize: 14,
+                      fontWeight: 600
+                    }}
+                  >
+                    <FileText size={16} />
+                    Projects
+                  </div>
+
+                  {resumeProjects.length > 0 ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 14
+                      }}
+                    >
+                      {resumeProjects.map(
+                        (project: any, index: number) => (
+                          <div
+                            key={index}
+                            style={{
+                              borderBottom:
+                                index !== resumeProjects.length - 1
+                                  ? `1px solid ${C.border}`
+                                  : "none",
+                              paddingBottom: 12
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontWeight: 600,
+                                fontSize: 13,
+                                color: C.text
+                              }}
+                            >
+                              {project.name ||
+                                project.title ||
+                                "Project"}
+                            </div>
+
+                            {project.description && (
+                              <p
+                                style={{
+                                  fontSize: 12,
+                                  color: C.textSec,
+                                  margin: "5px 0 0",
+                                  lineHeight: 1.5
+                                }}
+                              >
+                                {project.description}
+                              </p>
+                            )}
+
+                            {project.link && (
+                              <a
+                                href={project.link}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                  marginTop: 6,
+                                  fontSize: 11.5,
+                                  color: "#6B46C1",
+                                  textDecoration: "none"
+                                }}
+                              >
+                                <ExternalLink size={12} />
+                                Project Link
+                              </a>
+                            )}
+                          </div>
+                        )
+                      )}
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        fontSize: 12.5,
+                        color: C.textSec
+                      }}
+                    >
                       No projects provided.
                     </div>
                   )}
                 </div>
 
-                <div style={{ padding: 20, border: `1px solid ${C.border}`, borderRadius: 16, background: C.surface }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, color: C.text, marginBottom: 12, fontSize: 14, fontWeight: 600 }}>
-                    <Award size={16} /> Certificates
+                <div
+                  style={{
+                    padding: 20,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 16,
+                    background: C.surface
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      color: C.text,
+                      marginBottom: 14,
+                      fontSize: 14,
+                      fontWeight: 600
+                    }}
+                  >
+                    <Award size={16} />
+                    Certificates
                   </div>
-                  {((candidate as any).certificates && (candidate as any).certificates.length > 0) ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                      {(candidate as any).certificates.map((cert: any, i: number) => (
-                        <div key={i} style={{ borderBottom: i !== (candidate as any).certificates.length - 1 ? `1px solid ${C.border}` : "none", paddingBottom: 10 }}>
-                          <div style={{ fontWeight: 600, fontSize: 13, color: C.text }}>{cert.title || cert.name}</div>
-                          <div style={{ fontSize: 12, color: C.textSec }}>{cert.issuer} {cert.date ? `• ${cert.date}` : ""}</div>
-                        </div>
-                      ))}
+
+                  {resumeCertificates.length > 0 ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 14
+                      }}
+                    >
+                      {resumeCertificates.map(
+                        (certificate: any, index: number) => (
+                          <div
+                            key={index}
+                            style={{
+                              borderBottom:
+                                index !==
+                                resumeCertificates.length - 1
+                                  ? `1px solid ${C.border}`
+                                  : "none",
+                              paddingBottom: 12
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontWeight: 600,
+                                fontSize: 13,
+                                color: C.text
+                              }}
+                            >
+                              {certificate.name ||
+                                certificate.title ||
+                                "Certificate"}
+                            </div>
+
+                            {certificate.issuer && (
+                              <div
+                                style={{
+                                  fontSize: 12,
+                                  color: C.textSec,
+                                  marginTop: 3
+                                }}
+                              >
+                                {certificate.issuer}
+                              </div>
+                            )}
+
+                            {(certificate.year ||
+                              certificate.date) && (
+                              <div
+                                style={{
+                                  fontSize: 11.5,
+                                  color: C.textSec,
+                                  marginTop: 3
+                                }}
+                              >
+                                {certificate.year ||
+                                  certificate.date}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      )}
                     </div>
                   ) : (
-                    <div style={{ fontSize: 12.5, color: C.textSec }}>
+                    <div
+                      style={{
+                        fontSize: 12.5,
+                        color: C.textSec
+                      }}
+                    >
                       No certificates listed.
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  style={{
+                    padding: 20,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 16,
+                    background: C.surface
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      color: C.text,
+                      marginBottom: 14,
+                      fontSize: 14,
+                      fontWeight: 600
+                    }}
+                  >
+                    <Languages size={16} />
+                    Languages
+                  </div>
+
+                  {resumeLanguages.length > 0 ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 8
+                      }}
+                    >
+                      {resumeLanguages.map(
+                        (language: any, index: number) => (
+                          <div
+                            key={index}
+                            style={{
+                              background: "#F7F3EE",
+                              border: `1px solid ${C.border}`,
+                              borderRadius: 12,
+                              padding: "8px 12px"
+                            }}
+                          >
+                            <div
+                              style={{
+                                fontSize: 12.5,
+                                fontWeight: 600,
+                                color: C.text
+                              }}
+                            >
+                              {language.language ||
+                                language.name ||
+                                "Language"}
+                            </div>
+
+                            {language.level && (
+                              <div
+                                style={{
+                                  fontSize: 11,
+                                  color: C.textSec,
+                                  marginTop: 2
+                                }}
+                              >
+                                {language.level}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      )}
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        fontSize: 12.5,
+                        color: C.textSec
+                      }}
+                    >
+                      No languages listed.
                     </div>
                   )}
                 </div>
@@ -819,7 +1577,13 @@ export default function CandidateDetails() {
             )}
 
             {tab === "Notes" && (
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 16
+                }}
+              >
                 <div
                   style={{
                     display: "flex",
@@ -834,7 +1598,9 @@ export default function CandidateDetails() {
                     value={newNote}
                     onChange={(e) => setNewNote(e.target.value)}
                     placeholder="Add an internal note about this applicant..."
-                    onKeyDown={(e) => e.key === "Enter" && handleAddNote()}
+                    onKeyDown={(e) =>
+                      e.key === "Enter" && handleAddNote()
+                    }
                     style={{
                       flex: 1,
                       border: "none",
@@ -846,12 +1612,27 @@ export default function CandidateDetails() {
                       color: C.text
                     }}
                   />
-                  <Btn v="primary" icon={Plus} onClick={handleAddNote} style={{ height: 34, padding: "0 14px" }}>
+
+                  <Btn
+                    v="primary"
+                    icon={Plus}
+                    onClick={handleAddNote}
+                    style={{
+                      height: 34,
+                      padding: "0 14px"
+                    }}
+                  >
                     Add
                   </Btn>
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8
+                  }}
+                >
                   {notes.length > 0 ? (
                     notes.map((note) => (
                       <div
@@ -866,17 +1647,40 @@ export default function CandidateDetails() {
                           background: C.surface
                         }}
                       >
-                        <p style={{ margin: 0, fontSize: 13, color: C.text }}>{note.note}</p>
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: 13,
+                            color: C.text
+                          }}
+                        >
+                          {note.note}
+                        </p>
+
                         <button
-                          onClick={() => handleDeleteNote(note.id)}
-                          style={{ background: "transparent", border: "none", cursor: "pointer", color: C.textSec }}
+                          onClick={() =>
+                            handleDeleteNote(note.id)
+                          }
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            cursor: "pointer",
+                            color: C.textSec
+                          }}
                         >
                           <Trash2 size={14} />
                         </button>
                       </div>
                     ))
                   ) : (
-                    <div style={{ textAlign: "center", padding: "24px 0", color: C.textSec, fontSize: 13 }}>
+                    <div
+                      style={{
+                        textAlign: "center",
+                        padding: "24px 0",
+                        color: C.textSec,
+                        fontSize: 13
+                      }}
+                    >
                       No notes created for this candidate yet.
                     </div>
                   )}

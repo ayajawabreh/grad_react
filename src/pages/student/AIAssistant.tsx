@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { C, F } from "../../constants/tokens";
 import { Btn } from "../../components/ui";
@@ -17,35 +16,6 @@ import {
   generateInterviewQuestions,
   getSavedJobs,
 } from "../../imports/api";
-
-import { UiJob } from "../../imports/jobs";
-
-/* =========================================================
-   TOOLS
-========================================================= */
-
-const TOOLS = [
-  {
-    icon: FileSearch,
-    color: C.purple,
-    bg: C.purpleBg,
-    title: "CV Review",
-    desc: "Analyze your resume with AI and get strengths, weaknesses and suggestions.",
-    action: "Review My CV",
-  },
-  {
-    icon: Bot,
-    color: C.success,
-    bg: C.successBg,
-    title: "AI Interview",
-    desc: "Practice interviews with AI-generated questions tailored to the selected job.",
-    action: "Start Interview",
-  },
-];
-
-/* =========================================================
-   TYPES
-========================================================= */
 
 interface CVResult {
   overall_score: number;
@@ -84,15 +54,26 @@ interface InterviewResult {
   questions: InterviewQuestion[];
 }
 
-/* =========================================================
-   SCORE RING
-========================================================= */
+const TOOLS = [
+  {
+    icon: FileSearch,
+    color: C.purple,
+    bg: C.purpleBg,
+    title: "CV Review",
+    desc: "Analyze your resume with AI and get strengths, weaknesses and suggestions.",
+    action: "Review My CV",
+  },
+  {
+    icon: Bot,
+    color: C.success,
+    bg: C.successBg,
+    title: "AI Interview",
+    desc: "Practice interviews with AI-generated questions tailored to the selected job.",
+    action: "Start Interview",
+  },
+];
 
-function ScoreRing({
-  score,
-}: {
-  score: number;
-}) {
+function ScoreRing({ score }: { score: number }) {
   const size = 96;
   const stroke = 8;
   const radius = (size - stroke) / 2;
@@ -111,8 +92,8 @@ function ScoreRing({
     safeScore >= 80
       ? C.success
       : safeScore >= 50
-        ? C.warning
-        : C.danger;
+      ? C.warning
+      : C.danger;
 
   return (
     <div
@@ -185,10 +166,6 @@ function ScoreRing({
   );
 }
 
-/* =========================================================
-   RESULT LIST
-========================================================= */
-
 function ResultList({
   items,
   icon: Icon,
@@ -238,19 +215,10 @@ function ResultList({
   );
 }
 
-/* =========================================================
-   MAIN COMPONENT
-========================================================= */
-
 export default function AIAssistant() {
-  const [loading, setLoading] =
-    useState(false);
-
-  const [active, setActive] =
-    useState("");
-
-  const [error, setError] =
-    useState("");
+  const [loading, setLoading] = useState(false);
+  const [active, setActive] = useState("");
+  const [error, setError] = useState("");
 
   const [cv, setCV] =
     useState<CVResult | null>(null);
@@ -273,43 +241,21 @@ export default function AIAssistant() {
   const [showResults, setShowResults] =
     useState(false);
 
-  const [score, setScore] =
-    useState(0);
+  const [score, setScore] = useState(0);
 
-  /* =======================================================
-     HANDLE ACTIONS
-  ======================================================= */
-
-  const handleAction = async (
-    title: string
-  ) => {
+  const handleAction = async (title: string) => {
     try {
       setLoading(true);
       setActive(title);
       setError("");
 
-      /* ===================================================
-         CV REVIEW
-      =================================================== */
-
       if (title === "CV Review") {
         setCV(null);
 
-        const res: any =
-          await reviewCV();
+        const res: any = await reviewCV();
 
         setCV(res);
       }
-
-      /* ===================================================
-         AI INTERVIEW
-
-         IMPORTANT:
-         We only fetch SAVED jobs here.
-
-         We DO NOT fetch all jobs.
-         We DO NOT use job recommendations.
-      =================================================== */
 
       if (title === "AI Interview") {
         setInterview(null);
@@ -319,21 +265,25 @@ export default function AIAssistant() {
         setScore(0);
         setJobs([]);
 
-        const response: any = await getSavedJobs();
+        const response: any =
+          await getSavedJobs();
 
-        console.log("Saved jobs response:", response);
+        console.log(
+          "Saved jobs response:",
+          response
+        );
 
-        // Same structure used by SavedJobs page
         const data = Array.isArray(response)
           ? response
           : response?.jobs || [];
 
-        console.log("Saved jobs data:", data);
+        console.log(
+          "Saved jobs data:",
+          data
+        );
 
-        const availableJobs: Job[] = data.map(
-          (item: any) => {
-            // Some APIs return the job directly,
-            // others return { job: {...} }
+        const availableJobs: Job[] =
+          data.map((item: any) => {
             const job = item.job ?? item;
 
             return {
@@ -372,8 +322,7 @@ export default function AIAssistant() {
                   ? job.match
                   : undefined,
             };
-          }
-        );
+          });
 
         console.log(
           "Mapped saved jobs:",
@@ -397,20 +346,14 @@ export default function AIAssistant() {
 
       setError(
         err?.response?.data?.message ||
-        "Something went wrong. Please try again."
+          "Something went wrong. Please try again."
       );
     } finally {
       setLoading(false);
     }
   };
 
-  /* =======================================================
-     START INTERVIEW
-  ======================================================= */
-
-  const startInterview = async (
-    job: Job
-  ) => {
+  const startInterview = async (job: Job) => {
     try {
       setLoading(true);
       setActive("AI Interview");
@@ -424,13 +367,10 @@ export default function AIAssistant() {
       setScore(0);
 
       const jobId =
-        job.job_id ??
-        job.id;
+        job.job_id ?? job.id;
 
       if (!jobId) {
-        throw new Error(
-          "Invalid job ID."
-        );
+        throw new Error("Invalid job ID.");
       }
 
       const res: any =
@@ -444,8 +384,8 @@ export default function AIAssistant() {
 
       setError(
         err?.response?.data?.message ||
-        err?.message ||
-        "Failed to generate interview questions."
+          err?.message ||
+          "Failed to generate interview questions."
       );
 
       setShowJobSelection(true);
@@ -453,10 +393,6 @@ export default function AIAssistant() {
       setLoading(false);
     }
   };
-
-  /* =======================================================
-     ANSWERS
-  ======================================================= */
 
   const handleAnswer = (
     questionId: number,
@@ -468,10 +404,6 @@ export default function AIAssistant() {
     }));
   };
 
-  /* =======================================================
-     CLOSE INTERVIEW
-  ======================================================= */
-
   const closeInterview = () => {
     setInterview(null);
     setSelectedJob(null);
@@ -479,10 +411,6 @@ export default function AIAssistant() {
     setShowResults(false);
     setScore(0);
   };
-
-  /* =======================================================
-     CALCULATE SCORE
-  ======================================================= */
 
   const calculateScore = () => {
     if (!interview) {
@@ -505,10 +433,6 @@ export default function AIAssistant() {
     return correct;
   };
 
-  /* =======================================================
-     SUBMIT
-  ======================================================= */
-
   const handleSubmit = () => {
     const correctAnswers =
       calculateScore();
@@ -517,19 +441,11 @@ export default function AIAssistant() {
     setShowResults(true);
   };
 
-  /* =======================================================
-     RESET
-  ======================================================= */
-
   const resetInterview = () => {
     setSelectedAnswers({});
     setShowResults(false);
     setScore(0);
   };
-
-  /* =======================================================
-     RENDER
-  ======================================================= */
 
   return (
     <div
@@ -538,10 +454,6 @@ export default function AIAssistant() {
         color: C.text as any,
       }}
     >
-      {/* =================================================
-          HEADER
-      ================================================= */}
-
       <div
         style={{
           display: "flex",
@@ -555,8 +467,7 @@ export default function AIAssistant() {
             width: 44,
             height: 44,
             borderRadius: 14,
-            background:
-              C.purpleBg as any,
+            background: C.purpleBg as any,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -573,7 +484,7 @@ export default function AIAssistant() {
             style={{
               margin: 0,
               fontSize: 24,
-              fontWeight: 700,
+              fontWeight: 900,
             }}
           >
             AI Career Assistant
@@ -592,46 +503,40 @@ export default function AIAssistant() {
         </div>
       </div>
 
-      {/* =================================================
-          TOOLS
-      ================================================= */}
-
       <div
         style={{
           display: "grid",
           gridTemplateColumns:
             "repeat(2, minmax(0, 1fr))",
-          gap: 16,
+          gap: 12,
         }}
       >
         {TOOLS.map((tool) => (
           <div
             key={tool.title}
             style={{
-              background:
-                C.surface as any,
+              background: C.surface as any,
               border: `1px solid ${C.border as any}`,
-              borderRadius: 20,
-              padding: 24,
+              borderRadius: 16,
+              padding: 18,
               display: "flex",
               flexDirection: "column",
-              gap: 14,
+              gap: 10,
             }}
           >
             <div
               style={{
-                width: 44,
-                height: 44,
-                borderRadius: 12,
-                background:
-                  tool.bg as any,
+                width: 38,
+                height: 38,
+                borderRadius: 10,
+                background: tool.bg as any,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
               }}
             >
               <tool.icon
-                size={20}
+                size={18}
                 color={tool.color as any}
               />
             </div>
@@ -639,7 +544,7 @@ export default function AIAssistant() {
             <h3
               style={{
                 margin: 0,
-                fontSize: 15,
+                fontSize: 14,
                 fontWeight: 700,
               }}
             >
@@ -649,10 +554,10 @@ export default function AIAssistant() {
             <p
               style={{
                 margin: 0,
-                fontSize: 13,
+                fontSize: 12,
                 color: C.textSec as any,
-                lineHeight: 1.6,
-                minHeight: 42,
+                lineHeight: 1.5,
+                minHeight: 36,
               }}
             >
               {tool.desc}
@@ -661,13 +566,16 @@ export default function AIAssistant() {
             <Btn
               v="outline"
               size="sm"
-              disabled={loading}
+              disabled={
+                loading &&
+                active === tool.title
+              }
               onClick={() =>
                 handleAction(tool.title)
               }
             >
               {loading &&
-                active === tool.title
+              active === tool.title
                 ? "Loading..."
                 : tool.action}
             </Btn>
@@ -675,17 +583,12 @@ export default function AIAssistant() {
         ))}
       </div>
 
-      {/* =================================================
-          ERROR
-      ================================================= */}
-
       {error && (
         <div
           style={{
             marginTop: 20,
             padding: "14px 18px",
-            background:
-              C.dangerBg as any,
+            background: C.dangerBg as any,
             border: `1px solid ${C.danger as any}`,
             color: C.danger as any,
             borderRadius: 12,
@@ -696,16 +599,11 @@ export default function AIAssistant() {
         </div>
       )}
 
-      {/* =================================================
-          CV RESULT
-      ================================================= */}
-
       {cv && (
         <div
           style={{
             marginTop: 24,
-            background:
-              C.surface as any,
+            background: C.surface as any,
             border: `1px solid ${C.border as any}`,
             borderRadius: 20,
             padding: 28,
@@ -714,49 +612,77 @@ export default function AIAssistant() {
           <div
             style={{
               display: "flex",
-              gap: 20,
-              alignItems: "center",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
               marginBottom: 28,
             }}
           >
-            <ScoreRing
-              score={cv.overall_score}
-            />
+            <div
+              style={{
+                display: "flex",
+                gap: 20,
+                alignItems: "center",
+              }}
+            >
+              <ScoreRing
+                score={cv.overall_score}
+              />
 
-            <div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
-              >
-                <Sparkles
-                  size={17}
-                  color={C.purple as any}
-                />
-
-                <h3
+              <div>
+                <div
                   style={{
-                    margin: 0,
-                    fontSize: 17,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
                   }}
                 >
-                  CV Analysis Result
-                </h3>
-              </div>
+                  <Sparkles
+                    size={17}
+                    color={C.purple as any}
+                  />
 
-              <p
-                style={{
-                  margin: "5px 0 0",
-                  color: C.textSec as any,
-                  fontSize: 13,
-                }}
-              >
-                Overall resume score based on
-                AI review
-              </p>
+                  <h3
+                    style={{
+                      margin: 0,
+                      fontSize: 17,
+                    }}
+                  >
+                    CV Analysis Result
+                  </h3>
+                </div>
+
+                <p
+                  style={{
+                    margin: "5px 0 0",
+                    color: C.textSec as any,
+                    fontSize: 13,
+                  }}
+                >
+                  Overall resume score based on AI
+                  review
+                </p>
+              </div>
             </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setCV(null);
+                setError("");
+              }}
+              style={{
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+                color: C.textSec as any,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 4,
+              }}
+            >
+              <X size={20} />
+            </button>
           </div>
 
           <div
@@ -825,16 +751,11 @@ export default function AIAssistant() {
         </div>
       )}
 
-      {/* =================================================
-          SAVED JOB SELECTION FOR AI INTERVIEW
-      ================================================= */}
-
       {showJobSelection && (
         <div
           style={{
             marginTop: 24,
-            background:
-              C.surface as any,
+            background: C.surface as any,
             border: `1px solid ${C.border as any}`,
             borderRadius: 20,
             padding: 24,
@@ -843,8 +764,7 @@ export default function AIAssistant() {
           <div
             style={{
               display: "flex",
-              justifyContent:
-                "space-between",
+              justifyContent: "space-between",
               alignItems: "center",
               marginBottom: 18,
             }}
@@ -861,8 +781,7 @@ export default function AIAssistant() {
 
               <p
                 style={{
-                  margin:
-                    "5px 0 0",
+                  margin: "5px 0 0",
                   color: C.textSec as any,
                   fontSize: 13,
                 }}
@@ -878,11 +797,9 @@ export default function AIAssistant() {
               }
               style={{
                 border: "none",
-                background:
-                  "transparent",
+                background: "transparent",
                 cursor: "pointer",
-                color:
-                  C.textSec as any,
+                color: C.textSec as any,
               }}
             >
               <X size={18} />
@@ -912,12 +829,10 @@ export default function AIAssistant() {
                   padding: 18,
                   borderRadius: 14,
                   border: `1px solid ${C.border as any}`,
-                  background:
-                    C.bg as any,
-                  cursor:
-                    loading
-                      ? "default"
-                      : "pointer",
+                  background: C.bg as any,
+                  cursor: loading
+                    ? "default"
+                    : "pointer",
                   fontFamily: F,
                 }}
               >
@@ -925,8 +840,7 @@ export default function AIAssistant() {
                   style={{
                     fontWeight: 700,
                     fontSize: 14,
-                    color:
-                      C.text as any,
+                    color: C.text as any,
                   }}
                 >
                   {job.title}
@@ -936,8 +850,7 @@ export default function AIAssistant() {
                   <div
                     style={{
                       marginTop: 5,
-                      color:
-                        C.textSec as any,
+                      color: C.textSec as any,
                       fontSize: 12,
                     }}
                   >
@@ -949,8 +862,7 @@ export default function AIAssistant() {
                   <div
                     style={{
                       marginTop: 8,
-                      color:
-                        C.textSec as any,
+                      color: C.textSec as any,
                       fontSize: 12,
                     }}
                   >
@@ -960,34 +872,28 @@ export default function AIAssistant() {
 
                 {typeof job.match ===
                   "number" && (
-                    <div
-                      style={{
-                        marginTop: 10,
-                        color:
-                          C.success as any,
-                        fontWeight: 700,
-                        fontSize: 12,
-                      }}
-                    >
-                      {job.match}% Match
-                    </div>
-                  )}
+                  <div
+                    style={{
+                      marginTop: 10,
+                      color: C.success as any,
+                      fontWeight: 700,
+                      fontSize: 12,
+                    }}
+                  >
+                    {job.match}% Match
+                  </div>
+                )}
               </button>
             ))}
           </div>
         </div>
       )}
 
-      {/* =================================================
-          INTERVIEW
-      ================================================= */}
-
       {interview && (
         <div
           style={{
             marginTop: 24,
-            background:
-              C.surface as any,
+            background: C.surface as any,
             border: `1px solid ${C.border as any}`,
             padding: 28,
             borderRadius: 20,
@@ -996,10 +902,8 @@ export default function AIAssistant() {
           <div
             style={{
               display: "flex",
-              justifyContent:
-                "space-between",
-              alignItems:
-                "flex-start",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
               marginBottom: 24,
             }}
           >
@@ -1007,16 +911,13 @@ export default function AIAssistant() {
               <div
                 style={{
                   display: "flex",
-                  alignItems:
-                    "center",
+                  alignItems: "center",
                   gap: 8,
                 }}
               >
                 <Bot
                   size={18}
-                  color={
-                    C.success as any
-                  }
+                  color={C.success as any}
                 />
 
                 <h3
@@ -1031,10 +932,8 @@ export default function AIAssistant() {
 
               <p
                 style={{
-                  margin:
-                    "6px 0 0",
-                  color:
-                    C.textSec as any,
+                  margin: "6px 0 0",
+                  color: C.textSec as any,
                   fontSize: 13,
                 }}
               >
@@ -1043,24 +942,17 @@ export default function AIAssistant() {
             </div>
 
             <button
-              onClick={
-                closeInterview
-              }
+              onClick={closeInterview}
               style={{
                 border: "none",
-                background:
-                  "transparent",
-                cursor:
-                  "pointer",
-                color:
-                  C.textSec as any,
+                background: "transparent",
+                cursor: "pointer",
+                color: C.textSec as any,
               }}
             >
               <X size={20} />
             </button>
           </div>
-
-          {/* Progress */}
 
           <div
             style={{
@@ -1070,29 +962,25 @@ export default function AIAssistant() {
             <div
               style={{
                 height: 6,
-                background:
-                  C.border as any,
+                background: C.border as any,
                 borderRadius: 3,
-                overflow:
-                  "hidden",
+                overflow: "hidden",
               }}
             >
               <div
                 style={{
-                  width: `${interview.questions
-                    .length
-                    ? (Object.keys(
-                      selectedAnswers
-                    ).length /
-                      interview
-                        .questions
-                        .length) *
-                    100
-                    : 0
-                    }%`,
+                  width: `${
+                    interview.questions.length
+                      ? (Object.keys(
+                          selectedAnswers
+                        ).length /
+                          interview.questions
+                            .length) *
+                        100
+                      : 0
+                  }%`,
                   height: "100%",
-                  background:
-                    C.purple as any,
+                  background: C.purple as any,
                   transition:
                     "width 0.3s ease",
                 }}
@@ -1102,8 +990,7 @@ export default function AIAssistant() {
             <div
               style={{
                 fontSize: 12,
-                color:
-                  C.textSec as any,
+                color: C.textSec as any,
                 marginTop: 4,
               }}
             >
@@ -1113,21 +1000,15 @@ export default function AIAssistant() {
                 ).length
               }{" "}
               of{" "}
-              {
-                interview.questions
-                  .length
-              }{" "}
+              {interview.questions.length}{" "}
               answered
             </div>
           </div>
 
-          {/* Questions */}
-
           <div
             style={{
               display: "flex",
-              flexDirection:
-                "column",
+              flexDirection: "column",
               gap: 18,
             }}
           >
@@ -1144,8 +1025,7 @@ export default function AIAssistant() {
                   <div
                     style={{
                       fontSize: 12,
-                      color:
-                        C.textSec as any,
+                      color: C.textSec as any,
                       marginBottom: 8,
                       fontWeight: 600,
                     }}
@@ -1183,20 +1063,19 @@ export default function AIAssistant() {
                       ([letter, text]) => {
                         const selected =
                           selectedAnswers[
-                          question.id
-                          ] ===
-                          letter;
+                            question.id
+                          ] === letter;
 
                         const isCorrect =
                           showResults &&
                           letter ===
-                          question.correct_answer;
+                            question.correct_answer;
 
                         const isWrong =
                           showResults &&
                           selected &&
                           letter !==
-                          question.correct_answer;
+                            question.correct_answer;
 
                         let borderColor =
                           C.border as any;
@@ -1204,29 +1083,21 @@ export default function AIAssistant() {
                         let bgColor =
                           C.bg as any;
 
-                        if (
-                          showResults
-                        ) {
-                          if (
-                            isCorrect
-                          ) {
+                        if (showResults) {
+                          if (isCorrect) {
                             borderColor =
                               C.success as any;
 
                             bgColor =
                               C.successBg as any;
-                          } else if (
-                            isWrong
-                          ) {
+                          } else if (isWrong) {
                             borderColor =
                               C.danger as any;
 
                             bgColor =
                               C.dangerBg as any;
                           }
-                        } else if (
-                          selected
-                        ) {
+                        } else if (selected) {
                           borderColor =
                             C.purple as any;
 
@@ -1248,12 +1119,10 @@ export default function AIAssistant() {
                               showResults
                             }
                             style={{
-                              textAlign:
-                                "left",
+                              textAlign: "left",
                               padding:
                                 "12px 14px",
-                              borderRadius:
-                                12,
+                              borderRadius: 12,
                               border: `1px solid ${borderColor}`,
                               background:
                                 bgColor,
@@ -1263,13 +1132,12 @@ export default function AIAssistant() {
                                 showResults
                                   ? "default"
                                   : "pointer",
-                              fontFamily:
-                                F,
+                              fontFamily: F,
                               fontSize: 13,
                               opacity:
                                 showResults &&
-                                  !isCorrect &&
-                                  !isWrong
+                                !isCorrect &&
+                                !isWrong
                                   ? 0.6
                                   : 1,
                             }}
@@ -1314,32 +1182,24 @@ export default function AIAssistant() {
             )}
           </div>
 
-          {/* =================================================
-              SUBMIT
-          ================================================= */}
-
           <div
             style={{
               marginTop: 24,
               display: "flex",
               gap: 12,
-              justifyContent:
-                "flex-end",
+              justifyContent: "flex-end",
             }}
           >
             {!showResults ? (
               <Btn
                 v="primary"
                 size="md"
-                onClick={
-                  handleSubmit
-                }
+                onClick={handleSubmit}
                 disabled={
                   Object.keys(
                     selectedAnswers
                   ).length !==
-                  interview.questions
-                    .length
+                  interview.questions.length
                 }
               >
                 Submit Answers
@@ -1349,9 +1209,7 @@ export default function AIAssistant() {
                 <Btn
                   v="outline"
                   size="md"
-                  onClick={
-                    resetInterview
-                  }
+                  onClick={resetInterview}
                 >
                   Retry
                 </Btn>
@@ -1359,19 +1217,13 @@ export default function AIAssistant() {
                 <Btn
                   v="primary"
                   size="md"
-                  onClick={
-                    closeInterview
-                  }
+                  onClick={closeInterview}
                 >
                   Close Interview
                 </Btn>
               </>
             )}
           </div>
-
-          {/* =================================================
-              RESULTS
-          ================================================= */}
 
           {showResults && (
             <div
@@ -1381,25 +1233,23 @@ export default function AIAssistant() {
                 borderRadius: 14,
                 background:
                   score /
-                    interview.questions
-                      .length >=
-                    0.7
+                    interview.questions.length >=
+                  0.7
                     ? C.successBg
                     : C.dangerBg,
-                border: `1px solid ${score /
-                  interview.questions
-                    .length >=
+                border: `1px solid ${
+                  score /
+                    interview.questions.length >=
                   0.7
-                  ? C.success
-                  : C.danger
-                  }`,
+                    ? C.success
+                    : C.danger
+                }`,
               }}
             >
               <div
                 style={{
                   display: "flex",
-                  alignItems:
-                    "center",
+                  alignItems: "center",
                   gap: 12,
                 }}
               >
@@ -1420,15 +1270,13 @@ export default function AIAssistant() {
                   <div
                     style={{
                       fontSize: 13,
-                      color:
-                        C.textSec as any,
+                      color: C.textSec as any,
                     }}
                   >
                     {score /
-                      interview
-                        .questions
+                      interview.questions
                         .length >=
-                      0.7
+                    0.7
                       ? "🎉 Excellent work!"
                       : "💪 Keep practicing!"}
                   </div>
@@ -1436,17 +1284,14 @@ export default function AIAssistant() {
 
                 <div
                   style={{
-                    marginLeft:
-                      "auto",
-                    padding:
-                      "6px 16px",
+                    marginLeft: "auto",
+                    padding: "6px 16px",
                     borderRadius: 20,
                     background:
                       score /
-                        interview
-                          .questions
+                        interview.questions
                           .length >=
-                        0.7
+                      0.7
                         ? C.success
                         : C.danger,
                     color: "white",
@@ -1456,10 +1301,9 @@ export default function AIAssistant() {
                 >
                   {Math.round(
                     (score /
-                      interview
-                        .questions
+                      interview.questions
                         .length) *
-                    100
+                      100
                   )}
                   %
                 </div>
@@ -1471,4 +1315,3 @@ export default function AIAssistant() {
     </div>
   );
 }
-
