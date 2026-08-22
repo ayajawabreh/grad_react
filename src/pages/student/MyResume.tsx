@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import {
   Upload,
   PenLine,
@@ -9,6 +9,8 @@ import { C, F } from "../../constants/tokens";
 
 export default function MyResume() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = (location.state as { returnTo?: string } | null)?.returnTo;
 
   return (
     <div
@@ -82,7 +84,7 @@ export default function MyResume() {
         >
           <button
             type="button"
-            onClick={() => navigate("/student/resume/upload")}
+            onClick={() => navigate("/student/resume/upload", { state: { returnTo } })}
             style={{
               position: "relative",
               overflow: "hidden",
@@ -202,7 +204,7 @@ export default function MyResume() {
 
           <button
             type="button"
-            onClick={() => navigate("/student/resume/create")}
+            onClick={() => navigate("/student/resume/create", { state: { returnTo } })}
             style={{
               position: "relative",
               overflow: "hidden",

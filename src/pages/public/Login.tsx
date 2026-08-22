@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { User, Building2, Shield, Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { User, Building2, Shield, Mail, Lock, Eye, EyeOff, MailCheck } from "lucide-react";
 import { C, F } from "../../constants/tokens";
 import { useAuth } from "../../context/AuthContext";
 import type { Role } from "../../types";
@@ -8,8 +8,7 @@ import type { Role } from "../../types";
 const ROLES: { key: Role; icon: typeof User; title: string; color: string; dest: string }[] = [
   { key: "student",  icon: User,      title: "Student",  color: C.success, dest: "/student/dashboard" },
   { key: "company",  icon: Building2, title: "Company",  color: C.accent,  dest: "/company/dashboard" },
-  { key: "admin",    icon: Shield,    title: "Admin",    color: C.error,   dest: "/admin/overview" },
-];
+{ key: "admin", icon: Shield, title: "Admin", color: C.error, dest: "/admin/dashboard" },];
 
 export default function Login() {
   const [role, setRole] = useState<Role>("student");
@@ -18,6 +17,7 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [verificationData, setVerificationData] = useState<{ userId: number; email: string } | null>(null);
 
   const { login } = useAuth(); 
   const nav = useNavigate();
@@ -25,6 +25,7 @@ export default function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setVerificationData(null);
 
     if (!email || !password) {
       setError("Please fill in all fields.");
@@ -50,6 +51,21 @@ export default function Login() {
       const data = await response.json();
 
       if (!response.ok) {
+        if (String(data.message || "").toLowerCase().includes("verify your email")) {
+          let saved: { userId?: number; email?: string } | null = null;
+          try {
+            saved = JSON.parse(sessionStorage.getItem("cb_verification") || "null");
+          } catch {
+            saved = null;
+          }
+
+          const userId = Number(data.user_id || (saved?.email === email ? saved?.userId : 0));
+          if (userId) {
+            const pending = { userId, email };
+            sessionStorage.setItem("cb_verification", JSON.stringify(pending));
+            setVerificationData(pending);
+          }
+        }
         throw new Error(data.message || "Invalid credentials");
       }
 
@@ -131,8 +147,17 @@ export default function Login() {
           <p style={{ fontSize: 14, color: C.textSec, margin: "0 0 28px" }}>Select your account type to continue</p>
 
           {error && (
-            <div style={{ padding: "12px", borderRadius: "10px", background: C.error + "15", color: C.error, fontSize: "13px", fontWeight: 600, marginBottom: "16px" }}>
-              {error}
+            <div style={{ padding: "12px 14px", borderRadius: 10, background: C.error + "15", color: C.error, fontSize: 13, fontWeight: 600, marginBottom: 16 }}>
+              <div>{error}</div>
+              {verificationData && (
+                <button
+                  type="button"
+                  onClick={() => nav("/verify-email", { state: verificationData })}
+                  style={{ marginTop: 10, padding: "8px 11px", borderRadius: 9, border: `1px solid ${C.error}35`, background: C.surface, color: C.error, cursor: "pointer", fontFamily: F, fontWeight: 700, display: "flex", alignItems: "center", gap: 7 }}
+                >
+                  <MailCheck size={15} /> Verify Email
+                </button>
+              )}
             </div>
           )}
 
@@ -142,7 +167,7 @@ export default function Login() {
               <button 
                 type="button" 
                 key={key} 
-                onClick={() => { setRole(key); setError(null); }}
+                onClick={() => { setRole(key); setError(null); setVerificationData(null); }}
                 style={{
                   flex: 1,
                   padding: "16px 12px",

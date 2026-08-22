@@ -7,6 +7,8 @@ import {
   Globe,
   Users,
   Building2,
+  AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 import {
   getCompanyProfile,
@@ -14,15 +16,18 @@ import {
   getCompanyJobs,
 } from "../../imports/api";
 
-const TABS = ["Overview", "Culture", "Open Roles"] as const;
+type ProfileTab = "Overview" | "Culture" | "Open Roles";
 
 export default function CompanyProfile() {
-  const [tab, setTab] = useState<(typeof TABS)[number]>("Overview");
+  const [tab, setTab] = useState<ProfileTab>("Overview");
   const [editing, setEditing] = useState(false);
 
   const [company, setCompany] = useState<any>(null);
   const [jobs, setJobs] = useState<any[]>([]);
   const [logo, setLogo] = useState<File | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [saveSuccess, setSaveSuccess] = useState("");
 
   const [form, setForm] = useState({
     company_name: "",
@@ -80,8 +85,9 @@ export default function CompanyProfile() {
   };
 
   const saveProfile = async () => {
-    console.log("SAVE CLICKED");
-
+    setSaveError("");
+    setSaveSuccess("");
+    setSaving(true);
     try {
       const formData = new FormData();
 
@@ -105,13 +111,34 @@ export default function CompanyProfile() {
       console.log("UPDATED COMPANY:", response.company);
 
       await loadCompany();
+      setSaveSuccess("Company profile updated successfully.");
       setEditing(false);
       setLogo(null);
     } catch (error: any) {
-      console.log("ERROR:", error);
-      console.log("ERROR RESPONSE:", error.response?.data);
+      const response = error?.response?.data;
+      const validationMessage = response?.errors
+        ? Object.values(response.errors).flat().join(" ")
+        : "";
+      setSaveError(
+        validationMessage ||
+        response?.message ||
+        "Failed to update the company profile."
+      );
+    } finally {
+      setSaving(false);
     }
   };
+
+  const hasCulture = Boolean(company?.values?.length || company?.benefits?.length);
+  const openJobs = jobs.filter((job) => {
+    const status = String(job.status || "").toLowerCase();
+    return !status || ["open", "approved", "active", "published"].includes(status);
+  });
+  const visibleTabs: ProfileTab[] = [
+    "Overview",
+    ...(hasCulture ? (["Culture"] as ProfileTab[]) : []),
+    ...(openJobs.length ? (["Open Roles"] as ProfileTab[]) : []),
+  ];
 
   if (!company) {
     return <div>Loading...</div>;
@@ -386,11 +413,17 @@ export default function CompanyProfile() {
               gap: 10,
             }}
           >
+            {saveError && (
+              <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 10, background: C.errorBg, color: C.error, fontSize: 12.5, fontWeight: 600 }}>
+                <AlertCircle size={16} /> {saveError}
+              </div>
+            )}
             <Btn
               v="primary"
               onClick={saveProfile}
+              disabled={saving}
             >
-              Save Changes
+              {saving ? "Saving..." : "Save Changes"}
             </Btn>
 
             <Btn
@@ -403,6 +436,12 @@ export default function CompanyProfile() {
               Cancel
             </Btn>
           </div>
+        </div>
+      )}
+
+      {saveSuccess && !editing && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "11px 14px", marginBottom: 16, borderRadius: 11, background: C.successBg, color: C.success, fontSize: 13, fontWeight: 600 }}>
+          <CheckCircle2 size={17} /> {saveSuccess}
         </div>
       )}
 
@@ -422,7 +461,7 @@ export default function CompanyProfile() {
             borderBottom: `1px solid ${C.divider}`,
           }}
         >
-          {TABS.map((t) => (
+          {visibleTabs.map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -659,7 +698,7 @@ export default function CompanyProfile() {
                 gap: 10,
               }}
             >
-              {jobs.length === 0 ? (
+              {openJobs.length === 0 ? (
                 <p
                   style={{
                     color: C.textSec,
@@ -670,7 +709,7 @@ export default function CompanyProfile() {
                   No open roles available.
                 </p>
               ) : (
-                jobs.map((job: any) => (
+                openJobs.map((job: any) => (
                   <div
                     key={job.id}
                     style={{

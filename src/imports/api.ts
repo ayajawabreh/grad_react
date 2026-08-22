@@ -9,6 +9,35 @@ export const API = axios.create({
   },
 });
 
+export const forgotPassword = (email: string) =>
+  apiRequest<{ message: string }>("/forgot-password", {
+    method: "POST",
+    data: { email },
+  });
+
+export const resetPassword = (data: {
+  email: string;
+  code: string;
+  password: string;
+  password_confirmation: string;
+}) =>
+  apiRequest<{ message: string }>("/reset-password", {
+    method: "POST",
+    data,
+  });
+
+export const verifyEmail = (userId: number, code: string) =>
+  apiRequest<{ message: string }>("/verify-email", {
+    method: "POST",
+    data: { user_id: userId, code },
+  });
+
+export const resendVerification = (userId: number) =>
+  apiRequest<{ message: string }>("/resend-verification", {
+    method: "POST",
+    data: { user_id: userId },
+  });
+
 API.interceptors.request.use(
   (config) => {
     const token =
@@ -227,5 +256,298 @@ export const deleteInterviewFeedback = async (
     }
   );
 };
+
+
+//admin
+export const getAdminDashboard = async () => {
+  return apiRequest("/admin/dashboard", {
+    method: "GET",
+  });
+};
+
+export const getAdminSystemLogs = async (params?: Record<string, unknown>) => {
+  return apiRequest("/admin/system-logs", { method: "GET", params });
+};
+
+export const getAdminAnalytics = async (params?: Record<string, unknown>) => {
+  return apiRequest("/admin/analytics", { method: "GET", params });
+};
+
+export const getAdminApplications = async (params?: Record<string, unknown>) => {
+  return apiRequest("/admin/applications", { method: "GET", params });
+};
+
+export const getAdminCompanies = async (status?: string) => {
+  return apiRequest("/admin/companies", {
+    method: "GET",
+    params: status ? { status } : undefined,
+  });
+};
+
+export const getPendingCompanies = async () => {
+  return apiRequest("/admin/companies/pending", {
+    method: "GET",
+  });
+};
+
+export const getAdminCompany = async (id: string | number) => {
+  return apiRequest(`/admin/companies/${id}`, {
+    method: "GET",
+  });
+};
+
+export const approveCompany = async (id: string | number) => {
+  return apiRequest(`/admin/companies/${id}/approve`, {
+    method: "PATCH",
+  });
+};
+
+export const rejectCompany = async (id: string | number) => {
+  return apiRequest(`/admin/companies/${id}/reject`, {
+    method: "PATCH",
+  });
+};
+
+export const suspendCompany = async (id: string | number) => {
+  return apiRequest(`/admin/companies/${id}/suspend`, {
+    method: "PATCH",
+  });
+};
+
+export const getAdminPlatformReport = async (
+  period: "week" | "month" | "year" = "month"
+) => {
+  return apiRequest("/admin/reports/platform", {
+    method: "GET",
+    params: { period },
+  });
+};
+
+export const getAdminAbuseReports = async (params?: {
+  status?: string;
+  entity_type?: string;
+  risk_level?: string;
+  limit?: number;
+}) => {
+  return apiRequest("/admin/reports/abuse", {
+    method: "GET",
+    params,
+  });
+};
+
+export const getAdminAbuseReport = async (
+  reportId: string | number
+) => {
+  return apiRequest(`/admin/reports/abuse/${reportId}`, {
+    method: "GET",
+  });
+};
+
+export const resolveAdminAbuseReport = async (
+  reportId: string | number,
+  admin_note?: string
+) => {
+  return apiRequest(`/admin/reports/abuse/${reportId}/resolve`, {
+    method: "PATCH",
+    data: {
+      admin_note,
+    },
+  });
+};
+
+export const dismissAdminAbuseReport = async (
+  reportId: string | number,
+  admin_note?: string
+) => {
+  return apiRequest(`/admin/reports/abuse/${reportId}/dismiss`, {
+    method: "PATCH",
+    data: {
+      admin_note,
+    },
+  });
+};
+
+
+export const getAdminJobsModeration = async (params?: {
+  status?: string;
+  search?: string;
+}) => {
+  return apiRequest("/admin/jobs/moderation", {
+    method: "GET",
+    params,
+  });
+};
+
+export const getAdminJobModeration = async (
+  jobId: string | number
+) => {
+  return apiRequest(`/admin/jobs/${jobId}/moderation`, {
+    method: "GET",
+  });
+};
+
+export const approveAdminJob = async (
+  jobId: string | number
+) => {
+  return apiRequest(`/admin/jobs/${jobId}/approve`, {
+    method: "PATCH",
+  });
+};
+
+export const rejectAdminJob = async (
+  jobId: string | number,
+  note: string
+) => {
+  return apiRequest(`/admin/jobs/${jobId}/reject`, {
+    method: "PATCH",
+    data: { note },
+  });
+};
+
+export const requestChangesAdminJob = async (
+  jobId: string | number
+) => {
+  return apiRequest(`/admin/jobs/${jobId}/request-changes`, {
+    method: "PATCH",
+  });
+};
+
+export const suspendAdminJob = async (
+  jobId: string | number
+) => {
+  return apiRequest(`/admin/jobs/${jobId}/suspend`, {
+    method: "PATCH",
+  });
+};
+
+export const restoreAdminJobToReview = async (
+  jobId: string | number
+) => {
+  return apiRequest(`/admin/jobs/${jobId}/restore-review`, {
+    method: "PATCH",
+  });
+};
+
+export const deleteAdminJob = async (jobId: string | number) => {
+  return apiRequest(`/admin/jobs/${jobId}`, { method: "DELETE" });
+};
+
+export const getAdminCategories = async () => {
+  return apiRequest("/admin/categories", { method: "GET" });
+};
+
+export const createAdminCategory = async (data: { name: string }) => {
+  return apiRequest("/admin/categories", { method: "POST", data });
+};
+
+export const updateAdminCategory = async (id: string | number, data: { name: string }) => {
+  return apiRequest(`/admin/categories/${id}`, { method: "PUT", data });
+};
+
+export const deleteAdminCategory = async (id: string | number) => {
+  return apiRequest(`/admin/categories/${id}`, { method: "DELETE" });
+};
+
+
+export const getAdminSkills = async () => {
+  return apiRequest("/admin/skills", {
+    method: "GET",
+  });
+};
+
+export const getAdminSkill = async (
+  skillId: string | number
+) => {
+  return apiRequest(`/admin/skills/${skillId}`, {
+    method: "GET",
+  });
+};
+
+export const createAdminSkill = async (data: {
+  name: string;
+}) => {
+  return apiRequest("/admin/skills", {
+    method: "POST",
+    data,
+  });
+};
+
+export const updateAdminSkill = async (
+  skillId: string | number,
+  data: {
+    name: string;
+  }
+) => {
+  return apiRequest(`/admin/skills/${skillId}`, {
+    method: "PUT",
+    data,
+  });
+};
+
+export const deleteAdminSkill = async (
+  skillId: string | number
+) => {
+  return apiRequest(`/admin/skills/${skillId}`, {
+    method: "DELETE",
+  });
+};
+
+// Admin Students
+
+export const getAdminStudents = async () => {
+  return apiRequest("/admin/students", {
+    method: "GET",
+  });
+};
+
+export const getAdminStudent = async (
+  id: string | number
+) => {
+  return apiRequest(`/admin/students/${id}`, {
+    method: "GET",
+  });
+};
+
+export const approveStudent = async (
+  id: string | number
+) => {
+  return apiRequest(`/admin/students/${id}/approve`, {
+    method: "PATCH",
+  });
+};
+
+export const rejectStudent = async (
+  id: string | number
+) => {
+  return apiRequest(`/admin/students/${id}/reject`, {
+    method: "PATCH",
+  });
+};
+
+export const suspendStudent = async (
+  id: string | number
+) => {
+  return apiRequest(`/admin/students/${id}/suspend`, {
+    method: "PATCH",
+  });
+};
+
+export const restoreStudent = async (
+  id: string | number
+) => {
+  return apiRequest(`/admin/students/${id}/restore`, {
+    method: "PATCH",
+  });
+};
+
+export const activateStudent = async (
+  id: string | number
+) => {
+  return apiRequest(`/admin/students/${id}/activate`, {
+    method: "PATCH",
+  });
+};
+
+
 
 export default API;

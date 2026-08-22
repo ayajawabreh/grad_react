@@ -23,6 +23,9 @@ interface ShortlistedApplicant {
     location?: string;
   };
   skills: (string | Skill)[];
+  job?: { id: number; title: string };
+  job_id?: number;
+  job_title?: string;
 }
 
 export default function Shortlisted() {
@@ -31,20 +34,30 @@ export default function Shortlisted() {
   const [applicants, setApplicants] = useState<ShortlistedApplicant[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!id) return;
-
-    API.get(`/company/jobs/${id}/shortlisted`)
+  const loadShortlisted = (showLoading = true) => {
+    if (showLoading) setLoading(true);
+    API.get(id ? `/company/jobs/${id}/shortlisted` : "/company/shortlisted")
       .then((res) => {
-        setApplicants(res.data || []);
+        setApplicants(Array.isArray(res.data) ? res.data : res.data?.applications ?? []);
       })
       .catch((err) => {
         console.error("Error fetching shortlisted applicants:", err);
         setApplicants([]);
       })
       .finally(() => {
-        setLoading(false);
+        if (showLoading) setLoading(false);
       });
+  };
+
+  useEffect(() => {
+    loadShortlisted();
+    const refresh = () => loadShortlisted(false);
+    const interval = window.setInterval(refresh, 5000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+    };
   }, [id]);
 
   if (loading) {
@@ -81,6 +94,9 @@ export default function Shortlisted() {
         >
           Shortlisted Candidates
         </h1>
+        <p style={{ margin: "6px 0 0", color: C.textSec, fontSize: 13 }}>
+          {id ? "Candidates shortlisted for this job" : "All shortlisted candidates across your jobs"}
+        </p>
       </div>
 
       {applicants.length === 0 ? (
@@ -174,6 +190,11 @@ export default function Shortlisted() {
                   >
                     {applicant.student.headline || "Software Developer"}
                   </p>
+                  {!id && (applicant.job?.title || applicant.job_title) && (
+                    <p style={{ margin: "6px 0 0", color: C.accentHover, fontSize: 12, fontWeight: 700 }}>
+                      {applicant.job?.title || applicant.job_title}
+                    </p>
+                  )}
                 </div>
               </div>
 

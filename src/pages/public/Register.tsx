@@ -23,7 +23,8 @@ export default function Register() {
     email: "",
     password: "",
     confirmPassword: "",
-    university: "", 
+    university: "",
+    industry: "",
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -46,6 +47,11 @@ export default function Register() {
       return;
     }
 
+    if (role === "company" && !form.industry.trim()) {
+      setNotification({ type: "error", message: "Please enter your company industry!" });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -53,11 +59,22 @@ export default function Register() {
         name: form.name,
         email: form.email,
         password: form.password,
+        password_confirmation: form.confirmPassword,
         role: role,
-        university: role === "student" ? form.university : undefined, 
+        university: role === "student" ? form.university : undefined,
+        industry: role === "company" ? form.industry : undefined,
       });
 
-      if (res.data.token) {
+      if (res.data.user_id) {
+        sessionStorage.setItem("cb_verification", JSON.stringify({
+          userId: res.data.user_id,
+          email: form.email,
+        }));
+        setNotification({ type: "success", message: "Account created! Enter the code sent to your email." });
+        setTimeout(() => nav("/verify-email", {
+          state: { userId: res.data.user_id, email: form.email },
+        }), 800);
+      } else if (res.data.token) {
         setNotification({ type: "success", message: "Account created successfully! Redirecting..." });
         login(role as Role, res.data.token);
         setTimeout(() => {
@@ -189,6 +206,22 @@ export default function Register() {
                   type="text"
                   placeholder="University Name"
                   value={form.university}
+                  onChange={handleChange}
+                  style={embeddedInputStyle}
+                />
+              </div>
+            )}
+
+            {role === "company" && (
+              <div style={inputContainerStyle}>
+                <div style={iconWrapperStyle}>
+                  <Building2 size={16} color={C.textMuted} />
+                </div>
+                <input
+                  name="industry"
+                  type="text"
+                  placeholder="Industry (e.g. Technology)"
+                  value={form.industry}
                   onChange={handleChange}
                   style={embeddedInputStyle}
                 />

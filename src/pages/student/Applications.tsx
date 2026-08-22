@@ -47,8 +47,8 @@ export default function Applications() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    setLoading(true);
+  const loadApplications = (showLoading = true) => {
+    if (showLoading) setLoading(true);
     setError("");
 
     fetchMyApplications()
@@ -57,7 +57,18 @@ export default function Applications() {
         setStats(res.stats);
       })
       .catch(() => setError("Failed to load applications"))
-      .finally(() => setLoading(false));
+      .finally(() => showLoading && setLoading(false));
+  };
+
+  useEffect(() => {
+    loadApplications();
+    const refresh = () => loadApplications(false);
+    const interval = window.setInterval(refresh, 5000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+    };
   }, []);
 
   const filtered =

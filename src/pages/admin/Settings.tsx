@@ -3,15 +3,18 @@ import { SettingsView } from "../../components/shared/SettingsView";
 import { useAuth } from "../../context/AuthContext";
 
 export default function AdminSettings() {
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const nav = useNavigate();
 
   return (
     <SettingsView
-      name="Admin"
-      email="admin@careerbridge.io"
+      name={user?.name || ""}
+      email={user?.email || ""}
       role="admin"
-      onLogout={() => { logout(); nav("/login"); }}
+      onLogout={() => {
+        logout();
+        nav("/login");
+      }}
     />
   );
 }

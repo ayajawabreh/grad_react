@@ -136,11 +136,14 @@ export const blockUser = (userId: number) => {
   });
 };
 
-export const reportUser = (userId: number, reason: string) => {
-  return apiRequest(`/messages/${userId}/report`, {
+export const reportUser = (messageId: number, reason: string) => {
+  return apiRequest("/reports/abuse", {
     method: "POST",
     data: {
+      reportable_type: "Message",
+      reportable_id: messageId,
       reason,
+      description: reason,
     },
   });
 };

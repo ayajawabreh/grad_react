@@ -69,16 +69,36 @@ export default function Notifications() {
 
   useEffect(() => {
     const channel = supabase
-      .channel("notifications-realtime")
+      .channel("company-notifications-realtime")
       .on(
         "postgres_changes",
         {
           event: "INSERT",
           schema: "public",
-          table: "notification_events",
+          table: "notifications",
         },
         (payload) => {
-          console.log("🔥 NOTIFICATION EVENT:", payload);
+          const row = payload.new as Partial<NotificationDTO>;
+
+          if (!row.id || !row.title || !row.message) {
+            loadNotifications();
+            return;
+          }
+
+          const notification = mapToNotif({
+            id: row.id,
+            title: row.title,
+            message: row.message,
+            is_read: Boolean(row.is_read),
+            time: row.time || "Just now",
+            created_at: row.created_at || new Date().toISOString(),
+          });
+
+          setItems((current) =>
+            current.some((item) => item.id === notification.id)
+              ? current
+              : [notification, ...current]
+          );
         }
       )
       .subscribe((status) => {

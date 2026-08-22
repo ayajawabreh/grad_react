@@ -22,6 +22,8 @@ export default function CreateJob() {
     salary: "",
     deadline: "",
     description: "",
+    responsibilities: "",
+    requirements: "",
     skills: [] as string[],
     benefits: [] as string[],
   });
@@ -134,6 +136,8 @@ export default function CreateJob() {
         : null,
       deadline: formData.deadline || null,
       description: formData.description,
+      responsibilities: formData.responsibilities,
+      requirements: formData.requirements,
       skills: formData.skills,
       benefits: formData.benefits,
     };
@@ -437,6 +441,32 @@ export default function CreateJob() {
               />
             </div>
           </div>
+        </div>
+
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 20 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 6px" }}>Key Responsibilities</h3>
+          <p style={{ margin: "0 0 12px", color: C.textSec, fontSize: 12 }}>Enter each responsibility on a separate line.</p>
+          <textarea
+            name="responsibilities"
+            rows={5}
+            value={formData.responsibilities}
+            onChange={handleChange}
+            placeholder={"Create wireframes and prototypes\nCollaborate with developers\nConduct usability testing"}
+            style={{ width: "100%", padding: 12, borderRadius: 8, border: `1px solid ${C.border}`, fontFamily: F, fontSize: 14, background: C.surface, color: C.text, boxSizing: "border-box", resize: "vertical" }}
+          />
+        </div>
+
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 20 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 6px" }}>Candidate Requirements</h3>
+          <p style={{ margin: "0 0 12px", color: C.textSec, fontSize: 12 }}>Qualifications and experience required from the candidate, one per line.</p>
+          <textarea
+            name="requirements"
+            rows={5}
+            value={formData.requirements}
+            onChange={handleChange}
+            placeholder={"Bachelor's degree or equivalent experience\n1+ year of relevant experience\nStrong communication skills"}
+            style={{ width: "100%", padding: 12, borderRadius: 8, border: `1px solid ${C.border}`, fontFamily: F, fontSize: 14, background: C.surface, color: C.text, boxSizing: "border-box", resize: "vertical" }}
+          />
         </div>
 
         <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 16, padding: 20 }}>

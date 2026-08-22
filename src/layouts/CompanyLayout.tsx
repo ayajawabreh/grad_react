@@ -49,6 +49,11 @@ const NAV = [
     label: "Applicants",
   },
   {
+    to: "/company/shortlisted",
+    icon: Users,
+    label: "Shortlisted",
+  },
+  {
     to: "/company/interviews",
     icon: Calendar,
     label: "Interviews",

@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router";
 import { C, F } from "../../constants/tokens";
 import { fetchJob, saveJob, unsaveJob, applyToJob, withdrawJobApplication, checkJobApplied, UiJob } from "../../imports/jobs";
 import { Btn, SBadge } from "../../components/ui";
-import { ArrowLeft, MapPin, DollarSign, Clock, Users, Heart, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, MapPin, DollarSign, Clock, Users, Heart, CheckCircle2, AlertCircle, FileText } from "lucide-react";
 
 export default function JobDetails() {
   const nav = useNavigate();
@@ -13,6 +13,7 @@ export default function JobDetails() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [applyError, setApplyError] = useState("");
   const [applied, setApplied] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
 
@@ -50,12 +51,17 @@ export default function JobDetails() {
 
   async function handleApply() {
     if (!job || applying) return;
+    setApplyError("");
     setApplying(true);
     try {
       await applyToJob(job.id);
       setApplied(true);
-    } catch (error) {
-      console.error(error);
+    } catch (error: any) {
+      setApplyError(
+        error?.response?.data?.message ||
+        Object.values(error?.response?.data?.errors || {}).flat().join(" ") ||
+        "Unable to submit your application. Please try again."
+      );
     } finally {
       setApplying(false);
     }
@@ -132,6 +138,56 @@ export default function JobDetails() {
                 {job.saved ? "Saved" : "Save"}
               </Btn>
             </div>
+            {applyError && (
+              <div
+                role="alert"
+                style={{
+                  marginTop: 14,
+                  padding: "12px 14px",
+                  borderRadius: 12,
+                  border: `1px solid ${C.warning}35`,
+                  background: C.warningBg,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
+                  <AlertCircle size={17} color={C.warning} style={{ flexShrink: 0 }} />
+                  <span style={{ color: C.text, fontSize: 12.5, fontWeight: 600, lineHeight: 1.5 }}>
+                    {applyError}
+                  </span>
+                </div>
+                {applyError.toLowerCase().includes("resume") && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const returnTo = `/student/jobs/${job.id}`;
+                      sessionStorage.setItem("cb_resume_return_to", returnTo);
+                      nav("/student/resume", { state: { returnTo } });
+                    }}
+                    style={{
+                      flexShrink: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "7px 10px",
+                      borderRadius: 9,
+                      border: `1px solid ${C.warning}45`,
+                      background: C.surface,
+                      color: C.warning,
+                      fontFamily: F,
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <FileText size={14} /> Create Resume
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           <div style={{ background: C.surface, borderRadius: 24, padding: 32, border: `1px solid ${C.border}`, marginBottom: 16, boxShadow: "0 4px 20px rgba(0,0,0,0.02)" }}>
@@ -145,35 +201,35 @@ export default function JobDetails() {
             </p>
           </div>
 
-          <div style={{ background: C.surface, borderRadius: 24, padding: 32, border: `1px solid ${C.border}`, marginBottom: 16, boxShadow: "0 4px 20px rgba(0,0,0,0.02)" }}>
+          {job.responsibilities?.trim() && <div style={{ background: C.surface, borderRadius: 24, padding: 32, border: `1px solid ${C.border}`, marginBottom: 16, boxShadow: "0 4px 20px rgba(0,0,0,0.02)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
               <div style={{ width: 4, height: 18, background: activeColor, borderRadius: 2 }} />
               <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: C.text }}>Key Responsibilities</h2>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              {job.responsibilities?.split(",").map((r, idx) => (
+              {job.responsibilities.split(/\r?\n|,/).filter((r) => r.trim()).map((r, idx) => (
                 <div key={idx} style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
                   <CheckCircle2 size={16} color={activeColor} style={{ marginTop: 3, flexShrink: 0, opacity: 0.8 }} />
                   <span style={{ fontSize: 14.5, color: C.textSec, lineHeight: 1.5 }}>{r.trim()}</span>
                 </div>
               ))}
             </div>
-          </div>
+          </div>}
 
-          <div style={{ background: C.surface, borderRadius: 24, padding: 32, border: `1px solid ${C.border}`, boxShadow: "0 4px 20px rgba(0,0,0,0.02)" }}>
+          {job.requirements?.trim() && <div style={{ background: C.surface, borderRadius: 24, padding: 32, border: `1px solid ${C.border}`, boxShadow: "0 4px 20px rgba(0,0,0,0.02)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
               <div style={{ width: 4, height: 18, background: activeColor, borderRadius: 2 }} />
-              <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: C.text }}>Requirements & Skills</h2>
+              <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, color: C.text }}>Candidate Requirements</h2>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              {job.requirements?.split(",").map((r, idx) => (
+              {job.requirements.split(/\r?\n|,/).filter((r) => r.trim()).map((r, idx) => (
                 <div key={idx} style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
                   <div style={{ width: 6, height: 6, borderRadius: "50%", background: C.textMuted, marginTop: 8, flexShrink: 0 }} />
                   <span style={{ fontSize: 14.5, color: C.textSec, lineHeight: 1.5 }}>{r.trim()}</span>
                 </div>
               ))}
             </div>
-          </div>
+          </div>}
         </div>
 
         <div>

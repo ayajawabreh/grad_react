@@ -8,6 +8,7 @@ import Landing from "../pages/public/Landing";
 import Login from "../pages/public/Login";
 import Register from "../pages/public/Register";
 import ForgotPassword from "../pages/public/ForgotPassword";
+import VerifyEmail from "../pages/public/VerifyEmail";
 
 import StudentDashboard from "../pages/student/Dashboard";
 import StudentProfile from "../pages/student/Profile";
@@ -37,8 +38,7 @@ import CompanyMessages from "../pages/company/Messages";
 import CompanyNotifications from "../pages/company/Notifications";
 import CompanySettings from "../pages/company/Settings";
 
-import AdminOverview from "../pages/admin/Overview";
-import AdminStudents from "../pages/admin/Students";
+import AdminDashboard from "../pages/admin/Dashboard";import AdminStudents from "../pages/admin/Students";
 import AdminCompanies from "../pages/admin/Companies";
 import AdminJobs from "../pages/admin/Jobs";
 import AdminApplications from "../pages/admin/Applications";
@@ -46,6 +46,9 @@ import AdminAnalytics from "../pages/admin/Analytics";
 import AdminReports from "../pages/admin/Reports";
 import AdminNotifications from "../pages/admin/Notifications";
 import AdminSettings from "../pages/admin/Settings";
+import AdminCategories from "../pages/admin/Categories";
+import AdminSystemLogs from "../pages/admin/SystemLogs";
+import AdminSkills from "../pages/admin/Skills";
 import Shortlisted from "../pages/company/Shortlisted";
 import Reports from "../pages/company/Reports";
 import MyResume from "../pages/student/MyResume";
@@ -58,6 +61,7 @@ export const router = createBrowserRouter([
   { path: "/login", Component: Login },
   { path: "/register", Component: Register },
   { path: "/forgot-password", Component: ForgotPassword },
+  { path: "/verify-email", Component: VerifyEmail },
 
   
 {
@@ -96,6 +100,7 @@ export const router = createBrowserRouter([
       { path: "jobs/edit/:id", Component: EditJob },
       { path: "jobs/:id", Component: CompanyJobDetails },
       { path: "applicants", Component: Applicants },
+      { path: "shortlisted", Component: Shortlisted },
       { path: "applicants/:id", Component: CandidateDetails },
       { path: "recommended", Component: RecommendedCandidates },
       { path: "interviews", Component: Interviews },
@@ -109,20 +114,23 @@ export const router = createBrowserRouter([
   },
 
   {
-    path: "/admin",
-    Component: AdminLayout,
-    children: [
-      { index: true, loader: () => redirect("/admin/overview") },
-      { path: "overview", Component: AdminOverview },
-      { path: "students", Component: AdminStudents },
-      { path: "companies", Component: AdminCompanies },
-      { path: "jobs", Component: AdminJobs },
-      { path: "applications", Component: AdminApplications },
-      { path: "analytics", Component: AdminAnalytics },
-      { path: "reports", Component: AdminReports },
-      { path: "notifications", Component: AdminNotifications },
-      { path: "settings", Component: AdminSettings },
-    ],
+    
+  path: "/admin",
+  Component: AdminLayout,
+  children: [
+    { index: true, loader: () => redirect("/admin/dashboard") },
+{ path: "dashboard", Component: AdminDashboard },    { path: "students", Component: AdminStudents },
+    { path: "companies", Component: AdminCompanies },
+    { path: "categories", Component: AdminCategories },
+    { path: "skills", Component: AdminSkills },
+    { path: "jobs", Component: AdminJobs },
+    { path: "applications", Component: AdminApplications },
+    { path: "analytics", Component: AdminAnalytics },
+    { path: "system-logs", Component: AdminSystemLogs },
+    { path: "reports", Component: AdminReports },
+    { path: "notifications", Component: AdminNotifications },
+    { path: "settings", Component: AdminSettings },
+  ],
   },
 
   { path: "*", loader: () => redirect("/") },

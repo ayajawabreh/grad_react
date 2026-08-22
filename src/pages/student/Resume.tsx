@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import {
   Save,
   Eye,
@@ -342,6 +342,19 @@ function DynamicSection({
 
 export default function ResumeBuilder() {
   const nav = useNavigate();
+  const location = useLocation();
+  const resumeReturnTo =
+    (location.state as { returnTo?: string } | null)?.returnTo ||
+    sessionStorage.getItem("cb_resume_return_to");
+
+  const handleResumeBack = () => {
+    if (resumeReturnTo) {
+      sessionStorage.removeItem("cb_resume_return_to");
+      nav(resumeReturnTo);
+      return;
+    }
+    nav("/student/resume");
+  };
 
   const [tpl, setTpl] = useState("executive");
   const [resumeId, setResumeId] = useState<number | null>(null);
@@ -932,7 +945,7 @@ export default function ResumeBuilder() {
 
       <button
         type="button"
-        onClick={() => nav("/student/resume")}
+        onClick={handleResumeBack}
         style={{
           display: "flex",
           alignItems: "center",

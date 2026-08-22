@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { User, Lock, Bell, Shield, LogOut, Upload } from "lucide-react";
 import { C, F } from "../../constants/tokens";
 import { Btn, Toggle } from "../ui";
+import { toast } from "sonner";
 import {
   changePassword,
   getNotificationSettings,
@@ -29,27 +30,50 @@ const TABS = [
   { k: "privacy", l: "Privacy", icon: Shield },
 ];
 
-const NOTIF_FIELDS: { k: keyof NotificationSettings; l: string; d: string }[] = [
+type SettingField<T> = { k: keyof T; l: string; d: string };
+
+const STUDENT_NOTIF_FIELDS: SettingField<NotificationSettings>[] = [
   { k: "application_updates", l: "Application Updates", d: "Get notified about your application status changes" },
   { k: "interview_notifications", l: "Interview Notifications", d: "Alerts about interview invites and scheduling" },
   { k: "job_recommendations", l: "Job Recommendations", d: "Get notified of new matching jobs" },
   { k: "messages", l: "Messages", d: "New message alerts" },
   { k: "profile_views", l: "Profile Views", d: "When someone views your profile" },
   { k: "resume_feedback", l: "Resume Feedback", d: "AI feedback and suggestions on your resume" },
+  { k: "job_deadline_reminders", l: "Job Deadline Reminders", d: "Receive job deadline notifications" },
+];
+
+const COMPANY_NOTIF_FIELDS: SettingField<NotificationSettings>[] = [
   { k: "company_applications", l: "New Applications", d: "Receive notifications when candidates apply" },
   { k: "company_messages", l: "Company Messages", d: "Receive new message notifications" },
   { k: "company_matches", l: "Matching Candidates", d: "Get notified about matching candidates" },
   { k: "company_deadlines", l: "Job Deadlines", d: "Receive deadline reminders" },
   { k: "company_interviews", l: "Interview Reminders", d: "Get reminders about interviews" },
   { k: "weekly_application_summary", l: "Weekly Application Summary", d: "Receive weekly application reports" },
-  { k: "job_deadline_reminders", l: "Job Deadline Reminders", d: "Receive job deadline notifications" },
 ];
 
-const PRIVACY_FIELDS: { k: keyof PrivacySettings; l: string; d: string }[] = [
+const ADMIN_NOTIF_FIELDS: SettingField<NotificationSettings>[] = [
+  { k: "new_student_registration", l: "New Student Registration", d: "Notify me when a new student joins the platform" },
+  { k: "new_company_registration", l: "New Company Registration", d: "Notify me when a company registers for review" },
+  { k: "job_pending_approval", l: "Job Pending Approval", d: "Alert me when a job requires moderation" },
+  { k: "abuse_reports", l: "Abuse Reports", d: "Notify me about new abuse and safety reports" },
+  { k: "system_alerts", l: "System Alerts", d: "Receive important platform and security alerts" },
+  { k: "admin_messages", l: "Admin Messages", d: "Receive messages addressed to administrators" },
+];
+
+const STUDENT_PRIVACY_FIELDS: SettingField<PrivacySettings>[] = [
   { k: "profile_visibility", l: "Public Profile", d: "Allow others to view your profile" },
   { k: "contact_visibility", l: "Contact Info Visibility", d: "Show your contact details to others" },
   { k: "ai_resume_analysis", l: "AI-Enhanced Matching", d: "Use AI to improve match recommendations" },
+];
+
+const COMPANY_PRIVACY_FIELDS: SettingField<PrivacySettings>[] = [
+  { k: "profile_visibility", l: "Public Profile", d: "Allow others to view your company profile" },
+  { k: "contact_visibility", l: "Contact Info Visibility", d: "Show company contact details to others" },
   { k: "ai_candidate_matching", l: "AI Candidate Matching", d: "Allow AI models to consider your company for candidate matching" },
+];
+
+const ADMIN_PRIVACY_FIELDS: SettingField<PrivacySettings>[] = [
+  { k: "profile_visibility", l: "Profile Visibility", d: "Control whether your administrator profile is visible to other administrators" },
 ];
 
 export function SettingsView({
@@ -80,14 +104,23 @@ export function SettingsView({
   const [deleteError, setDeleteError] = useState("");
   const [deleting, setDeleting] = useState(false);
 
+  const notificationFields = role === "admin" ? ADMIN_NOTIF_FIELDS : role === "company" ? COMPANY_NOTIF_FIELDS : STUDENT_NOTIF_FIELDS;
+  const privacyFields = role === "admin" ? ADMIN_PRIVACY_FIELDS : role === "company" ? COMPANY_PRIVACY_FIELDS : STUDENT_PRIVACY_FIELDS;
+
   const flashSaved = () => { setSaved(true); setTimeout(() => setSaved(false), 2000); };
 
   useEffect(() => {
     if (tab === "notifications" && !notifSettings) {
       setNotifLoading(true);
       getNotificationSettings()
-        .then((res: any) => setNotifSettings(res.data ?? res))
-        .catch(() => {})
+        .then((res: any) => {
+          const settings = res.data ?? res;
+          if (role === "admin") {
+            const defaults = Object.fromEntries(ADMIN_NOTIF_FIELDS.map(({ k }) => [k, false]));
+            setNotifSettings({ ...defaults, ...settings } as NotificationSettings);
+          } else setNotifSettings(settings);
+        })
+        .catch((error) => { console.error(error); toast.error("Could not load notification preferences"); })
         .finally(() => setNotifLoading(false));
     }
   }, [tab, notifSettings]);
@@ -97,7 +130,7 @@ export function SettingsView({
       setPrivacyLoading(true);
       getPrivacySettings()
         .then((res: any) => setPrivacySettings(res.data ?? res))
-        .catch(() => {})
+        .catch((error) => { console.error(error); toast.error("Could not load privacy settings"); })
         .finally(() => setPrivacyLoading(false));
     }
   }, [tab, privacySettings]);
@@ -110,8 +143,10 @@ export function SettingsView({
     try {
       await updateNotificationSettings({ [key]: updated[key] });
       flashSaved();
-    } catch {
+      toast.success("Notification preference saved");
+    } catch (error: any) {
       setNotifSettings(notifSettings);
+      toast.error("Could not save this preference", { description: error?.response?.data?.message || "The backend may not support this admin setting yet." });
     } finally {
       setNotifSaving(false);
     }
@@ -125,8 +160,10 @@ export function SettingsView({
     try {
       await updatePrivacySettings({ [key]: updated[key] });
       flashSaved();
-    } catch {
+      toast.success("Privacy setting saved");
+    } catch (error: any) {
       setPrivacySettings(privacySettings);
+      toast.error("Could not save privacy setting", { description: error?.response?.data?.message });
     } finally {
       setPrivacySaving(false);
     }
@@ -149,6 +186,7 @@ export function SettingsView({
       await changePassword(pwForm);
       setPwForm({ current_password: "", password: "", password_confirmation: "" });
       flashSaved();
+      toast.success("Password updated successfully");
     } catch (err: any) {
       setPwError(err?.response?.data?.message || "Failed to update password");
     } finally {
@@ -211,12 +249,11 @@ export function SettingsView({
                 </div>
               )}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
-                {[
-                  { label: "Full Name", value: name },
+                {([
+                  { label: role === "company" ? "Company Name" : "Full Name", value: name },
                   { label: "Email Address", value: email },
-                  { label: "Phone Number", value: phone },
-                  { label: "Location", value: location }
-                ].map(({ label, value }) => (
+                  ...(role === "admin" ? [{ label: "Account Role", value: role }] : [{ label: "Phone Number", value: phone }, { label: "Location", value: location }])
+                ]).map(({ label, value }) => (
                   <div key={label}>
                     <label style={{
                       fontSize: 12,
@@ -248,8 +285,9 @@ export function SettingsView({
                 ))}
               </div>
               <p style={{ fontSize: 12, color: C.textSec, margin: "0 0 16px", fontFamily: F }}>
-                Profile fields are managed from your profile/resume page.
+                {role === "admin" ? "Administrator identity is loaded from the authenticated account." : "Profile fields are managed from your profile/resume page."}
               </p>
+              {role === "admin" && <Btn v="outline" size="sm" icon={Lock} onClick={() => setTab("security")}>Change Password</Btn>}
             </>
           )}
 
@@ -318,7 +356,7 @@ export function SettingsView({
               )}
               {notifSettings && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  {NOTIF_FIELDS.map(({ k, l, d }) => (
+                  {notificationFields.map(({ k, l, d }) => (
                     <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 0", borderBottom: `1px solid ${C.divider}` }}>
                       <div>
                         <p style={{ fontSize: 14, fontWeight: 600, color: C.text, margin: "0 0 2px", fontFamily: F }}>{l}</p>
@@ -343,7 +381,7 @@ export function SettingsView({
               )}
               {privacySettings && (
                 <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  {PRIVACY_FIELDS.map(({ k, l, d }) => (
+                  {privacyFields.map(({ k, l, d }) => (
                     <div key={k} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 0", borderBottom: `1px solid ${C.divider}` }}>
                       <div>
                         <p style={{ fontSize: 14, fontWeight: 600, color: C.text, margin: "0 0 2px", fontFamily: F }}>{l}</p>

@@ -12,6 +12,8 @@ export default function ManageJobs() {
   const [filter, setFilter] = useState("All");
   const [query, setQuery] = useState("");
   const [jobs, setJobs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   const [deleteModal, setDeleteModal] = useState<{ open: boolean; jobId: number | null }>({
     open: false,
@@ -20,17 +22,38 @@ export default function ManageJobs() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const loadJobs = async () => {
+  const loadJobs = async (showLoading = true) => {
     try {
+      if (showLoading) setLoading(true);
+      setLoadError("");
       const data = await getCompanyJobs();
-      setJobs(data);
-    } catch (e) {
-      console.log(e);
+      const list = Array.isArray(data)
+        ? data
+        : data?.jobs ?? data?.data ?? [];
+      setJobs(list);
+    } catch (e: any) {
+      console.error(e);
+      setLoadError(
+        e?.response?.data?.message ||
+        "Failed to load your job listings."
+      );
+    } finally {
+      if (showLoading) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadJobs();
+  }, []);
+
+  useEffect(() => {
+    const refresh = () => loadJobs(false);
+    const interval = window.setInterval(refresh, 5000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+    };
   }, []);
 
   const openDeleteModal = (id: number) => {
@@ -122,7 +145,15 @@ export default function ManageJobs() {
         ))}
       </div>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div style={{ padding: 56, textAlign: "center", background: C.surface, borderRadius: 16, border: `1px solid ${C.border}`, color: C.textSec, fontSize: 14 }}>
+          Loading your jobs...
+        </div>
+      ) : loadError ? (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 9, padding: 40, background: C.errorBg, color: C.error, borderRadius: 16, border: `1px solid ${C.error}25`, fontSize: 13, fontWeight: 600 }}>
+          <AlertCircle size={18} /> {loadError}
+        </div>
+      ) : filtered.length === 0 ? (
         <div style={{
           display: "flex",
           flexDirection: "column",
@@ -165,6 +196,12 @@ export default function ManageJobs() {
                 </div>
                 <SBadge s={job.status} />      
               </div>
+              {["rejected", "changes requested"].includes(String(job.status || "").toLowerCase()) && job.moderation_note && (
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 12px", marginBottom: 13, borderRadius: 10, background: String(job.status).toLowerCase() === "rejected" ? C.errorBg : C.warningBg, color: String(job.status).toLowerCase() === "rejected" ? C.error : C.warning, fontSize: 12, lineHeight: 1.5 }}>
+                  <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+                  <span><strong>Admin note:</strong> {job.moderation_note}</span>
+                </div>
+              )}
               <div style={{ display: "flex", gap: 16, marginBottom: 14 }}>
                 <span style={{ fontSize: 12, color: C.textSec }}>{job.applicants ?? 0} applicants</span>
                 <span style={{ fontSize: 12, color: C.textSec }}>{job.views ?? 0} views</span>

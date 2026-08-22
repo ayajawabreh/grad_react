@@ -16,6 +16,12 @@ export interface NotificationSettings {
   company_interviews: boolean;
   weekly_application_summary: boolean;
   job_deadline_reminders: boolean;     
+  new_student_registration: boolean;
+  new_company_registration: boolean;
+  job_pending_approval: boolean;
+  abuse_reports: boolean;
+  system_alerts: boolean;
+  admin_messages: boolean;
 }
 
 export interface PrivacySettings {

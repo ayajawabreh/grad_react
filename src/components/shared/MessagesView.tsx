@@ -132,6 +132,8 @@ export function MessagesView({
     useState<ConfirmType | null>(null);
 
   const [confirmLoading, setConfirmLoading] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [confirmError, setConfirmError] = useState("");
 
   const [toast, setToast] = useState<{
     show: boolean;
@@ -440,6 +442,68 @@ export function MessagesView({
 
     return () => {
       cancelled = true;
+    };
+  }, [activeUserId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const refreshConversations = async () => {
+      try {
+        const data = await getConversations();
+        if (cancelled) return;
+        const convos = Array.isArray(data) ? data : (data as any)?.data ?? [];
+        setConversations(convos.map((conversation: ApiConversation) =>
+          conversation.user_id === activeUserIdRef.current
+            ? { ...conversation, unread: 0 }
+            : conversation
+        ));
+      } catch {
+        // Keep the last successful state during background refreshes.
+      }
+    };
+
+    const interval = window.setInterval(refreshConversations, 5000);
+    window.addEventListener("focus", refreshConversations);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshConversations);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (activeUserId == null) return;
+    let cancelled = false;
+
+    const refreshActiveMessages = async () => {
+      try {
+        const response = await getConversation(activeUserId);
+        if (cancelled) return;
+        const list = Array.isArray(response) ? response : (response as any)?.data ?? [];
+        const normalized = list.map((message: ApiChatMessage) => ({
+          ...message,
+          file_url: normalizeFileUrl(message.file_url),
+        }));
+
+        setMessages((current) => {
+          const currentLast = current[current.length - 1]?.id;
+          const nextLast = normalized[normalized.length - 1]?.id;
+          return current.length === normalized.length && currentLast === nextLast
+            ? current
+            : normalized;
+        });
+      } catch {
+        // Realtime remains primary; polling is a silent fallback.
+      }
+    };
+
+    const interval = window.setInterval(refreshActiveMessages, 2500);
+    window.addEventListener("focus", refreshActiveMessages);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshActiveMessages);
     };
   }, [activeUserId]);
 
@@ -890,6 +954,8 @@ export function MessagesView({
 
   const openConfirm = (type: ConfirmType) => {
     setShowMenu(false);
+    setConfirmError("");
+    if (type === "report") setReportReason("");
     setConfirmDialog(type);
   };
 
@@ -897,6 +963,8 @@ export function MessagesView({
     if (confirmLoading) return;
 
     setConfirmDialog(null);
+    setConfirmError("");
+    setReportReason("");
   };
 
   const handleDeleteConversation = () => {
@@ -919,6 +987,17 @@ export function MessagesView({
       return;
     }
 
+    if (
+      confirmDialog === "report" &&
+      reportReason.trim().length < 5
+    ) {
+      setConfirmError(
+        "Please write a clear reason (at least 5 characters)."
+      );
+      return;
+    }
+
+    setConfirmError("");
     setConfirmLoading(true);
 
     try {
@@ -951,18 +1030,31 @@ export function MessagesView({
         setMessages([]);
         setConfirmDialog(null);
       } else if (confirmDialog === "report") {
-        await reportUser(
-          activeUserId,
-          "Reported from conversation"
+        const reportedMessage = [...messages]
+          .reverse()
+          .find((message) => message.from === "them");
+
+        if (!reportedMessage) {
+          setConfirmError(
+            "There is no received message in this conversation to report."
+          );
+          return;
+        }
+
+        const response = await reportUser(
+          reportedMessage.id,
+          reportReason.trim()
         );
 
         setConfirmDialog(null);
+        setReportReason("");
+        sessionStorage.removeItem("careerbridge:admin-reports");
 
         showToastMessage(
-          "User reported successfully."
+          response?.message || "User reported successfully."
         );
       }
-    } catch {
+    } catch (requestError: any) {
       if (confirmDialog === "delete") {
         setError(
           "Could not delete conversation."
@@ -972,12 +1064,15 @@ export function MessagesView({
           "Could not block user."
         );
       } else {
-        setError(
-          "Could not report user."
+        setConfirmError(
+          requestError?.response?.data?.message ||
+            "Could not submit the report. Please try again."
         );
       }
 
-      setConfirmDialog(null);
+      if (confirmDialog !== "report") {
+        setConfirmDialog(null);
+      }
     } finally {
       setConfirmLoading(false);
     }
@@ -1151,6 +1246,72 @@ export function MessagesView({
             >
               {activeConfirm.message}
             </p>
+
+            {confirmDialog === "report" && (
+              <div style={{ marginBottom: 18 }}>
+                <label
+                  htmlFor="report-reason"
+                  style={{
+                    display: "block",
+                    color: C.text,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    marginBottom: 7,
+                  }}
+                >
+                  Reason for reporting
+                </label>
+                <textarea
+                  id="report-reason"
+                  value={reportReason}
+                  onChange={(event) => {
+                    setReportReason(event.target.value);
+                    if (confirmError) setConfirmError("");
+                  }}
+                  disabled={confirmLoading}
+                  maxLength={1000}
+                  rows={4}
+                  placeholder="Describe what happened..."
+                  autoFocus
+                  style={{
+                    width: "100%",
+                    boxSizing: "border-box",
+                    resize: "vertical",
+                    border: `1px solid ${confirmError ? "#ef4444" : C.border}`,
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                    color: C.text,
+                    background: C.surface,
+                    fontFamily: F,
+                    fontSize: 13,
+                    lineHeight: 1.5,
+                    outline: "none",
+                  }}
+                />
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    marginTop: 5,
+                  }}
+                >
+                  {confirmError && (
+                    <span style={{ color: "#dc2626", fontSize: 12 }}>
+                      {confirmError}
+                    </span>
+                  )}
+                  <span
+                    style={{
+                      color: C.textSec,
+                      fontSize: 11,
+                      marginLeft: "auto",
+                    }}
+                  >
+                    {reportReason.length}/1000
+                  </span>
+                </div>
+              </div>
+            )}
 
             <div
               style={{

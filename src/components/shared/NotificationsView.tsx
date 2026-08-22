@@ -30,6 +30,10 @@ interface Notif {
   color: string;
 }
 
+interface NotificationsViewProps {
+  role: "student" | "admin";
+}
+
 const iconFor = (
   title: string
 ): { icon: LucideIcon; color: string } => {
@@ -45,7 +49,8 @@ const iconFor = (
   if (
     t.includes("shortlist") ||
     t.includes("published") ||
-    t.includes("confirmed")
+    t.includes("confirmed") ||
+    t.includes("approved")
   ) {
     return {
       icon: CheckCircle2,
@@ -56,7 +61,8 @@ const iconFor = (
   if (
     t.includes("flag") ||
     t.includes("awaiting") ||
-    t.includes("alert")
+    t.includes("alert") ||
+    t.includes("rejected")
   ) {
     return {
       icon: AlertCircle,
@@ -77,7 +83,9 @@ const iconFor = (
 
   if (
     t.includes("registration") ||
-    t.includes("application")
+    t.includes("application") ||
+    t.includes("student") ||
+    t.includes("company")
   ) {
     return {
       icon: UserPlus,
@@ -114,14 +122,17 @@ const mapToNotif = (
   };
 };
 
-export function NotificationsView() {
+export function NotificationsView({
+  role,
+}: NotificationsViewProps) {
   const [items, setItems] = useState<Notif[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const loadNotifications = async () => {
+  const loadNotifications = async (showLoading = true) => {
     try {
       setError("");
+      if (showLoading) setLoading(true);
 
       const data = await getNotifications();
 
@@ -132,17 +143,33 @@ export function NotificationsView() {
       console.error(err);
       setError("Failed to load notifications");
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadNotifications();
-  }, []);
+  }, [role]);
 
   useEffect(() => {
+    const refresh = () => loadNotifications(false);
+    const interval = window.setInterval(refresh, 10000);
+    window.addEventListener("focus", refresh);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [role]);
+
+  useEffect(() => {
+    const channelName =
+      role === "admin"
+        ? "admin-notifications-realtime"
+        : "student-notifications-realtime";
+
     const channel = supabase
-      .channel("notifications-realtime")
+      .channel(channelName)
       .on(
         "postgres_changes",
         {
@@ -152,7 +179,7 @@ export function NotificationsView() {
         },
         (payload) => {
           console.log(
-            "🔥 NOTIFICATION REALTIME EVENT:",
+            `🔥 ${role.toUpperCase()} NOTIFICATION REALTIME EVENT:`,
             payload
           );
 
@@ -185,7 +212,7 @@ export function NotificationsView() {
       )
       .subscribe((status) => {
         console.log(
-          "NOTIFICATION REALTIME STATUS:",
+          `${role.toUpperCase()} NOTIFICATION REALTIME STATUS:`,
           status
         );
       });
@@ -193,7 +220,7 @@ export function NotificationsView() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [role]);
 
   const unreadCount = items.filter(
     (n) => !n.read

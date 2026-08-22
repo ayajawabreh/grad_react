@@ -1,0 +1,11 @@
+.admin-categories-page button,
+.admin-categories-page input,
+.admin-categories-page select,
+.admin-categories-page textarea {
+  font-family: "Plus Jakarta Sans", sans-serif;
+}
+
+.admin-categories-page button {
+  letter-spacing: 0;
+  line-height: 1.2;
+}

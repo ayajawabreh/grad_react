@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import {
   Upload,
   FileText,
@@ -22,6 +22,19 @@ interface ExistingResume {
 
 export default function ResumeUpload() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const resumeReturnTo =
+    (location.state as { returnTo?: string } | null)?.returnTo ||
+    sessionStorage.getItem("cb_resume_return_to");
+
+  const returnAfterResume = () => {
+    if (resumeReturnTo) {
+      sessionStorage.removeItem("cb_resume_return_to");
+      navigate(resumeReturnTo);
+      return;
+    }
+    navigate("/student/resume");
+  };
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [file, setFile] = useState<File | null>(null);
@@ -161,9 +174,7 @@ export default function ResumeUpload() {
         {/* Back to Resume */}
         <button
           type="button"
-          onClick={() =>
-            navigate("/student/resume")
-          }
+          onClick={returnAfterResume}
           style={{
             display: "flex",
             alignItems: "center",
@@ -180,7 +191,7 @@ export default function ResumeUpload() {
           }}
         >
           <ArrowLeft size={16} />
-          Back to My Resume
+          {resumeReturnTo ? "Back to Job" : "Back to My Resume"}
         </button>
 
         <div
@@ -250,9 +261,7 @@ export default function ResumeUpload() {
           >
             <button
               type="button"
-              onClick={() =>
-                navigate("/student/jobs")
-              }
+              onClick={returnAfterResume}
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -270,7 +279,7 @@ export default function ResumeUpload() {
               }}
             >
               <Briefcase size={17} />
-              Browse Jobs
+              {resumeReturnTo ? "Back to Job" : "Browse Jobs"}
             </button>
 
             <button
@@ -303,7 +312,7 @@ export default function ResumeUpload() {
           <button
             type="button"
             onClick={() =>
-              navigate("/student/resume/create")
+              navigate("/student/resume/create", { state: { returnTo: resumeReturnTo } })
             }
             style={{
               display: "inline-flex",
