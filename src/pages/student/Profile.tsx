@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { API } from "../../imports/api";
 import EditProfileModal from "./EditProfileModal";
+import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
 
 const TABS = ["Overview", "Experience", "Education", "Skills"] as const;
 
@@ -123,6 +124,8 @@ const normalizeStudent = (data: any): Student => {
 };
 
 export default function Profile() {
+  const profileSyncVersion = useSyncResourceVersion("student");
+  const resumeSyncVersion = useSyncResourceVersion("resume");
   const [student, setStudent] = useState<Student | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -132,8 +135,8 @@ export default function Profile() {
   const [toast, setToast] = useState<Toast | null>(null);
 
   useEffect(() => {
-    fetchProfile();
-  }, []);
+    fetchProfile(profileSyncVersion === 0 && resumeSyncVersion === 0);
+  }, [profileSyncVersion, resumeSyncVersion]);
 
   useEffect(() => {
     if (!toast) return;
@@ -145,9 +148,9 @@ export default function Profile() {
     return () => clearTimeout(timer);
   }, [toast]);
 
-  const fetchProfile = async () => {
+  const fetchProfile = async (showLoading = true) => {
     try {
-      setLoading(true);
+      if (showLoading) setLoading(true);
 
       const response = await API.get("/student/profile");
 
@@ -167,7 +170,7 @@ export default function Profile() {
         message,
       });
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
@@ -321,7 +324,7 @@ export default function Profile() {
         <Btn
           v="primary"
           size="sm"
-          onClick={fetchProfile}
+          onClick={() => fetchProfile()}
           style={{
             marginTop: 20,
             width: "100%",

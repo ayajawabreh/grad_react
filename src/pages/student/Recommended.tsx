@@ -4,15 +4,27 @@ import { C, F } from "../../constants/tokens";
 import { MatchRing, Btn } from "../../components/ui";
 import { MapPin, DollarSign, Heart } from "lucide-react";
 import { API } from "../../imports/api";
+import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
+import { formatExperienceRange } from "../../utils/experience";
+
+const asTextList = (value: unknown): string[] =>
+  (Array.isArray(value) ? value : [])
+    .map((item) => typeof item === "string" ? item.trim() : "")
+    .filter(Boolean);
 
 export default function Recommended() {
   const nav = useNavigate();
   const [jobs, setJobs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const jobsSyncVersion = useSyncResourceVersion("jobs");
+  const resumeSyncVersion = useSyncResourceVersion("resume");
+  const studentSyncVersion = useSyncResourceVersion("student");
 
   useEffect(() => {
-    API.get("/student/recommended-jobs")
-      .then(async (res) => {
+    setError("");
+    API.get("/student/recommended-jobs", { timeout: 15000 })
+      .then((res) => {
         const data = Array.isArray(res.data)
           ? res.data
           : res.data.jobs || [];
@@ -21,7 +33,10 @@ export default function Recommended() {
           (a, b) => (b.match || 0) - (a.match || 0)
         );
 
-        const jobsWithSaveStatus = await Promise.all(
+        setJobs(sortedJobs.map((job) => ({ ...job, is_saved: Boolean(job.is_saved) })));
+        setLoading(false);
+
+        void Promise.all(
           sortedJobs.map(async (job) => {
             try {
               const savedRes = await API.get(`/jobs/${job.job_id}/saved`);
@@ -36,17 +51,14 @@ export default function Recommended() {
               };
             }
           })
-        );
-
-        setJobs(jobsWithSaveStatus);
+        ).then((jobsWithSaveStatus) => setJobs(jobsWithSaveStatus));
       })
       .catch((err) => {
         console.error("Error fetching recommended jobs:", err);
+        setError(err?.response?.data?.message || "Could not load recommended jobs.");
       })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, []);
+      .finally(() => setLoading(false));
+  }, [jobsSyncVersion, resumeSyncVersion, studentSyncVersion]);
 
   const handleSave = async (jobId: number, isSaved: boolean) => {
     try {
@@ -86,6 +98,8 @@ export default function Recommended() {
       </div>
     );
   }
+
+  if (error) return <div style={{ fontFamily: F, color: C.error, padding: 24, background: C.errorBg, borderRadius: 14 }}>{error}</div>;
 
   return (
     <div
@@ -152,8 +166,7 @@ export default function Recommended() {
           ) : (
             jobs.map((job, idx) => {
               const companyName =
-                job.company?.company_name ||
-                job.company?.name ||
+                (typeof job.company === "string" ? job.company : job.company?.company_name || job.company?.name) ||
                 "Tech Solutions Co.";
 
               const initialLetter = companyName[0] || "J";
@@ -165,11 +178,11 @@ export default function Recommended() {
                   ? `$${Number(job.salary).toLocaleString()}`
                   : "Competitive";
 
-              const whyMatches = [
-                "Matches your educational background and field of interest",
-                `Aligns with your preferences for ${job.location || "this location"}`,
-                `Work type (${job.employment_type || "Full-Time"}) fits your current profile`,
-              ];
+              const matchingSkills = asTextList(job.matching_skills);
+              const missingSkills = asTextList(job.missing_skills);
+              const whyMatches = asTextList(job.reasons);
+              const warnings = asTextList(job.warnings);
+              const recommendationLevel = job.recommendation_level ?? "Not rated";
 
               return (
                 <div
@@ -232,6 +245,9 @@ export default function Recommended() {
                         {companyName} ·{" "}
                         {job.employment_type || "Engineering"}
                       </p>
+                      <div style={{ display: "flex", gap: 7, flexWrap: "wrap", marginBottom: 10 }}><span style={{ padding: "3px 8px", borderRadius: 99, background: matchScore >= 90 ? C.successBg : matchScore >= 75 ? C.infoBg : matchScore >= 60 ? C.warningBg : C.divider, fontSize: 11, fontWeight: 700 }}>{recommendationLevel}</span><span style={{ fontSize: 11, color: C.textSec }}>{formatExperienceRange(job.min_experience_years, job.max_experience_years)}</span></div>
+                      {matchingSkills.length > 0 && <div style={{ marginBottom: 8, fontSize: 11, color: C.success }}>Matching skills: {matchingSkills.join(", ")}</div>}
+                      {missingSkills.length > 0 && <div style={{ marginBottom: 8, fontSize: 11, color: C.warning }}>Missing skills: {missingSkills.join(", ")}</div>}
 
                       <div
                         style={{
@@ -299,7 +315,7 @@ export default function Recommended() {
                           Why this matches
                         </p>
 
-                        <ul
+                        {whyMatches.length > 0 ? <ul
                           style={{
                             margin: 0,
                             paddingLeft: 15,
@@ -317,7 +333,8 @@ export default function Recommended() {
                               {item}
                             </li>
                           ))}
-                        </ul>
+                        </ul> : <span style={{ fontSize: 11.5, color: C.textMuted }}>{matchScore > 0 ? "This recommendation is based on your current profile." : "No strong match found with your current profile yet."}</span>}
+                        {warnings.length > 0 && <div style={{ marginTop: 7, color: C.warning, fontSize: 11 }}>{warnings.join(" · ")}</div>}
                       </div>
                     </div>
 

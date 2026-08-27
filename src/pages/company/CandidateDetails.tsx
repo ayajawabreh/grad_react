@@ -18,7 +18,8 @@ import {
   ExternalLink,
   Download,
   Loader2,
-  Languages
+  Languages,
+  X
 } from "lucide-react";
 
 import {
@@ -31,6 +32,7 @@ import {
   type CompanyNote
 } from "../../imports/applicants";
 import { API } from "../../imports/api";
+import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
 
 const TABS = ["Profile", "Resume", "Notes"] as const;
 const STATUS_OPTIONS = [
@@ -42,7 +44,20 @@ const STATUS_OPTIONS = [
   "Rejected"
 ] as const;
 
+const formatExperienceMonth = (value: unknown) => {
+  const raw = String(value ?? "").trim();
+  if (!raw || /^present$/i.test(raw)) return raw;
+  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(raw);
+  return match
+    ? new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, 1)))
+    : raw;
+};
+
 export default function CandidateDetails() {
+  const profileSyncVersion = useSyncResourceVersion("student");
+  const resumeSyncVersion = useSyncResourceVersion("resume");
+  const jobsSyncVersion = useSyncResourceVersion("jobs");
+  const applicationsSyncVersion = useSyncResourceVersion("applications");
   const nav = useNavigate();
   const { id } = useParams();
 
@@ -56,6 +71,7 @@ export default function CandidateDetails() {
   const [showAISummary, setShowAISummary] = useState(false);
   const [loadingAISummary, setLoadingAISummary] = useState(false);
   const [aiSummaryError, setAiSummaryError] = useState<string | null>(null);
+  const [showMatchDetails, setShowMatchDetails] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -85,7 +101,7 @@ export default function CandidateDetails() {
         console.error("Failed to load applicant details:", err);
       })
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, profileSyncVersion, resumeSyncVersion, jobsSyncVersion, applicationsSyncVersion]);
 
   const resume = (candidate as any)?.resume || null;
 
@@ -113,8 +129,50 @@ export default function CandidateDetails() {
   const resumeCertificates = parseResumeField<any[]>(resume?.certificates, []);
   const resumeLanguages = parseResumeField<any[]>(resume?.languages, []);
 
-  const matchPercentage = candidate?.match?.percentage ?? 0;
+  const matchPercentage = candidate?.match?.percentage ?? null;
   const matchReasons = candidate?.match?.reasons ?? [];
+  const matchWarnings = candidate?.match?.warnings ?? [];
+  const incompleteDataWarning = matchWarnings.some((warning) =>
+    /missing|not specified|not defined|no required|does not contain|incomplete|unavailable/i.test(warning)
+  );
+  const matchUnavailable = candidate?.match?.available === false || matchPercentage == null || (matchPercentage === 0 && incompleteDataWarning);
+  const applicableMatchItems = Object.entries(candidate?.match?.breakdown ?? {})
+    .filter(([, item]: [string, any]) => item?.applicable === true)
+    .map(([key, item]: [string, any]) => ({
+      key,
+      label: key.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase()),
+      score: Number(item?.score ?? 0),
+      maxWeight: Number(item?.max_weight ?? 0),
+    }));
+  const earnedMatchPoints = applicableMatchItems.reduce((total, item) => total + item.score, 0);
+  const applicableMatchWeight = applicableMatchItems.reduce((total, item) => total + item.maxWeight, 0);
+  const explainedMatchPercentage = applicableMatchWeight ? (earnedMatchPoints / applicableMatchWeight) * 100 : 0;
+  const summaryUnavailable = !candidate?.ai_summary || /^ai summary unavailable$/i.test(candidate.ai_summary.trim());
+
+  const loadAISummary = async () => {
+    if (!id || loadingAISummary) return;
+
+    setLoadingAISummary(true);
+    setAiSummaryError(null);
+
+    try {
+      const summaryText = await fetchApplicantAISummary(Number(id));
+      if (!summaryText?.trim() || /^ai summary unavailable$/i.test(summaryText.trim())) {
+        setAiSummaryError("AI summary is temporarily unavailable. Please try again.");
+        return;
+      }
+      setCandidate((prev) => prev ? { ...prev, ai_summary: summaryText } : prev);
+    } catch (err: any) {
+      console.error("Failed to fetch AI summary:", err);
+      setAiSummaryError(
+        err?.response?.status === 503
+          ? "AI summary is temporarily unavailable. Please try again."
+          : "Failed to generate AI summary. Please try again."
+      );
+    } finally {
+      setLoadingAISummary(false);
+    }
+  };
 
   const handleToggleAISummary = async () => {
     if (showAISummary) {
@@ -124,36 +182,7 @@ export default function CandidateDetails() {
 
     setShowAISummary(true);
 
-    if ((!candidate?.ai_summary || aiSummaryError) && id) {
-      setLoadingAISummary(true);
-      setAiSummaryError(null);
-
-      try {
-        const summaryText = await fetchApplicantAISummary(Number(id));
-
-        if (summaryText && summaryText.trim()) {
-          setCandidate((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  ai_summary: summaryText
-                }
-              : prev
-          );
-        } else {
-          setAiSummaryError(
-            "Failed to generate AI summary. Please try again."
-          );
-        }
-      } catch (err) {
-        console.error("Failed to fetch AI summary:", err);
-        setAiSummaryError(
-          "Failed to generate AI summary. Please try again."
-        );
-      } finally {
-        setLoadingAISummary(false);
-      }
-    }
+    if (summaryUnavailable || aiSummaryError) await loadAISummary();
   };
 
   const handleAddNote = async () => {
@@ -300,16 +329,11 @@ export default function CandidateDetails() {
     ? (candidate as any).skills
     : [];
 
-  const displaySkills =
-    candidate.match?.matching_skills?.length
-      ? candidate.match.matching_skills
-      : resumeSkills.length
-      ? resumeSkills
-          .map((skill: any) =>
-            typeof skill === "string" ? skill : skill?.name
-          )
-          .filter(Boolean)
-      : studentSkills;
+  const matchingSkills = Array.isArray(candidate.match?.matching_skills) ? candidate.match.matching_skills : [];
+  const missingSkills = Array.isArray(candidate.match?.missing_skills) ? candidate.match.missing_skills : [];
+  const displaySkills = studentSkills;
+  const jobTitle = candidate.job_title || (typeof candidate.job === "object" ? candidate.job?.title : candidate.job) || "Job title unavailable";
+  const totalExperience = candidate.total_years_of_experience ?? candidate.total_years_experience ?? resume?.total_years_of_experience ?? resume?.total_years_experience ?? null;
 
   const experiencesList =
     resumeExperience.length > 0
@@ -415,7 +439,7 @@ export default function CandidateDetails() {
                 margin: "0 0 16px"
               }}
             >
-              {candidate.student.headline || "No headline provided"}
+              {jobTitle}
             </p>
 
             <div
@@ -425,7 +449,25 @@ export default function CandidateDetails() {
                 marginBottom: 20
               }}
             >
-              <MatchRing v={matchPercentage} />
+              {!matchUnavailable && matchPercentage != null ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 7 }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowMatchDetails(true)}
+                    aria-label="View match score details"
+                    title="View match score details"
+                    style={{ border: 0, padding: 0, borderRadius: "50%", background: "transparent", cursor: "pointer" }}
+                  >
+                    <MatchRing v={matchPercentage} />
+                  </button>
+                  {candidate.match.recommendation_level && <strong style={{ fontSize: 12, color: C.textSec }}>{candidate.match.recommendation_level}</strong>}
+                  {candidate.match.source && <span style={{ fontSize: 10.5, color: C.textMuted }}>Source: {candidate.match.source}</span>}
+                </div>
+              ) : (
+                <div style={{ padding: "12px 14px", borderRadius: 12, background: C.warningBg, color: C.warning, fontSize: 12, fontWeight: 700 }}>
+                  Match unavailable — incomplete job or resume data
+                </div>
+              )}
             </div>
 
             <div
@@ -503,6 +545,16 @@ export default function CandidateDetails() {
                 </span>
               </div>
 
+              <div style={{ display: "flex", alignItems: "center", gap: 8, color: C.textSec }}>
+                <GraduationCap size={14} style={{ flexShrink: 0 }} />
+                <span>{candidate.student.university || "University not specified"}</span>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 8, color: C.textSec }}>
+                <Award size={14} style={{ flexShrink: 0 }} />
+                <span>{candidate.student.major || "Major not specified"}</span>
+              </div>
+
               <div
                 style={{
                   display: "flex",
@@ -513,9 +565,9 @@ export default function CandidateDetails() {
               >
                 <Briefcase size={14} style={{ flexShrink: 0 }} />
                 <span>
-                  {experiencesList.length > 0
-                    ? `${experiencesList.length} experience record(s)`
-                    : "Not specified"}
+                  {totalExperience != null
+                    ? `${totalExperience} years of experience`
+                    : "Total years of experience not specified"}
                 </span>
               </div>
             </div>
@@ -701,7 +753,7 @@ export default function CandidateDetails() {
                     <span style={{ fontSize: 11 }}>
                       {showAISummary
                         ? "Hide"
-                        : candidate?.ai_summary
+                        : !summaryUnavailable
                         ? "View"
                         : "Generate Summary"}
                     </span>
@@ -728,15 +780,17 @@ export default function CandidateDetails() {
                           Generating AI summary...
                         </div>
                       ) : aiSummaryError ? (
-                        <p
-                          style={{
-                            margin: 0,
-                            fontSize: 12.5,
-                            color: "#E53E3E"
-                          }}
-                        >
-                          {aiSummaryError}
-                        </p>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                          <p style={{ margin: 0, fontSize: 12.5, color: "#E53E3E" }}>{aiSummaryError}</p>
+                          <button
+                            type="button"
+                            onClick={(event) => { event.stopPropagation(); void loadAISummary(); }}
+                            disabled={loadingAISummary}
+                            style={{ border: "1px solid #D6BCFA", background: "#fff", color: "#6B46C1", borderRadius: 8, padding: "6px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                          >
+                            Retry
+                          </button>
+                        </div>
                       ) : (
                         <p
                           style={{
@@ -762,7 +816,7 @@ export default function CandidateDetails() {
                       color: C.text
                     }}
                   >
-                    Skills
+                    Student Skills
                   </h3>
 
                   {displaySkills.length > 0 ? (
@@ -807,8 +861,18 @@ export default function CandidateDetails() {
                     </div>
                   )}
 
-                  {(candidate.match?.missing_skills ?? []).length > 0 && (
-                    <>
+                  <>
+                      <h3 style={{ fontSize: 13, fontWeight: 600, margin: "20px 0 10px", color: C.text }}>
+                        Matching Skills
+                      </h3>
+                      {matchingSkills.length > 0 ? (
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                          {matchingSkills.map((skill) => <span key={skill} style={{ background: C.successBg, color: C.success, padding: "5px 14px", borderRadius: 16, fontSize: 12, fontWeight: 500 }}>{skill}</span>)}
+                        </div>
+                      ) : (
+                        <p style={{ margin: 0, fontSize: 12.5, color: C.textSec }}>No matching skills identified</p>
+                      )}
+
                       <h3
                         style={{
                           fontSize: 13,
@@ -827,7 +891,7 @@ export default function CandidateDetails() {
                           gap: 8
                         }}
                       >
-                        {(candidate.match?.missing_skills || []).map(
+                        {missingSkills.length > 0 ? missingSkills.map(
                           (skill) => (
                             <span
                               key={skill}
@@ -843,10 +907,9 @@ export default function CandidateDetails() {
                               {skill}
                             </span>
                           )
-                        )}
+                        ) : <p style={{ margin: 0, fontSize: 12.5, color: C.textSec }}>No missing skills identified</p>}
                       </div>
                     </>
-                  )}
                 </div>
 
                 <div>
@@ -889,10 +952,22 @@ export default function CandidateDetails() {
                         color: C.textSec
                       }}
                     >
-                      No match details available.
+                      No match explanation is available.
                     </div>
                   )}
                 </div>
+
+                <div>
+                  <h3 style={{ fontSize: 13, fontWeight: 600, margin: "0 0 10px", color: C.text }}>Warnings</h3>
+                  {matchWarnings.length > 0 ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+                      {matchWarnings.map((warning, index) => <div key={index} style={{ padding: "8px 10px", borderRadius: 9, background: C.warningBg, color: C.warning, fontSize: 12 }}>{warning}</div>)}
+                    </div>
+                  ) : (
+                    <p style={{ margin: 0, fontSize: 12.5, color: C.textSec }}>No match warnings.</p>
+                  )}
+                </div>
+
               </div>
             )}
 
@@ -1135,7 +1210,7 @@ export default function CandidateDetails() {
                     Work Experience
                   </div>
 
-                  {resumeExperience.length > 0 ? (
+                  {experiencesList.length > 0 ? (
                     <div
                       style={{
                         display: "flex",
@@ -1143,13 +1218,13 @@ export default function CandidateDetails() {
                         gap: 14
                       }}
                     >
-                      {resumeExperience.map(
+                      {experiencesList.map(
                         (exp: any, index: number) => (
                           <div
                             key={index}
                             style={{
                               borderBottom:
-                                index !== resumeExperience.length - 1
+                                index !== experiencesList.length - 1
                                   ? `1px solid ${C.border}`
                                   : "none",
                               paddingBottom: 12
@@ -1162,7 +1237,8 @@ export default function CandidateDetails() {
                                 color: C.text
                               }}
                             >
-                              {exp.title ||
+                              {exp.position ||
+                                exp.title ||
                                 exp.role ||
                                 "Position"}
                             </div>
@@ -1188,12 +1264,12 @@ export default function CandidateDetails() {
                                   marginTop: 3
                                 }}
                               >
-                                {exp.start_date || ""}
+                                {formatExperienceMonth(exp.start_date)}
                                 {exp.start_date &&
                                 exp.end_date
                                   ? " - "
                                   : ""}
-                                {exp.end_date || ""}
+                                {formatExperienceMonth(exp.end_date)}
                               </div>
                             )}
 
@@ -1690,6 +1766,61 @@ export default function CandidateDetails() {
           </div>
         </div>
       </div>
+      {showMatchDetails && matchPercentage != null && (
+        <div
+          role="presentation"
+          onClick={() => setShowMatchDetails(false)}
+          style={{ position: "fixed", inset: 0, zIndex: 10000, background: "rgba(15,23,42,.48)", display: "flex", alignItems: "center", justifyContent: "center", padding: 18 }}
+        >
+          <style>{`@media(max-width:640px){.match-details-sheet{align-self:flex-end;width:100%!important;max-width:none!important;border-radius:20px 20px 0 0!important;margin:-18px!important;padding-bottom:calc(24px + env(safe-area-inset-bottom))!important}}`}</style>
+          <div
+            className="match-details-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="match-details-title"
+            onClick={(event) => event.stopPropagation()}
+            style={{ width: "min(480px, 100%)", maxHeight: "82vh", overflowY: "auto", background: C.surface, borderRadius: 20, padding: 24, boxShadow: "0 24px 70px rgba(15,23,42,.24)" }}
+          >
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16 }}>
+              <div>
+                <h2 id="match-details-title" style={{ margin: 0, fontSize: 18, color: C.text }}>How the match score was calculated</h2>
+                <p style={{ margin: "6px 0 0", fontSize: 12.5, lineHeight: 1.5, color: C.textSec }}>The official score is provided by the matching service. This breakdown explains the applicable criteria.</p>
+              </div>
+              <button type="button" onClick={() => setShowMatchDetails(false)} aria-label="Close" style={{ border: 0, background: C.bg, color: C.textSec, borderRadius: 9, width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}><X size={17} /></button>
+            </div>
+
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", margin: "22px 0 18px", padding: "14px 16px", borderRadius: 14, background: C.bg }}>
+              <strong style={{ fontSize: 14, color: C.text }}>Official match</strong>
+              <strong style={{ fontSize: 24, color: C.info }}>{matchPercentage}%</strong>
+            </div>
+
+            {applicableMatchItems.length > 0 ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {applicableMatchItems.map((item) => {
+                  const progress = item.maxWeight > 0 ? Math.max(0, Math.min(100, (item.score / item.maxWeight) * 100)) : 0;
+                  return (
+                    <div key={item.key}>
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 7, fontSize: 12.5 }}>
+                        <strong style={{ color: C.text }}>{item.label}</strong>
+                        <span style={{ color: C.textSec }}>{item.score}/{item.maxWeight}</span>
+                      </div>
+                      <div style={{ height: 9, borderRadius: 99, background: C.divider, overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${progress}%`, borderRadius: 99, background: C.info, transition: "width .25s ease" }} />
+                      </div>
+                    </div>
+                  );
+                })}
+                <div style={{ marginTop: 4, paddingTop: 16, borderTop: `1px solid ${C.border}`, fontSize: 12.5, color: C.textSec, lineHeight: 1.6 }}>
+                  <div>{earnedMatchPoints} earned points ÷ {applicableMatchWeight} applicable points × 100</div>
+                  <strong style={{ color: C.text }}>Explanation result: {explainedMatchPercentage.toFixed(1)}%</strong>
+                </div>
+              </div>
+            ) : (
+              <p style={{ margin: 0, color: C.textSec, fontSize: 13 }}>No applicable criteria breakdown is available.</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, Res
 import { toast } from "sonner";
 import { C, F } from "../../constants/tokens";
 import { getAdminAnalytics, getAdminDashboard, getAdminJobsModeration, getAdminPlatformReport } from "../../imports/api";
+import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
 
 const box = { background: C.surface, border: `1px solid ${C.border}`, borderRadius: 18 };
 const colors = [C.accent, C.info, C.purple, C.success, C.warning, C.error];
@@ -12,6 +13,9 @@ const valueOf = (source: any, ...keys: string[]) => { for (const key of keys) if
 const listOf = (data: any, ...keys: string[]) => { for (const key of keys) if (Array.isArray(data?.[key])) return data[key]; return []; };
 
 export default function AdminAnalytics() {
+  const applicationsSyncVersion = useSyncResourceVersion("applications");
+  const jobsSyncVersion = useSyncResourceVersion("jobs");
+  const interviewsSyncVersion = useSyncResourceVersion("interviews");
   const [data, setData] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   useEffect(() => { (async () => {
@@ -36,7 +40,7 @@ export default function AdminAnalytics() {
       months.set(key, (months.get(key) ?? 0) + 1); return months;
     }, new Map<string, number>()).entries()).sort(([a], [b]) => a.localeCompare(b)).map(([month, count]) => ({ month: new Date(`${month}-01`).toLocaleDateString("en-US", { month: "short", year: "2-digit" }), count }));
     const categoryJobs = Array.from(jobs.reduce((categories: Map<string, number>, job: any) => {
-      const name = job.category?.name ?? job.category_name ?? job.department ?? job.dept ?? "Uncategorized";
+      const name = job.category?.name ?? "Uncategorized";
       categories.set(name, (categories.get(name) ?? 0) + 1); return categories;
     }, new Map<string, number>()).entries()).map(([name, count]) => ({ name, count }));
     const apiTrend = analytics.jobs_over_time ?? analytics.jobsOverTime ?? analytics.jobs_by_month;
@@ -64,7 +68,7 @@ export default function AdminAnalytics() {
     } catch {}
     if (analyticsResult.status === "rejected" && reportResult.status === "rejected" && dashboardResult.status === "rejected") toast.error("Could not load platform analytics");
     setLoading(false);
-  })(); }, []);
+  })(); }, [applicationsSyncVersion, jobsSyncVersion, interviewsSyncVersion]);
   const metrics = data.overview ?? data.metrics ?? data.statistics ?? data;
   const cards = [
     ["Students", valueOf(metrics, "total_students", "totalStudents", "students"), Users, C.info],
@@ -74,7 +78,11 @@ export default function AdminAnalytics() {
     ["Interviews", valueOf(metrics, "total_interviews", "totalInterviews", "interviews"), CalendarCheck, C.success],
     ["Hires", valueOf(metrics, "total_hires", "totalHires", "hires", "accepted"), Target, C.error],
   ] as const;
-  const jobsTrend = listOf(data, "jobs_over_time", "jobsOverTime", "jobs_by_month").map((item: any, i: number) => ({ name: item.label ?? item.month ?? item.date ?? `Period ${i + 1}`, value: valueOf(item, "value", "count", "total", "jobs") }));
+  const rawJobsTrend = listOf(data, "jobs_over_time", "jobsOverTime", "jobs_by_month").map((item: any, i: number) => ({ name: item.label ?? item.month ?? item.date ?? `Period ${i + 1}`, value: valueOf(item, "value", "count", "total", "jobs") }));
+  const totalJobs = valueOf(metrics, "total_jobs", "totalJobs", "jobs");
+  const jobsTrend = rawJobsTrend.some((item) => item.value > 0)
+    ? (rawJobsTrend.length === 1 ? [{ name: "Start", value: 0 }, ...rawJobsTrend] : rawJobsTrend)
+    : [{ name: "Start", value: 0 }, { name: "Current", value: totalJobs }];
   const categories = listOf(data, "jobs_by_category", "jobsByCategory", "categories").map((item: any) => ({ name: item.name ?? item.category ?? item.label ?? "Other", value: valueOf(item, "value", "count", "total", "jobs") }));
   const statusesRaw = data.application_funnel ?? data.applicationFunnel ?? data.application_statuses ?? data.applicationStatuses ?? {};
   const funnelKeys = [{ name: "Submitted", keys: ["submitted", "total"] }, { name: "Viewed", keys: ["viewed"] }, { name: "Shortlisted", keys: ["shortlisted"] }, { name: "Interview", keys: ["interview", "interviews"] }, { name: "Accepted", keys: ["accepted", "hired"] }];
@@ -87,7 +95,7 @@ export default function AdminAnalytics() {
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}><div><h1 style={{ fontSize: 25, fontWeight: 800, margin: 0 }}>Reports & Analytics</h1><p style={{ color: C.textSec, fontSize: 14, margin: "6px 0 0" }}>Live platform health, growth and recruitment conversion data.</p></div><span style={{ padding: "7px 11px", borderRadius: 99, background: C.successBg, color: C.success, fontSize: 11, fontWeight: 700, display: "flex", gap: 6, alignItems: "center" }}><Activity size={13}/> Live API data</span></div>
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(170px,1fr))", gap: 13, marginBottom: 20 }}>{cards.map(([label, value, Icon, color]) => <div key={label} style={{ ...box, padding: 17 }}><div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}><div style={{ width: 38, height: 38, borderRadius: 11, display: "grid", placeItems: "center", background: `${color}16`, color }}><Icon size={18}/></div><TrendingUp size={14} color={C.textMuted}/></div><div style={{ fontSize: 23, fontWeight: 800, marginTop: 13 }}>{loading ? "—" : value.toLocaleString()}</div><div style={{ color: C.textSec, fontSize: 12, marginTop: 2 }}>Total {label}</div></div>)}</div>
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.5fr) minmax(300px,1fr)", gap: 16, marginBottom: 16 }}>
-      <ChartBox title="Jobs Posted Over Time" subtitle="New job listings by reporting period"><ResponsiveContainer width="100%" height={260}>{jobsTrend.length ? <AreaChart data={jobsTrend}><defs><linearGradient id="jobsFill" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={C.accent} stopOpacity={.3}/><stop offset="95%" stopColor={C.accent} stopOpacity={0}/></linearGradient></defs><CartesianGrid strokeDasharray="3 3" stroke={C.divider}/><XAxis dataKey="name" tick={{ fontSize: 11 }} axisLine={false}/><YAxis tick={{ fontSize: 11 }} axisLine={false}/><Tooltip/><Area type="monotone" dataKey="value" name="Jobs" stroke={C.accent} fill="url(#jobsFill)" strokeWidth={2}/></AreaChart> : <Empty text="No jobs trend data returned"/>}</ResponsiveContainer></ChartBox>
+      <ChartBox title="Jobs Posted Over Time" subtitle="New job listings by reporting period"><ResponsiveContainer width="100%" height={260}><AreaChart data={jobsTrend}><defs><linearGradient id="jobsFill" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={C.accent} stopOpacity={.3}/><stop offset="95%" stopColor={C.accent} stopOpacity={0}/></linearGradient></defs><CartesianGrid strokeDasharray="3 3" stroke={C.divider}/><XAxis dataKey="name" tick={{ fontSize: 11 }} axisLine={false}/><YAxis domain={[0, (max: number) => Math.max(1, max)]} allowDecimals={false} tick={{ fontSize: 11 }} axisLine={false}/><Tooltip/><Area type="monotone" dataKey="value" name="Jobs" stroke={C.accent} fill="url(#jobsFill)" strokeWidth={2}/></AreaChart></ResponsiveContainer></ChartBox>
       <ChartBox title="Jobs by Category" subtitle="Distribution of active demand"><ResponsiveContainer width="100%" height={260}>{categories.length ? <PieChart><Pie data={categories} dataKey="value" nameKey="name" innerRadius={55} outerRadius={90} paddingAngle={3}>{categories.map((_: any, i: number) => <Cell key={i} fill={colors[i % colors.length]}/>)}</Pie><Tooltip/></PieChart> : <Empty text="No category analytics returned"/>}</ResponsiveContainer>{categories.length > 0 && <div style={{ display: "flex", flexWrap: "wrap", gap: 9 }}>{categories.slice(0, 6).map((item: any, i: number) => <span key={item.name} style={{ fontSize: 11, color: C.textSec }}><i style={{ display: "inline-block", width: 8, height: 8, borderRadius: 3, background: colors[i % colors.length], marginRight: 5 }}/>{item.name}</span>)}</div>}</ChartBox>
     </div>
     <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.35fr) minmax(300px,1fr)", gap: 16 }}>

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { User, Lock, Bell, Shield, LogOut, Upload } from "lucide-react";
 import { C, F } from "../../constants/tokens";
 import { Btn, Toggle } from "../ui";
+import { PasswordInput } from "./PasswordInput";
 import { toast } from "sonner";
 import {
   changePassword,
@@ -304,33 +305,15 @@ export function SettingsView({
               <div style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 400, marginBottom: 20 }}>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6, fontFamily: F }}>Current Password</label>
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    value={pwForm.current_password}
-                    onChange={(e) => setPwForm({ ...pwForm, current_password: e.target.value })}
-                    style={{ width: "100%", padding: "11px 14px", borderRadius: 12, border: `1px solid ${C.border}`, fontSize: 14, color: C.text, fontFamily: F, outline: "none", boxSizing: "border-box" }}
-                  />
+                  <PasswordInput value={pwForm.current_password} onChange={(value) => setPwForm({ ...pwForm, current_password: value })} />
                 </div>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6, fontFamily: F }}>New Password</label>
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    value={pwForm.password}
-                    onChange={(e) => setPwForm({ ...pwForm, password: e.target.value })}
-                    style={{ width: "100%", padding: "11px 14px", borderRadius: 12, border: `1px solid ${C.border}`, fontSize: 14, color: C.text, fontFamily: F, outline: "none", boxSizing: "border-box" }}
-                  />
+                  <PasswordInput value={pwForm.password} onChange={(value) => setPwForm({ ...pwForm, password: value })} />
                 </div>
                 <div>
                   <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6, fontFamily: F }}>Confirm Password</label>
-                  <input
-                    type="password"
-                    placeholder="••••••••"
-                    value={pwForm.password_confirmation}
-                    onChange={(e) => setPwForm({ ...pwForm, password_confirmation: e.target.value })}
-                    style={{ width: "100%", padding: "11px 14px", borderRadius: 12, border: `1px solid ${C.border}`, fontSize: 14, color: C.text, fontFamily: F, outline: "none", boxSizing: "border-box" }}
-                  />
+                  <PasswordInput value={pwForm.password_confirmation} onChange={(value) => setPwForm({ ...pwForm, password_confirmation: value })} />
                 </div>
               </div>
 

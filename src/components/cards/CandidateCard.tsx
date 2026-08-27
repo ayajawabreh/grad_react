@@ -29,6 +29,8 @@ export function CandidateCard({
   const status = c.status || "Applied";
   const match = c.match ?? c.match_score ?? 0;
   const skills = c.skills || c.student?.skills || [];
+  const matchingSkills = c.matching_skills ?? c.match_analysis?.matching_skills ?? [];
+  const missingSkills = c.missing_skills ?? c.match_analysis?.missing_skills ?? [];
 
   const isShortlisted = status === "Shortlisted";
   const isFinished = status === "Accepted" || status === "Rejected";
@@ -170,6 +172,8 @@ export function CandidateCard({
           flexWrap: "wrap"
         }}
       >
+        {matchingSkills.slice(0, 3).map((skill: string) => <span key={`match-${skill}`} style={{ padding: "3px 8px", borderRadius: 6, background: C.successBg, color: C.success, fontSize: 10 }}>✓ {skill}</span>)}
+        {missingSkills.slice(0, 2).map((skill: string) => <span key={`missing-${skill}`} style={{ padding: "3px 8px", borderRadius: 6, background: C.warningBg, color: C.warning, fontSize: 10 }}>Missing: {skill}</span>)}
         {skills.slice(0, 3).map((skill: any, index: number) => {
           const skillName =
             typeof skill === "string" ? skill : skill.name;

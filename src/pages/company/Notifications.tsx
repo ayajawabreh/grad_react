@@ -9,6 +9,7 @@ import {
   NotificationDTO,
 } from "../../imports/Notifications";
 import { supabase } from "../../lib/supabase";
+import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
 
 interface Notif {
   id: number;
@@ -45,13 +46,14 @@ const mapToNotif = (n: NotificationDTO): Notif => {
 };
 
 export default function Notifications() {
+  const notificationsSyncVersion = useSyncResourceVersion("notifications");
   const [items, setItems] = useState<Notif[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const loadNotifications = async () => {
-    setLoading(true);
-    setError("");
+  const loadNotifications = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
+    if (showLoading) setError("");
     try {
       const data = await getNotifications();
       setItems(data.notifications.map(mapToNotif));
@@ -59,7 +61,7 @@ export default function Notifications() {
       setError("Failed to load notifications");
       console.error(err);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
@@ -68,38 +70,30 @@ export default function Notifications() {
   }, []);
 
   useEffect(() => {
+    if (notificationsSyncVersion > 0) void loadNotifications(false);
+  }, [notificationsSyncVersion]);
+
+  useEffect(() => {
+    const refresh = () => loadNotifications(false);
+    const interval = window.setInterval(refresh, 10000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+    };
+  }, []);
+
+  useEffect(() => {
     const channel = supabase
       .channel("company-notifications-realtime")
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*",
           schema: "public",
           table: "notifications",
         },
-        (payload) => {
-          const row = payload.new as Partial<NotificationDTO>;
-
-          if (!row.id || !row.title || !row.message) {
-            loadNotifications();
-            return;
-          }
-
-          const notification = mapToNotif({
-            id: row.id,
-            title: row.title,
-            message: row.message,
-            is_read: Boolean(row.is_read),
-            time: row.time || "Just now",
-            created_at: row.created_at || new Date().toISOString(),
-          });
-
-          setItems((current) =>
-            current.some((item) => item.id === notification.id)
-              ? current
-              : [notification, ...current]
-          );
-        }
+        () => loadNotifications(false)
       )
       .subscribe((status) => {
         console.log("Notification realtime status:", status);

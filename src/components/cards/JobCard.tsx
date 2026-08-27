@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Briefcase, MapPin, Clock, Heart } from "lucide-react";
 import { C, F } from "../../constants/tokens";
 import { SBadge, Btn } from "../ui";
-import { API } from "../../imports/api";
+import { saveJob, unsaveJob } from "../../imports/jobs";
+import { formatExperienceRange } from "../../utils/experience";
 
 interface JobCardProps {
   job: any;
@@ -20,6 +21,10 @@ export function JobCard({
   const [isSaved, setIsSaved] = useState(
     Boolean(job?.saved || job?.is_saved)
   );
+
+  useEffect(() => {
+    setIsSaved(Boolean(job?.saved || job?.is_saved));
+  }, [job?.saved, job?.is_saved]);
 
   const companyName =
     job?.company?.company_name ||
@@ -82,9 +87,9 @@ export function JobCard({
 
     try {
       if (newState) {
-        await API.post(`/jobs/${job.id}/save`);
+        await saveJob(job.id);
       } else {
-        await API.delete(`/jobs/${job.id}/save`);
+        await unsaveJob(job.id);
       }
 
       onSave?.(job.id, newState);
@@ -174,6 +179,7 @@ export function JobCard({
           >
             {companyName}
           </p>
+          <p style={{ margin: "4px 0 0", fontSize: 11, color: C.textMuted, fontFamily: F }}>{formatExperienceRange(job?.min_experience_years, job?.max_experience_years)}</p>
 
           <div
             style={{

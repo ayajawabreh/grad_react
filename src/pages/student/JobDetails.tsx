@@ -4,6 +4,10 @@ import { C, F } from "../../constants/tokens";
 import { fetchJob, saveJob, unsaveJob, applyToJob, withdrawJobApplication, checkJobApplied, UiJob } from "../../imports/jobs";
 import { Btn, SBadge } from "../../components/ui";
 import { ArrowLeft, MapPin, DollarSign, Clock, Users, Heart, CheckCircle2, AlertCircle, FileText } from "lucide-react";
+import { useSavedJobsCache } from "../../sync/savedJobsStore";
+import { useApplicationsCache } from "../../sync/applicationsStore";
+import { formatExperienceRange } from "../../utils/experience";
+import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
 
 export default function JobDetails() {
   const nav = useNavigate();
@@ -16,6 +20,22 @@ export default function JobDetails() {
   const [applyError, setApplyError] = useState("");
   const [applied, setApplied] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const { ids: savedJobIds, hydrated: savedJobsHydrated } = useSavedJobsCache();
+  const { jobIds: applicationJobIds, hydrated: applicationsHydrated } = useApplicationsCache();
+  const jobsSyncVersion = useSyncResourceVersion("jobs");
+
+  useEffect(() => {
+    if (!id || !savedJobsHydrated) return;
+    setJob((current) => current
+      ? { ...current, saved: savedJobIds.has(String(id)) }
+      : current
+    );
+  }, [id, savedJobIds, savedJobsHydrated]);
+
+  useEffect(() => {
+    if (!id || !applicationsHydrated) return;
+    setApplied(applicationJobIds.has(String(id)));
+  }, [id, applicationJobIds, applicationsHydrated]);
 
   useEffect(() => {
     if (!id) return;
@@ -29,7 +49,7 @@ export default function JobDetails() {
       .then((isApplied) => setApplied(isApplied))
       .catch(() => setError("Failed to load job details"))
       .finally(() => setLoading(false));
-  }, [id]);
+  }, [id, jobsSyncVersion]);
 
   async function handleToggleSave() {
     if (!job || saving) return;
@@ -240,6 +260,7 @@ export default function JobDetails() {
               { icon: MapPin, label: "Location", value: job.location },
               { icon: Clock, label: "Posted", value: job.posted },
               { icon: Users, label: "Applicants", value: `${job.applicants} applied` },
+              { icon: Clock, label: "Experience", value: formatExperienceRange(job.min_experience_years, job.max_experience_years) },
             ].map(({ icon: Icon, label, value }) => (
               <div key={label} style={{ display: "flex", gap: 12, marginBottom: 14, alignItems: "flex-start" }}>
                 <div style={{ width: 32, height: 32, borderRadius: 8, background: C.accentLight, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>

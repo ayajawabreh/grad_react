@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { C, F } from "../../constants/tokens";
 import { Btn } from "../../components/ui";
 import { ArrowLeft, Save, Sparkles, Plus, X, CheckCircle2, AlertCircle } from "lucide-react";
-import api, { generateJobDescription } from "../../imports/api";
+import api, { generateJobDescription, getJobCategories } from "../../imports/api";
+import { EnglishDatePicker } from "../../components/shared/EnglishDatePicker";
+import { isExperienceYears, numberOrNull } from "../../utils/numbers";
 
 export default function CreateJob() {
   const nav = useNavigate();
@@ -11,13 +13,16 @@ export default function CreateJob() {
   const [generatingAi, setGeneratingAi] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [categories, setCategories] = useState<Array<{ id: number; name: string }>>([]);
 
   const [formData, setFormData] = useState({
     title: "",
-    dept: "",
+    categoryId: "",
     type: "Full-Time",
     level: "Entry",
     workMode: "Remote",
+    minExperienceYears: "",
+    maxExperienceYears: "",
     location: "",
     salary: "",
     deadline: "",
@@ -30,6 +35,13 @@ export default function CreateJob() {
 
   const [skillInput, setSkillInput] = useState("");
 
+  useEffect(() => {
+    void getJobCategories().then((response: any) => {
+      const data = response?.data ?? response;
+      setCategories(Array.isArray(data) ? data : data?.categories ?? data?.data ?? []);
+    }).catch(() => setError("Could not load job categories."));
+  }, []);
+
   const availableBenefits = [
     "Health Insurance",
     "Transportation Allowance",
@@ -41,6 +53,20 @@ export default function CreateJob() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleExperienceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const arabic = "٠١٢٣٤٥٦٧٨٩";
+    const persian = "۰۱۲۳۴۵۶۷۸۹";
+    const value = e.target.value.replace(/[٠-٩]/g, d => String(arabic.indexOf(d))).replace(/[۰-۹]/g, d => String(persian.indexOf(d))).replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
+    setFormData(current => ({ ...current, [e.target.name]: value }));
+  };
+
+  const handleEnglishDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const arabic = "٠١٢٣٤٥٦٧٨٩";
+    const persian = "۰۱۲۳۴۵۶۷۸۹";
+    const value = e.target.value.replace(/[٠-٩]/g, d => String(arabic.indexOf(d))).replace(/[۰-۹]/g, d => String(persian.indexOf(d))).replace(/[^0-9-]/g, "").slice(0, 10);
+    setFormData(current => ({ ...current, deadline: value }));
   };
 
   const handleAddSkill = () => {
@@ -84,10 +110,11 @@ export default function CreateJob() {
     try {
       const res = await generateJobDescription({
         title: formData.title.trim(),
-        department: formData.dept.trim(),
+        department: categories.find((category) => String(category.id) === formData.categoryId)?.name ?? "",
         level: formData.level,
         work_mode: formData.workMode,
         skills: formData.skills,
+        description: formData.description,
       });
 
       if (res?.description) {
@@ -120,16 +147,32 @@ export default function CreateJob() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(formData.deadline) || Number.isNaN(new Date(`${formData.deadline}T00:00:00`).getTime())) {
+      setError("Please enter the deadline in YYYY-MM-DD format.");
+      return;
+    }
+    const minExperience = numberOrNull(formData.minExperienceYears);
+    const maxExperience = numberOrNull(formData.maxExperienceYears);
+    if (!isExperienceYears(minExperience) || !isExperienceYears(maxExperience)) {
+      setError("Experience years must be between 0 and 60");
+      return;
+    }
+    if (minExperience !== null && maxExperience !== null && maxExperience < minExperience) {
+      setError("Maximum experience must be greater than or equal to minimum experience");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     setNotification(null);
 
     const payload = {
       title: formData.title,
-      department: formData.dept,
+      category_id: Number(formData.categoryId),
       employment_type: formData.type,
       level: formData.level,
       work_mode: formData.workMode,
+      min_experience_years: minExperience,
+      max_experience_years: maxExperience,
       location: formData.location,
       salary: formData.salary
         ? Number(String(formData.salary).replace(/[^\d.]/g, ""))
@@ -262,14 +305,17 @@ export default function CreateJob() {
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Department</label>
-              <input
-                name="dept"
-                value={formData.dept}
+              <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Category</label>
+              <select
+                name="categoryId"
+                value={formData.categoryId}
                 onChange={handleChange}
-                placeholder="e.g. Engineering"
+                required
                 style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${C.border}`, fontFamily: F, fontSize: 14, background: C.surface, color: C.text, boxSizing: "border-box" }}
-              />
+              >
+                <option value="">Select a category</option>
+                {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+              </select>
             </div>
 
             <div>
@@ -315,6 +361,7 @@ export default function CreateJob() {
                 <option value="Hybrid">Hybrid</option>
               </select>
             </div>
+            <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "nowrap" }}><div><label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Min Experience</label><input lang="en-US" dir="ltr" inputMode="decimal" type="text" name="minExperienceYears" value={formData.minExperienceYears} onChange={handleExperienceChange} placeholder="Years" style={{ width: 120, padding: "9px 10px", borderRadius: 8, border: `1px solid ${C.border}`, fontFamily: F, fontSize: 13, boxSizing: "border-box", direction: "ltr" }}/></div><div><label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Max Experience</label><input lang="en-US" dir="ltr" inputMode="decimal" type="text" name="maxExperienceYears" value={formData.maxExperienceYears} onChange={handleExperienceChange} placeholder="Years" style={{ width: 120, padding: "9px 10px", borderRadius: 8, border: `1px solid ${C.border}`, fontFamily: F, fontSize: 13, boxSizing: "border-box", direction: "ltr" }}/></div></div>
           </div>
         </div>
 
@@ -420,25 +467,7 @@ export default function CreateJob() {
                 Deadline
               </label>
 
-              <input
-                name="deadline"
-                type="date"
-                value={formData.deadline}
-                onChange={handleChange}
-                required
-                min={new Date().toISOString().split("T")[0]}
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: 8,
-                  border: `1px solid ${C.border}`,
-                  fontFamily: F,
-                  fontSize: 14,
-                  background: C.surface,
-                  color: C.text,
-                  boxSizing: "border-box",
-                }}
-              />
+              <EnglishDatePicker value={formData.deadline} onChange={(deadline) => setFormData((current) => ({ ...current, deadline }))} required />
             </div>
           </div>
         </div>
@@ -478,7 +507,7 @@ export default function CreateJob() {
               disabled={generatingAi}
               style={{ background: "none", border: "none", cursor: "pointer", color: C.accent, fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}
             >
-              <Sparkles size={14} /> {generatingAi ? "Generating..." : "AI Generate"}
+              <Sparkles size={14} /> {generatingAi ? (formData.description.trim() ? "Improving..." : "Generating...") : (formData.description.trim() ? "Improve with AI" : "Generate with AI")}
             </button>
           </div>
 

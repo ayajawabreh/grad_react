@@ -3,7 +3,9 @@ import { useNavigate, useParams } from "react-router";
 import { C, F } from "../../constants/tokens";
 import { Btn } from "../../components/ui";
 import { ArrowLeft, Save, Sparkles, Plus, X, CheckCircle2, AlertCircle } from "lucide-react";
-import { getCompanyJobs, updateJob, generateJobDescription } from "../../imports/api";
+import { getCompanyJobs, updateJob, generateJobDescription, getJobCategories } from "../../imports/api";
+import { EnglishDatePicker } from "../../components/shared/EnglishDatePicker";
+import { isExperienceYears, numberOrNull } from "../../utils/numbers";
 
 export default function EditJob() {
   const { id } = useParams();
@@ -13,13 +15,16 @@ export default function EditJob() {
   const [generatingAi, setGeneratingAi] = useState(false);
   const [originalStatus, setOriginalStatus] = useState("");
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [categories, setCategories] = useState<Array<{ id: number; name: string }>>([]);
 
   const [formData, setFormData] = useState({
     title: "",
-    dept: "",
+    categoryId: "",
     type: "Full-Time",
     level: "Entry",
     workMode: "Remote",
+    minExperienceYears: "",
+    maxExperienceYears: "",
     location: "",
     salary: "",
     deadline: "",
@@ -42,6 +47,13 @@ export default function EditJob() {
   ];
 
   useEffect(() => {
+    void getJobCategories().then((response: any) => {
+      const data = response?.data ?? response;
+      setCategories(Array.isArray(data) ? data : data?.categories ?? data?.data ?? []);
+    }).catch(() => setNotification({ type: "error", message: "Could not load job categories." }));
+  }, []);
+
+  useEffect(() => {
     const fetchJob = async () => {
       try {
         const jobs = await getCompanyJobs();
@@ -51,10 +63,12 @@ export default function EditJob() {
           setOriginalStatus(currentJob.status || "");
           setFormData({
             title: currentJob.title || "",
-            dept: currentJob.dept || currentJob.department || "",
+            categoryId: String(currentJob.category_id ?? currentJob.category?.id ?? ""),
             type: currentJob.type || currentJob.employment_type || "Full-Time",
             level: currentJob.level || "Entry",
             workMode: currentJob.mode || currentJob.workMode || currentJob.work_mode || "Remote",
+            minExperienceYears: currentJob.min_experience_years == null ? "" : String(currentJob.min_experience_years),
+            maxExperienceYears: currentJob.max_experience_years == null ? "" : String(currentJob.max_experience_years),
             location: currentJob.location || "",
             salary: currentJob.salary?.toString() || "",
             deadline: currentJob.deadline || "",
@@ -79,6 +93,20 @@ export default function EditJob() {
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleExperienceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const arabic = "٠١٢٣٤٥٦٧٨٩";
+    const persian = "۰۱۲۳۴۵۶۷۸۹";
+    const value = e.target.value.replace(/[٠-٩]/g, d => String(arabic.indexOf(d))).replace(/[۰-۹]/g, d => String(persian.indexOf(d))).replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1");
+    setFormData(current => ({ ...current, [e.target.name]: value }));
+  };
+
+  const handleEnglishDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const arabic = "٠١٢٣٤٥٦٧٨٩";
+    const persian = "۰۱۲۳۴۵۶۷۸۹";
+    const value = e.target.value.replace(/[٠-٩]/g, d => String(arabic.indexOf(d))).replace(/[۰-۹]/g, d => String(persian.indexOf(d))).replace(/[^0-9-]/g, "").slice(0, 10);
+    setFormData(current => ({ ...current, deadline: value }));
   };
 
   const handleAddSkill = () => {
@@ -117,10 +145,11 @@ export default function EditJob() {
     try {
       const res = await generateJobDescription({
         title: formData.title,
-        department: formData.dept,
+        department: categories.find((category) => String(category.id) === formData.categoryId)?.name ?? "",
         level: formData.level,
         work_mode: formData.workMode,
         skills: formData.skills,
+        description: formData.description,
       });
 
       if (res?.description) {
@@ -129,8 +158,12 @@ export default function EditJob() {
           description: res.description,
         }));
       }
-    } catch (e) {
-      console.log(e);
+    } catch (e: any) {
+      console.error("AI description error:", e?.response?.data || e);
+      setNotification({
+        type: "error",
+        message: e?.response?.data?.message || "Failed to generate job description. Please try again.",
+      });
     } finally {
       setGeneratingAi(false);
     }
@@ -138,6 +171,20 @@ export default function EditJob() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (formData.deadline && (!/^\d{4}-\d{2}-\d{2}$/.test(formData.deadline) || Number.isNaN(new Date(`${formData.deadline}T00:00:00`).getTime()))) {
+      setNotification({ type: "error", message: "Please enter the deadline in YYYY-MM-DD format." });
+      return;
+    }
+    const minExperience = numberOrNull(formData.minExperienceYears);
+    const maxExperience = numberOrNull(formData.maxExperienceYears);
+    if (!isExperienceYears(minExperience) || !isExperienceYears(maxExperience)) {
+      setNotification({ type: "error", message: "Experience years must be between 0 and 60" });
+      return;
+    }
+    if (minExperience !== null && maxExperience !== null && maxExperience < minExperience) {
+      setNotification({ type: "error", message: "Maximum experience must be greater than or equal to minimum experience" });
+      return;
+    }
     setSubmitting(true);
     setNotification(null);
 
@@ -145,10 +192,12 @@ export default function EditJob() {
 
     const payload = {
       title: formData.title,
-      department: formData.dept,
+      category_id: Number(formData.categoryId),
       employment_type: formData.type,
       level: formData.level,
       work_mode: formData.workMode,
+      min_experience_years: minExperience,
+      max_experience_years: maxExperience,
       location: formData.location,
       salary: salaryValue ? Number(salaryValue.replace(/[^\d.]/g, "")) : null,
       deadline: formData.deadline,
@@ -369,14 +418,14 @@ export default function EditJob() {
                   marginBottom: 6,
                 }}
               >
-                Department
+                Category
               </label>
 
-              <input
-                name="dept"
-                value={formData.dept}
+              <select
+                name="categoryId"
+                value={formData.categoryId}
                 onChange={handleChange}
-                placeholder="e.g. Engineering"
+                required
                 style={{
                   width: "100%",
                   padding: "10px 12px",
@@ -388,7 +437,10 @@ export default function EditJob() {
                   color: C.text,
                   boxSizing: "border-box",
                 }}
-              />
+              >
+                <option value="">Select a category</option>
+                {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+              </select>
             </div>
 
             <div>
@@ -494,6 +546,7 @@ export default function EditJob() {
                 <option value="Hybrid">Hybrid</option>
               </select>
             </div>
+            <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "nowrap" }}><div><label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Min Experience</label><input lang="en-US" dir="ltr" inputMode="decimal" type="text" name="minExperienceYears" value={formData.minExperienceYears} onChange={handleExperienceChange} placeholder="Years" style={{ width: 120, padding: "9px 10px", borderRadius: 8, border: `1px solid ${C.border}`, fontFamily: F, fontSize: 13, boxSizing: "border-box", direction: "ltr" }}/></div><div><label style={{ display: "block", fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Max Experience</label><input lang="en-US" dir="ltr" inputMode="decimal" type="text" name="maxExperienceYears" value={formData.maxExperienceYears} onChange={handleExperienceChange} placeholder="Years" style={{ width: 120, padding: "9px 10px", borderRadius: 8, border: `1px solid ${C.border}`, fontFamily: F, fontSize: 13, boxSizing: "border-box", direction: "ltr" }}/></div></div>
           </div>
         </div>
 
@@ -623,23 +676,7 @@ export default function EditJob() {
                 Deadline
               </label>
 
-              <input
-                type="date"
-                name="deadline"
-                value={formData.deadline}
-                onChange={handleChange}
-                style={{
-                  width: "100%",
-                  padding: "10px 12px",
-                  borderRadius: 8,
-                  border: `1px solid ${C.border}`,
-                  fontFamily: F,
-                  fontSize: 14,
-                  background: C.surface,
-                  color: C.text,
-                  boxSizing: "border-box",
-                }}
-              />
+              <EnglishDatePicker value={formData.deadline} onChange={(deadline) => setFormData((current) => ({ ...current, deadline }))} />
             </div>
           </div>
         </div>
@@ -681,7 +718,7 @@ export default function EditJob() {
               }}
             >
               <Sparkles size={14} />
-              {generatingAi ? "Generating..." : "AI Generate"}
+              {generatingAi ? (formData.description.trim() ? "Improving..." : "Generating...") : (formData.description.trim() ? "Improve with AI" : "Generate with AI")}
             </button>
           </div>
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
 import { useNavigate, useParams } from "react-router";
 import { C, F } from "../../constants/tokens";
 import { API } from "../../imports/api";
@@ -29,6 +30,7 @@ interface ShortlistedApplicant {
 }
 
 export default function Shortlisted() {
+  const applicationsSyncVersion = useSyncResourceVersion("applications");
   const { id } = useParams();
   const nav = useNavigate();
   const [applicants, setApplicants] = useState<ShortlistedApplicant[]>([]);
@@ -59,6 +61,10 @@ export default function Shortlisted() {
       window.removeEventListener("focus", refresh);
     };
   }, [id]);
+
+  useEffect(() => {
+    if (applicationsSyncVersion > 0) loadShortlisted(false);
+  }, [applicationsSyncVersion]);
 
   if (loading) {
     return (

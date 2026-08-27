@@ -3,11 +3,7 @@ import { useNavigate } from "react-router";
 import { C, F } from "../../constants/tokens";
 import { Btn, SBadge } from "../../components/ui";
 import { Briefcase, Clock, TrendingUp, Trophy } from "lucide-react";
-import {
-  fetchMyApplications,
-  ApiApplication,
-  ApplicationStats,
-} from "../../imports/jobs";
+import { refreshApplicationsCache, useApplicationsCache } from "../../sync/applicationsStore";
 
 const FILTERS = [
   "All",
@@ -36,39 +32,10 @@ export default function Applications() {
   const nav = useNavigate();
   const [filter, setFilter] = useState("All");
 
-  const [apps, setApps] = useState<ApiApplication[]>([]);
-  const [stats, setStats] = useState<ApplicationStats>({
-    total: 0,
-    active: 0,
-    interviews: 0,
-    offers: 0,
-  });
-
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  const loadApplications = (showLoading = true) => {
-    if (showLoading) setLoading(true);
-    setError("");
-
-    fetchMyApplications()
-      .then((res) => {
-        setApps(res.applications);
-        setStats(res.stats);
-      })
-      .catch(() => setError("Failed to load applications"))
-      .finally(() => showLoading && setLoading(false));
-  };
+  const { applications: apps, stats, loading, error, hydrated } = useApplicationsCache();
 
   useEffect(() => {
-    loadApplications();
-    const refresh = () => loadApplications(false);
-    const interval = window.setInterval(refresh, 5000);
-    window.addEventListener("focus", refresh);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener("focus", refresh);
-    };
+    void refreshApplicationsCache(hydrated);
   }, []);
 
   const filtered =

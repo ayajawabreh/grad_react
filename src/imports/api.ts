@@ -81,6 +81,7 @@ export const updateStudentProfile = async (data: any) => {
 export const reviewCV = async () => {
   return apiRequest("/ai/cv-review", {
     method: "POST",
+    timeout: 30000,
   });
 };
 
@@ -96,6 +97,7 @@ export const generateInterviewQuestions = async (jobId: number) => {
     data: {
       job_id: jobId,
     },
+    timeout: 60000,
   });
 };
 
@@ -103,6 +105,23 @@ export const submitInterviewAnswers = async (data: any) => {
   return apiRequest("/ai/interview/submit", {
     method: "POST",
     data,
+    timeout: 60000,
+  });
+};
+
+export const retakeInterviewQuiz = async (jobId: number) => {
+  return apiRequest("/ai/interview/retake", {
+    method: "POST",
+    data: { job_id: jobId },
+    timeout: 60000,
+  });
+};
+
+export const getInterviewAttempts = async (jobId: number) => {
+  return apiRequest("/ai/interview/attempts", {
+    method: "GET",
+    params: { job_id: jobId },
+    timeout: 30000,
   });
 };
 
@@ -436,6 +455,10 @@ export const getAdminCategories = async () => {
   return apiRequest("/admin/categories", { method: "GET" });
 };
 
+export const getJobCategories = async () => {
+  return apiRequest("/job-categories", { method: "GET" });
+};
+
 export const createAdminCategory = async (data: { name: string }) => {
   return apiRequest("/admin/categories", { method: "POST", data });
 };
@@ -452,6 +475,7 @@ export const deleteAdminCategory = async (id: string | number) => {
 export const getAdminSkills = async () => {
   return apiRequest("/admin/skills", {
     method: "GET",
+    params: { per_page: 100 },
   });
 };
 

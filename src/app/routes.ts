@@ -54,10 +54,11 @@ import Reports from "../pages/company/Reports";
 import MyResume from "../pages/student/MyResume";
 import ResumeUpload from "../pages/student/ResumeUpload";
 import ResumeBuilder from "../pages/student/Resume";
+import RouteErrorBoundary from "./RouteErrorBoundary";
 
 
 export const router = createBrowserRouter([
-  { path: "/", Component: Landing },
+  { path: "/", Component: Landing, ErrorBoundary: RouteErrorBoundary },
   { path: "/login", Component: Login },
   { path: "/register", Component: Register },
   { path: "/forgot-password", Component: ForgotPassword },
@@ -67,6 +68,7 @@ export const router = createBrowserRouter([
 {
   path: "/student",
   Component: StudentLayout,
+  ErrorBoundary: RouteErrorBoundary,
   children: [
     { index: true, loader: () => redirect("/student/dashboard") },
     { path: "dashboard", Component: StudentDashboard },
@@ -91,6 +93,7 @@ export const router = createBrowserRouter([
   {
     path: "/company",
     Component: CompanyLayout,
+    ErrorBoundary: RouteErrorBoundary,
     children: [
       { index: true, loader: () => redirect("/company/dashboard") },
       { path: "dashboard", Component: CompanyDashboard },
@@ -117,6 +120,7 @@ export const router = createBrowserRouter([
     
   path: "/admin",
   Component: AdminLayout,
+  ErrorBoundary: RouteErrorBoundary,
   children: [
     { index: true, loader: () => redirect("/admin/dashboard") },
 { path: "dashboard", Component: AdminDashboard },    { path: "students", Component: AdminStudents },

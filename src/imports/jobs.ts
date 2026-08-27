@@ -1,6 +1,8 @@
 /// <reference types="vite/client" />
 
 import { API } from "./api";
+import { refreshSavedJobsCache, setSavedJobState } from "../sync/savedJobsStore";
+import { refreshApplicationsCache, setApplicationState } from "../sync/applicationsStore";
 
 export interface ApiCompany {
   id: number;
@@ -25,7 +27,8 @@ export interface ApiJob {
   salary?: string | null;
   location?: string | null;
 
-  department?: string | null;
+  category_id?: number | null;
+  category?: { id: number; name: string } | null;
   level?: string | null;
 
   description?: string | null;
@@ -37,6 +40,8 @@ export interface ApiJob {
 
   applications_count: number;
   is_saved?: boolean;
+  min_experience_years?: number | null;
+  max_experience_years?: number | null;
 
   company: ApiCompany;
   skills: ApiSkill[];
@@ -79,6 +84,8 @@ export interface UiJob {
   saved: boolean;
 
   applied?: boolean;
+  min_experience_years?: number | null;
+  max_experience_years?: number | null;
 
   description?: string;
 
@@ -178,7 +185,7 @@ export function mapApiJobToUiJob(
 
 
     dept:
-      job.department ??
+      job.category?.name ??
       "General",
 
 
@@ -230,6 +237,9 @@ export function mapApiJobToUiJob(
     saved:
       job.is_saved ?? false,
 
+    min_experience_years: job.min_experience_years ?? null,
+    max_experience_years: job.max_experience_years ?? null,
+
 
     description:
       job.description ??
@@ -263,6 +273,8 @@ export async function fetchJobs(params?: {
   types?: string[];
 
   modes?: string[];
+
+  categoryId?: number;
 
   page?: number;
 
@@ -361,6 +373,12 @@ export async function saveJob(
     `/jobs/${id}/save`
   );
 
+  if (params?.categoryId)
+    query.append("category_id", String(params.categoryId));
+
+  setSavedJobState(id, true);
+  void refreshSavedJobsCache(true);
+
 }
 
 
@@ -375,6 +393,9 @@ export async function unsaveJob(
   await API.delete(
     `/jobs/${id}/save`
   );
+
+  setSavedJobState(id, false);
+  void refreshSavedJobsCache(true);
 
 }
 
@@ -426,12 +447,18 @@ export async function applyToJob(
   resumeId?: number
 ): Promise<{ message: string; application: any }> {
 
-  const res = await API.post(
+  setApplicationState(id, true);
+  try {
+    const res = await API.post(
     `/jobs/${id}/apply`,
     resumeId ? { resume_id: resumeId } : {}
-  );
-
-  return res.data;
+    );
+    void refreshApplicationsCache(true);
+    return res.data;
+  } catch (error) {
+    setApplicationState(id, false);
+    throw error;
+  }
 }
 
 
@@ -451,9 +478,14 @@ export async function withdrawJobApplication(
   id: string | number
 ): Promise<void> {
 
-  await API.delete(
-    `/jobs/${id}/apply`
-  );
+  setApplicationState(id, false);
+  try {
+    await API.delete(`/jobs/${id}/apply`);
+    void refreshApplicationsCache(true);
+  } catch (error) {
+    setApplicationState(id, true);
+    throw error;
+  }
 
 }
 

@@ -22,6 +22,7 @@ import {
   getCurrentUser,
   getConversations,
   getConversation,
+  startConversation,
   sendMessage,
   findUserByEmail,
   deleteConversation,
@@ -31,6 +32,7 @@ import {
   ApiChatMessage,
 } from "../../imports/messages";
 import { supabase } from "../../lib/supabase";
+import { SYNC_EVENT_NAME, type SyncEventDetail } from "../../sync/syncEvents";
 
 interface MessagesViewProps {
   meInitials?: string;
@@ -56,6 +58,101 @@ function normalizeFileUrl(url: string | null) {
   }
 
   return url;
+}
+
+function lastMessageText(value: any): string {
+  if (typeof value === "string") return value;
+  if (!value || typeof value !== "object") return "";
+  if (value.type === "image") return "Image";
+  if (value.type === "audio") return "Voice message";
+  if (value.type === "file") return value.file_name || "File";
+  return String(value.message ?? value.text ?? "");
+}
+
+function conversationTimestamp(conversation: ApiConversation): number {
+  const value = conversation.activity_at || conversation.last_time;
+  if (value === "Now") return Date.now();
+  const timestamp = value ? new Date(value).getTime() : 0;
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function formatConversationTime(value?: string | null): string {
+  if (!value) return "";
+  if (value === "Now") return "Just now";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  if (seconds < 10) return "Just now";
+  if (seconds < 60) return `${seconds}s ago`;
+
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+
+  const sameYear = date.getFullYear() === new Date().getFullYear();
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    ...(sameYear ? {} : { year: "numeric" }),
+  });
+}
+
+function mergeConversationLists(saved: ApiConversation[], fresh: ApiConversation[]) {
+  const merged = new Map<number, ApiConversation>();
+  saved.forEach((conversation) => conversation.user_id && merged.set(conversation.user_id, conversation));
+  fresh.forEach((conversation) => {
+    if (!conversation.user_id) return;
+    const previous = merged.get(conversation.user_id);
+    merged.set(conversation.user_id, {
+      ...previous,
+      ...conversation,
+      last_message: conversation.last_message || previous?.last_message || "",
+      last_time: conversation.last_time || previous?.last_time || "",
+      activity_at: conversation.activity_at || previous?.activity_at || null,
+    });
+  });
+  return Array.from(merged.values());
+}
+
+const conversationCacheKey = (userId: number) =>
+  `careerbridge:conversations:${userId}`;
+
+function normalizeApiMessage(
+  message: any,
+  currentUserId: number | null
+): ApiChatMessage {
+  const createdAt =
+    message.created_at ?? new Date().toISOString();
+
+  return {
+    ...message,
+    id: Number(message.id),
+    from:
+      message.from ??
+      (Number(message.sender_id) === Number(currentUserId)
+        ? "me"
+        : "them"),
+    text: message.text ?? message.message ?? null,
+    type: message.type ?? "text",
+    file_url: normalizeFileUrl(message.file_url ?? null),
+    file_name: message.file_name ?? null,
+    file_type: message.file_type ?? null,
+    created_at: createdAt,
+    time:
+      message.time ??
+      new Date(createdAt).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+  };
 }
 
 const confirmContent: Record<
@@ -96,6 +193,7 @@ export function MessagesView({
 }: MessagesViewProps) {
   const [conversations, setConversations] = useState<ApiConversation[]>([]);
   const [activeUserId, setActiveUserId] = useState<number | null>(null);
+  const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
   const [messages, setMessages] = useState<ApiChatMessage[]>([]);
   const [msg, setMsg] = useState("");
   const [search, setSearch] = useState("");
@@ -151,10 +249,25 @@ export function MessagesView({
 
   const currentUserIdRef = useRef<number | null>(null);
   const activeUserIdRef = useRef<number | null>(null);
+  const activeConversationIdRef = useRef<number | null>(null);
+  const cacheHydratedUserRef = useRef<number | null>(null);
 
   useEffect(() => {
     currentUserIdRef.current = currentUserId;
   }, [currentUserId]);
+
+  useEffect(() => {
+    if (currentUserId == null) return;
+    if (cacheHydratedUserRef.current !== currentUserId) return;
+    try {
+      localStorage.setItem(
+        conversationCacheKey(currentUserId),
+        JSON.stringify(conversations)
+      );
+    } catch {
+      // Laravel remains the source of truth when storage is unavailable.
+    }
+  }, [conversations, currentUserId]);
 
   useEffect(() => {
     activeUserIdRef.current = activeUserId;
@@ -321,6 +434,7 @@ export function MessagesView({
                   ...conversation,
                   last_message: lastMessage,
                   last_time: "Now",
+                  activity_at: new Date().toISOString(),
                   unread: shouldIncreaseUnread
                     ? (conversation.unread || 0) + 1
                     : conversation.unread || 0,
@@ -354,7 +468,22 @@ export function MessagesView({
   }, [currentUserId]);
 
   useEffect(() => {
+    if (currentUserId == null) return;
     let cancelled = false;
+
+    let cachedConversations: ApiConversation[] = [];
+    try {
+      const cached = localStorage.getItem(conversationCacheKey(currentUserId));
+      cachedConversations = cached ? JSON.parse(cached) : [];
+      cacheHydratedUserRef.current = currentUserId;
+      if (cachedConversations.length > 0) {
+        setConversations(cachedConversations);
+        setLoadingConvos(false);
+      }
+    } catch {
+      cachedConversations = [];
+      cacheHydratedUserRef.current = currentUserId;
+    }
 
     (async () => {
       setLoadingConvos(true);
@@ -369,10 +498,15 @@ export function MessagesView({
           ? data
           : (data as any)?.data ?? [];
 
-        setConversations(convos);
+        const mergedConversations = mergeConversationLists(cachedConversations, convos);
+        setConversations(mergedConversations);
 
-        if (convos.length > 0) {
-          setActiveUserId(convos[0].user_id);
+        if (mergedConversations.length > 0) {
+          setActiveUserId(mergedConversations[0].user_id);
+          activeUserIdRef.current = mergedConversations[0].user_id;
+          const conversationId = Number(mergedConversations[0].conversation_id ?? mergedConversations[0].id);
+          setActiveConversationId(conversationId);
+          activeConversationIdRef.current = conversationId;
         }
       } catch {
         if (!cancelled) {
@@ -388,10 +522,10 @@ export function MessagesView({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [currentUserId]);
 
   useEffect(() => {
-    if (activeUserId == null) {
+    if (activeUserId == null || activeConversationId == null) {
       setMessages([]);
       return;
     }
@@ -402,19 +536,18 @@ export function MessagesView({
       setLoadingMessages(true);
 
       try {
-        const res = await getConversation(activeUserId);
+        const res = await getConversation(activeConversationId, activeUserId);
 
         if (!cancelled) {
           const messageList = Array.isArray(res)
             ? res
-            : (res as any).data;
+            : (res as any).messages ?? (res as any).data;
 
           const normalizedMessages = (
             messageList ?? []
-          ).map((message: ApiChatMessage) => ({
-            ...message,
-            file_url: normalizeFileUrl(message.file_url),
-          }));
+          ).map((message: ApiChatMessage) =>
+            normalizeApiMessage(message, currentUserIdRef.current)
+          );
 
           setMessages(normalizedMessages);
 
@@ -443,7 +576,40 @@ export function MessagesView({
     return () => {
       cancelled = true;
     };
-  }, [activeUserId]);
+  }, [activeUserId, activeConversationId]);
+
+  useEffect(() => {
+    const handleSync = (event: Event) => {
+      const detail = (event as CustomEvent<SyncEventDetail>).detail;
+      const affectsMessages = detail?.resources.some((resource) =>
+        ["messages", "conversations"].includes(resource.toLowerCase())
+      ) || detail?.paths.some((path) =>
+        path.includes("/messages") || path.includes("/conversations")
+      );
+
+      if (!affectsMessages) return;
+
+      void getConversations().then((fresh) => {
+        setConversations((current) => mergeConversationLists(current, fresh));
+      }).catch(() => undefined);
+
+      const userId = activeUserIdRef.current;
+      const conversationId = activeConversationIdRef.current;
+      if (userId != null && conversationId != null) {
+        void getConversation(conversationId, userId).then((response) => {
+          const list = Array.isArray(response)
+            ? response
+            : (response as any)?.messages ?? (response as any)?.data ?? [];
+          setMessages(list.map((message: ApiChatMessage) =>
+            normalizeApiMessage(message, currentUserIdRef.current)
+          ));
+        }).catch(() => undefined);
+      }
+    };
+
+    window.addEventListener(SYNC_EVENT_NAME, handleSync);
+    return () => window.removeEventListener(SYNC_EVENT_NAME, handleSync);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -453,11 +619,16 @@ export function MessagesView({
         const data = await getConversations();
         if (cancelled) return;
         const convos = Array.isArray(data) ? data : (data as any)?.data ?? [];
-        setConversations(convos.map((conversation: ApiConversation) =>
-          conversation.user_id === activeUserIdRef.current
-            ? { ...conversation, unread: 0 }
-            : conversation
-        ));
+        setConversations((current) =>
+          mergeConversationLists(
+            current,
+            convos.map((conversation: ApiConversation) =>
+              conversation.user_id === activeUserIdRef.current
+                ? { ...conversation, unread: 0 }
+                : conversation
+            )
+          )
+        );
       } catch {
         // Keep the last successful state during background refreshes.
       }
@@ -470,21 +641,20 @@ export function MessagesView({
       window.clearInterval(interval);
       window.removeEventListener("focus", refreshConversations);
     };
-  }, []);
+  }, [currentUserId]);
 
   useEffect(() => {
-    if (activeUserId == null) return;
+    if (activeUserId == null || activeConversationId == null) return;
     let cancelled = false;
 
     const refreshActiveMessages = async () => {
       try {
-        const response = await getConversation(activeUserId);
+        const response = await getConversation(activeConversationId, activeUserId);
         if (cancelled) return;
-        const list = Array.isArray(response) ? response : (response as any)?.data ?? [];
-        const normalized = list.map((message: ApiChatMessage) => ({
-          ...message,
-          file_url: normalizeFileUrl(message.file_url),
-        }));
+        const list = Array.isArray(response) ? response : (response as any)?.messages ?? (response as any)?.data ?? [];
+        const normalized = list.map((message: ApiChatMessage) =>
+          normalizeApiMessage(message, currentUserIdRef.current)
+        );
 
         setMessages((current) => {
           const currentLast = current[current.length - 1]?.id;
@@ -505,7 +675,7 @@ export function MessagesView({
       window.clearInterval(interval);
       window.removeEventListener("focus", refreshActiveMessages);
     };
-  }, [activeUserId]);
+  }, [activeUserId, activeConversationId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({
@@ -525,9 +695,11 @@ export function MessagesView({
     (c) => c.user_id === activeUserId
   );
 
-  const filteredConversations = conversations.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredConversations = [...conversations]
+    .sort((a, b) => conversationTimestamp(b) - conversationTimestamp(a))
+    .filter((c) =>
+      c.name.toLowerCase().includes(search.toLowerCase())
+    );
 
   const showToastMessage = (message: string) => {
     setToast({
@@ -544,8 +716,12 @@ export function MessagesView({
   };
 
   const handleOpenConversation = (userId: number) => {
+    const selected = conversations.find((conversation) => conversation.user_id === userId);
+    const conversationId = Number(selected?.conversation_id ?? selected?.id);
     setActiveUserId(userId);
     activeUserIdRef.current = userId;
+    setActiveConversationId(conversationId);
+    activeConversationIdRef.current = conversationId;
     setShowMenu(false);
 
     setConversations((prev) =>
@@ -564,6 +740,8 @@ export function MessagesView({
     setShowMenu(false);
     setActiveUserId(null);
     activeUserIdRef.current = null;
+    setActiveConversationId(null);
+    activeConversationIdRef.current = null;
     setMessages([]);
     setMsg("");
     setSelectedFile(null);
@@ -591,19 +769,17 @@ export function MessagesView({
   };
 
   const refreshMessages = async () => {
-    if (activeUserId == null) return;
+    if (activeUserId == null || activeConversationId == null) return;
 
-    const res = await getConversation(activeUserId);
+    const res = await getConversation(activeConversationId, activeUserId);
 
     const messageList = Array.isArray(res)
       ? res
-      : (res as any).data;
+      : (res as any).messages ?? (res as any).data;
 
     const normalizedMessages = (messageList ?? []).map(
-      (message: ApiChatMessage) => ({
-        ...message,
-        file_url: normalizeFileUrl(message.file_url),
-      })
+      (message: ApiChatMessage) =>
+        normalizeApiMessage(message, currentUserIdRef.current)
     );
 
     setMessages(normalizedMessages);
@@ -673,32 +849,54 @@ export function MessagesView({
 
   const startNewConversation = async () => {
     if (!recipientUser) return;
-
-    setShowNewMessage(false);
-    setRecipientEmail("");
+    setRecipientLoading(true);
     setRecipientError("");
 
-    const existingConversation = conversations.find(
-      (c) => c.user_id === recipientUser.id
-    );
+    try {
+      const response = await startConversation(recipientUser.id);
+      const created = response?.conversation ?? response?.data?.conversation ?? response?.data ?? response;
+      const conversationId = Number(created?.id ?? created?.conversation_id);
 
-    if (!existingConversation) {
-      setConversations((prev) => [
-        {
-          user_id: recipientUser.id,
-          name: recipientUser.name,
-          avatar: recipientUser.avatar ?? null,
-          last_message: "",
-          last_time: "Now",
-          unread: 0,
-        },
-        ...prev,
-      ]);
+      if (!conversationId) {
+        throw new Error("The server did not return a conversation ID.");
+      }
+
+      const savedConversation: ApiConversation = {
+        ...created,
+        id: conversationId,
+        conversation_id: conversationId,
+        user_id: recipientUser.id,
+        name: created?.participant?.name ?? recipientUser.name,
+        avatar: created?.participant?.avatar ?? recipientUser.avatar ?? null,
+        last_message: lastMessageText(created?.last_message),
+        last_time: created?.last_time ?? created?.last_message_at ?? "",
+        activity_at: created?.last_message_at ?? created?.updated_at ?? created?.created_at ?? new Date().toISOString(),
+        unread: Number(created?.unread ?? created?.unread_count ?? 0),
+      };
+
+      setConversations((current) => {
+        const exists = current.some((item) => item.user_id === recipientUser.id);
+        return exists
+          ? current.map((item) => item.user_id === recipientUser.id ? savedConversation : item)
+          : [savedConversation, ...current];
+      });
+      setActiveUserId(recipientUser.id);
+      activeUserIdRef.current = recipientUser.id;
+      setActiveConversationId(conversationId);
+      activeConversationIdRef.current = conversationId;
+      setMessages([]);
+      setShowNewMessage(false);
+      setRecipientEmail("");
+      setRecipientUser(null);
+    } catch (error: any) {
+      setRecipientError(
+        error?.response?.data?.message ??
+          error?.message ??
+          "Could not start the conversation."
+      );
+    } finally {
+      setRecipientLoading(false);
     }
-
-    setActiveUserId(recipientUser.id);
-    activeUserIdRef.current = recipientUser.id;
-    setMessages([]);
   };
 
   const sendAttachment = async () => {
@@ -737,6 +935,7 @@ export function MessagesView({
                     ? "📷 Image"
                     : `📎 ${file.name}`,
                 last_time: "Now",
+                activity_at: new Date().toISOString(),
               }
             : conversation
         )
@@ -814,6 +1013,7 @@ export function MessagesView({
                     last_message:
                       "🎤 Voice message",
                     last_time: "Now",
+                    activity_at: new Date().toISOString(),
                   }
                 : conversation
             )
@@ -909,6 +1109,7 @@ export function MessagesView({
                 ...conversation,
                 last_message: text,
                 last_time: "Now",
+                activity_at: new Date().toISOString(),
               }
             : conversation
         );
@@ -1013,6 +1214,8 @@ export function MessagesView({
 
         setActiveUserId(null);
         activeUserIdRef.current = null;
+        setActiveConversationId(null);
+        activeConversationIdRef.current = null;
         setMessages([]);
         setConfirmDialog(null);
       } else if (confirmDialog === "block") {
@@ -1027,6 +1230,8 @@ export function MessagesView({
 
         setActiveUserId(null);
         activeUserIdRef.current = null;
+        setActiveConversationId(null);
+        activeConversationIdRef.current = null;
         setMessages([]);
         setConfirmDialog(null);
       } else if (confirmDialog === "report") {
@@ -1925,7 +2130,7 @@ export function MessagesView({
                       fontFamily: F,
                     }}
                   >
-                    {c.last_time}
+                    {formatConversationTime(c.activity_at || c.last_time)}
                   </span>
                 </div>
 
@@ -1944,7 +2149,7 @@ export function MessagesView({
                         : 400,
                   }}
                 >
-                  {c.last_message ||
+                  {lastMessageText(c.last_message) ||
                     "New conversation"}
                 </p>
               </div>

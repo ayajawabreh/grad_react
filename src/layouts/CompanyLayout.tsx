@@ -19,6 +19,7 @@ import {
 import { C, F } from "../constants/tokens";
 import { useAuth } from "../context/AuthContext";
 import { getCompanyProfile } from "../imports/api";
+import { useSyncResourceVersion } from "../sync/useSyncResourceVersion";
 
 const NAV = [
   {
@@ -91,6 +92,7 @@ interface Company {
 }
 
 function Sidebar({ onClose }: { onClose?: () => void }) {
+  const profileSyncVersion = useSyncResourceVersion("company");
   const { logout } = useAuth();
   const nav = useNavigate();
   const [company, setCompany] = useState<Company | null>(null);
@@ -99,7 +101,7 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
     getCompanyProfile()
       .then((data) => setCompany(data))
       .catch((error) => console.log(error));
-  }, []);
+  }, [profileSyncVersion]);
 
   const companyName = company?.name || "Company";
 
@@ -315,6 +317,7 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
 }
 
 function TopBar({ onMenu }: { onMenu: () => void }) {
+  const profileSyncVersion = useSyncResourceVersion("company");
   const nav = useNavigate();
   const [company, setCompany] = useState<Company | null>(null);
 
@@ -322,7 +325,7 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
     getCompanyProfile()
       .then((data) => setCompany(data))
       .catch((error) => console.log(error));
-  }, []);
+  }, [profileSyncVersion]);
 
   const companyName = company?.name || "Company";
 

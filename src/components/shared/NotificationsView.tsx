@@ -19,6 +19,7 @@ import {
   NotificationDTO,
 } from "../../imports/Notifications";
 import { supabase } from "../../lib/supabase";
+import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
 
 interface Notif {
   id: number;
@@ -125,6 +126,7 @@ const mapToNotif = (
 export function NotificationsView({
   role,
 }: NotificationsViewProps) {
+  const notificationsSyncVersion = useSyncResourceVersion("notifications");
   const [items, setItems] = useState<Notif[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -152,6 +154,10 @@ export function NotificationsView({
   }, [role]);
 
   useEffect(() => {
+    if (notificationsSyncVersion > 0) void loadNotifications(false);
+  }, [notificationsSyncVersion]);
+
+  useEffect(() => {
     const refresh = () => loadNotifications(false);
     const interval = window.setInterval(refresh, 10000);
     window.addEventListener("focus", refresh);
@@ -173,11 +179,15 @@ export function NotificationsView({
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*",
           schema: "public",
           table: "notifications",
         },
         (payload) => {
+          // Laravel API applies the authenticated-user filter. Refetching here
+          // also synchronizes INSERT, UPDATE and DELETE without duplicating rows.
+          loadNotifications(false);
+          return;
           console.log(
             `🔥 ${role.toUpperCase()} NOTIFICATION REALTIME EVENT:`,
             payload

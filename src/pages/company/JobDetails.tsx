@@ -6,8 +6,11 @@ import { CandidateCard } from "../../components/cards/CandidateCard";
 import { ArrowLeft, TrendingUp, Eye, Users, UserCheck } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { getJobDetails, getJobApplicants } from "../../imports/api";
+import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
 
 export default function CompanyJobDetails() {
+  const applicationsSyncVersion = useSyncResourceVersion("applications");
+  const jobsSyncVersion = useSyncResourceVersion("jobs");
   const nav = useNavigate();
   const { id } = useParams();
 
@@ -38,7 +41,7 @@ export default function CompanyJobDetails() {
     };
 
     loadData();
-  }, [id]);
+  }, [id, applicationsSyncVersion, jobsSyncVersion]);
 
   if (loading) {
     return (

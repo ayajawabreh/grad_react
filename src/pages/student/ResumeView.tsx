@@ -13,6 +13,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { API } from "../../imports/api";
+import ClassicResumeTemplate from "../../components/resume/ClassicResumeTemplate";
 
 interface SectionProps {
   title: string;
@@ -259,7 +260,7 @@ export default function ResumeView() {
         <Btn
           v="ghost"
           icon={ArrowLeft}
-          onClick={() => nav("/student/resume")}
+          onClick={() => nav("/student/resume/create")}
         >
           Back to Editor
         </Btn>
@@ -280,8 +281,11 @@ export default function ResumeView() {
         </div>
       </div>
 
+      <ClassicResumeTemplate resume={resume} />
+
       <div
         style={{
+          display: "none",
           maxWidth: 850,
           margin: "0 auto",
           background: "#fff",

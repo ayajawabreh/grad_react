@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
 import { C, F } from "../../constants/tokens";
 import {
   fetchInterviews,
@@ -40,6 +41,7 @@ interface ToastState {
 }
 
 export default function CompanyInterviews() {
+  const interviewsSyncVersion = useSyncResourceVersion("interviews");
   const [interviews, setInterviews] = useState<any[]>([]);
   const [calendar, setCalendar] = useState<any[]>([]);
   const [stats, setStats] = useState({
@@ -117,7 +119,7 @@ export default function CompanyInterviews() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [interviewsSyncVersion]);
 
   const selectedInterview =
     selected !== null ? interviews.find((i) => i.id === selected) : null;

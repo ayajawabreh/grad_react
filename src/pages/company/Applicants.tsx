@@ -11,8 +11,11 @@ import {
 import { shortlistApplicant } from "../../imports/api";
 import ScheduleInterviewModal from "./ScheduleInterviewModal";
 import BulkScheduleModal from "./BulkScheduleModal";
+import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
 
 export default function Applicants() {
+  const applicationsSyncVersion = useSyncResourceVersion("applications");
+  const interviewsSyncVersion = useSyncResourceVersion("interviews");
   const nav = useNavigate();
 
   const [query, setQuery] = useState("");
@@ -62,7 +65,7 @@ export default function Applicants() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [applicationsSyncVersion, interviewsSyncVersion]);
 
 
   const filtered = candidates.filter((candidate) => {

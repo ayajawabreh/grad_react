@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { C, F } from "../../constants/tokens";
 import { Btn } from "../../components/ui";
 import {
@@ -15,13 +15,25 @@ import {
   reviewCV,
   generateInterviewQuestions,
   getSavedJobs,
+  submitInterviewAnswers,
+  retakeInterviewQuiz,
+  getInterviewAttempts,
 } from "../../imports/api";
+import { checkJobSaved, saveJob } from "../../imports/jobs";
+import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
 
 interface CVResult {
   overall_score: number;
   strengths: string[];
   weaknesses: string[];
   suggestions: string[];
+  missing_sections?: string[];
+  skills?: string[];
+  recommendations?: string[];
+  section_scores?: Record<string, number>;
+  ats_score?: number;
+  level?: string;
+  [key: string]: unknown;
 }
 
 interface Job {
@@ -45,14 +57,25 @@ interface InterviewQuestion {
     C: string;
     D: string;
   };
-  correct_answer: string;
+  correct_answer?: string;
+  student_answer?: string;
+  is_correct?: boolean;
+  difficulty?: string;
+  skill?: string;
 }
 
 interface InterviewResult {
+  attempt_id: number;
   job_id: number;
   job_title: string;
   questions: InterviewQuestion[];
+  status: "open" | "completed" | "abandoned";
+  metadata?: { attempt_source?: string; from_cache?: boolean };
 }
+
+interface AttemptSummary { attempt_id: number; status: string; percentage: number | null; score: number | null; total_questions: number; started_at: string; completed_at: string | null; }
+
+type AIState = "idle" | "checking_saved_job" | "generating_questions" | "quiz_open" | "submitting" | "completed" | "retaking" | "loading_history" | "error";
 
 const TOOLS = [
   {
@@ -216,6 +239,7 @@ function ResultList({
 }
 
 export default function AIAssistant() {
+  const interviewSyncVersion = useSyncResourceVersion("interview");
   const [loading, setLoading] = useState(false);
   const [active, setActive] = useState("");
   const [error, setError] = useState("");
@@ -242,6 +266,46 @@ export default function AIAssistant() {
     useState(false);
 
   const [score, setScore] = useState(0);
+  const [aiState, setAiState] = useState<AIState>("idle");
+  const [attemptId, setAttemptId] = useState<number | null>(null);
+  const [percentage, setPercentage] = useState(0);
+  const [attempts, setAttempts] = useState<AttemptSummary[]>([]);
+  const strengths = cv?.strengths ?? [];
+  const weaknesses = cv?.weaknesses ?? [];
+  const missingSections = cv?.missing_sections ?? [];
+  const recommendations = cv?.recommendations ?? cv?.suggestions ?? [];
+  const sectionScores = cv?.section_scores ?? {};
+  const overallScore = cv?.overall_score ?? 0;
+  const atsScore = cv?.ats_score ?? 0;
+
+  const loadHistory = async (jobId: number) => {
+    try {
+      setAiState((current) => current === "idle" ? "loading_history" : current);
+      const response: any = await getInterviewAttempts(jobId);
+      setAttempts(response?.attempts ?? response?.data?.attempts ?? []);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Could not load quiz history.");
+    } finally {
+      setAiState((current) => current === "loading_history" ? "idle" : current);
+    }
+  };
+
+  useEffect(() => {
+    const refresh = () => {
+      const jobId = selectedJob?.job_id ?? selectedJob?.id;
+      if (jobId) void loadHistory(jobId);
+    };
+    window.addEventListener("online", refresh);
+    window.addEventListener("focus", refresh);
+    const visible = () => document.visibilityState === "visible" && refresh();
+    document.addEventListener("visibilitychange", visible);
+    return () => { window.removeEventListener("online", refresh); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", visible); };
+  }, [selectedJob]);
+
+  useEffect(() => {
+    const jobId = selectedJob?.job_id ?? selectedJob?.id;
+    if (jobId && interviewSyncVersion > 0) void loadHistory(jobId);
+  }, [interviewSyncVersion, selectedJob]);
 
   const handleAction = async (title: string) => {
     try {
@@ -254,7 +318,7 @@ export default function AIAssistant() {
 
         const res: any = await reviewCV();
 
-        setCV(res);
+        setCV(res?.data ?? res);
       }
 
       if (title === "AI Interview") {
@@ -355,7 +419,9 @@ export default function AIAssistant() {
 
   const startInterview = async (job: Job) => {
     try {
+      if (["checking_saved_job", "generating_questions", "submitting", "retaking"].includes(aiState)) return;
       setLoading(true);
+      setAiState("checking_saved_job");
       setActive("AI Interview");
       setError("");
 
@@ -373,12 +439,23 @@ export default function AIAssistant() {
         throw new Error("Invalid job ID.");
       }
 
+      const saved = await checkJobSaved(jobId);
+      if (!saved) {
+        await saveJob(jobId);
+      }
+
+      setAiState("generating_questions");
+
       const res: any =
         await generateInterviewQuestions(
           jobId
         );
 
-      setInterview(res);
+      const quiz = res?.data ?? res;
+      setAttemptId(Number(quiz.attempt_id));
+      setInterview(quiz);
+      setAiState("quiz_open");
+      await loadHistory(jobId);
     } catch (err: any) {
       console.error(err);
 
@@ -389,6 +466,7 @@ export default function AIAssistant() {
       );
 
       setShowJobSelection(true);
+      setAiState("error");
     } finally {
       setLoading(false);
     }
@@ -398,6 +476,7 @@ export default function AIAssistant() {
     questionId: number,
     answer: string
   ) => {
+    setError("");
     setSelectedAnswers((prev) => ({
       ...prev,
       [questionId]: answer,
@@ -410,41 +489,41 @@ export default function AIAssistant() {
     setSelectedAnswers({});
     setShowResults(false);
     setScore(0);
+    setAttemptId(null);
+    setPercentage(0);
+    setAiState("idle");
   };
 
-  const calculateScore = () => {
-    if (!interview) {
-      return 0;
+  const handleSubmit = async () => {
+    if (!interview || !attemptId || aiState === "submitting" || showResults) return;
+    const unansweredCount = interview.questions.filter(
+      (question) => !selectedAnswers[question.id]
+    ).length;
+    if (unansweredCount > 0) {
+      setError(`Please answer all questions before submitting. ${unansweredCount} question${unansweredCount === 1 ? " is" : "s are"} still unanswered.`);
+      return;
     }
-
-    let correct = 0;
-
-    interview.questions.forEach(
-      (question) => {
-        if (
-          selectedAnswers[question.id] ===
-          question.correct_answer
-        ) {
-          correct++;
-        }
-      }
-    );
-
-    return correct;
+    try {
+      setAiState("submitting"); setError("");
+      const response: any = await submitInterviewAnswers({ attempt_id: attemptId, answers: Object.fromEntries(Object.entries(selectedAnswers).map(([id, answer]) => [String(id), answer])) });
+      const result = response?.data ?? response;
+      setScore(Number(result.correct_count ?? result.score ?? 0));
+      setPercentage(Number(result.percentage ?? result.score ?? 0));
+      setInterview((current) => current ? { ...current, status: "completed", questions: result.results ?? current.questions } : current);
+      setShowResults(true); setAiState("completed");
+      await loadHistory(interview.job_id);
+    } catch (err: any) { setError(err?.response?.data?.message || "Failed to submit interview answers."); setAiState("error"); }
   };
 
-  const handleSubmit = () => {
-    const correctAnswers =
-      calculateScore();
-
-    setScore(correctAnswers);
-    setShowResults(true);
-  };
-
-  const resetInterview = () => {
-    setSelectedAnswers({});
-    setShowResults(false);
-    setScore(0);
+  const resetInterview = async () => {
+    if (!interview || aiState === "retaking") return;
+    try {
+      setAiState("retaking"); setError("");
+      const response: any = await retakeInterviewQuiz(interview.job_id);
+      const quiz = response?.data ?? response;
+      setInterview(quiz); setAttemptId(Number(quiz.attempt_id)); setSelectedAnswers({}); setShowResults(false); setScore(0); setPercentage(0); setAiState("quiz_open");
+      await loadHistory(interview.job_id);
+    } catch (err: any) { setError(err?.response?.data?.message || "Could not start a new quiz attempt."); setAiState("error"); }
   };
 
   return (
@@ -625,7 +704,7 @@ export default function AIAssistant() {
               }}
             >
               <ScoreRing
-                score={cv.overall_score}
+                score={overallScore}
               />
 
               <div>
@@ -661,6 +740,7 @@ export default function AIAssistant() {
                   Overall resume score based on AI
                   review
                 </p>
+                <div style={{ display: "flex", gap: 8, marginTop: 9, flexWrap: "wrap" }}><span style={{ padding: "4px 8px", borderRadius: 8, background: C.bg, fontSize: 11 }}>ATS score: {atsScore}</span>{cv.level && <span style={{ padding: "4px 8px", borderRadius: 8, background: C.bg, fontSize: 11 }}>{cv.level}</span>}</div>
               </div>
             </div>
 
@@ -706,7 +786,7 @@ export default function AIAssistant() {
               </h4>
 
               <ResultList
-                items={cv.strengths}
+                items={strengths}
                 icon={CheckCircle2}
                 color={C.success}
               />
@@ -724,7 +804,7 @@ export default function AIAssistant() {
               </h4>
 
               <ResultList
-                items={cv.weaknesses}
+                items={weaknesses}
                 icon={XCircle}
                 color={C.danger}
               />
@@ -743,11 +823,13 @@ export default function AIAssistant() {
             </h4>
 
             <ResultList
-              items={cv.suggestions}
+                items={recommendations}
               icon={Lightbulb}
               color={C.warning}
             />
           </div>
+          {missingSections.length > 0 && <div style={{ marginTop: 20 }}><h4 style={{ color: C.danger, margin: "0 0 12px", fontSize: 14 }}>Missing Sections</h4><ResultList items={missingSections} icon={XCircle} color={C.danger}/></div>}
+          {Object.keys(sectionScores).length > 0 && <div style={{ marginTop: 20 }}><h4 style={{ margin: "0 0 12px", fontSize: 14 }}>Section Scores</h4><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{Object.entries(sectionScores).map(([section, value]) => <span key={section} style={{ padding: "6px 9px", borderRadius: 8, background: C.bg, fontSize: 11 }}>{section}: <b>{value}</b></span>)}</div></div>}
         </div>
       )}
 
@@ -986,7 +1068,6 @@ export default function AIAssistant() {
                 }}
               />
             </div>
-
             <div
               style={{
                 fontSize: 12,
@@ -1030,7 +1111,7 @@ export default function AIAssistant() {
                       fontWeight: 600,
                     }}
                   >
-                    Question {index + 1}
+                    Question {index + 1}{question.skill ? ` · ${question.skill}` : ""}{question.difficulty ? ` · ${question.difficulty}` : ""}
                   </div>
 
                   <div
@@ -1177,6 +1258,7 @@ export default function AIAssistant() {
                       }
                     )}
                   </div>
+                  {showResults && <div style={{ marginTop: 12, display: "flex", gap: 14, flexWrap: "wrap", fontSize: 12 }}><span style={{ color: question.is_correct ? C.success : C.danger }}>Your answer: <b>{question.student_answer ?? selectedAnswers[question.id] ?? "—"}</b></span><span style={{ color: C.success }}>Correct answer: <b>{question.correct_answer ?? "—"}</b></span></div>}
                 </div>
               )
             )}
@@ -1196,13 +1278,10 @@ export default function AIAssistant() {
                 size="md"
                 onClick={handleSubmit}
                 disabled={
-                  Object.keys(
-                    selectedAnswers
-                  ).length !==
-                  interview.questions.length
+                  aiState === "submitting"
                 }
               >
-                Submit Answers
+                {aiState === "submitting" ? "Submitting..." : "Submit Answers"}
               </Btn>
             ) : (
               <>
@@ -1210,8 +1289,9 @@ export default function AIAssistant() {
                   v="outline"
                   size="md"
                   onClick={resetInterview}
+                  disabled={aiState === "retaking"}
                 >
-                  Retry
+                  {aiState === "retaking" ? "Preparing new quiz..." : "Retake Quiz"}
                 </Btn>
 
                 <Btn
@@ -1299,17 +1379,13 @@ export default function AIAssistant() {
                     fontSize: 14,
                   }}
                 >
-                  {Math.round(
-                    (score /
-                      interview.questions
-                        .length) *
-                      100
-                  )}
-                  %
+                  {percentage}%
                 </div>
               </div>
             </div>
           )}
+
+          {attempts.length > 0 && <div style={{ marginTop: 22, borderTop: `1px solid ${C.divider}`, paddingTop: 18 }}><h4 style={{ margin: "0 0 12px", fontSize: 14 }}>Attempt History</h4><div style={{ display: "flex", flexDirection: "column", gap: 8 }}>{attempts.map((attempt) => <div key={attempt.attempt_id} style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 12, padding: "10px 12px", borderRadius: 10, background: C.bg, fontSize: 12, alignItems: "center" }}><span>{new Date(attempt.started_at).toLocaleString()}</span><b>{attempt.status === "open" ? "In Progress" : attempt.status === "completed" ? "Completed" : "Abandoned"}</b><span style={{ color: C.textSec }}>{attempt.percentage == null ? "—" : `${attempt.percentage}%`}</span></div>)}</div></div>}
         </div>
       )}
     </div>

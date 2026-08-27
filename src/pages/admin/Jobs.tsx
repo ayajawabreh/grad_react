@@ -14,6 +14,7 @@ import {
   Users,
   RotateCcw,
   PlayCircle,
+  AlertCircle,
 } from "lucide-react";
 import {
   getAdminJobsModeration,
@@ -24,7 +25,10 @@ import {
   getAdminJobModeration,
   deleteAdminJob,
   restoreAdminJobToReview,
+  getAdminCategories,
 } from "../../imports/api";
+import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
+import { formatExperienceRange } from "../../utils/experience";
 
 type AdminJob = {
   id: number;
@@ -32,8 +36,6 @@ type AdminJob = {
   company?: string;
   company_name?: string;
   company_profile?: { company_name?: string };
-  department?: string;
-  dept?: string;
   type?: string;
   employment_type?: string;
   applicants?: number;
@@ -46,6 +48,8 @@ type AdminJob = {
   rejected_count?: number;
   description?: string;
   moderation_note?: string | null;
+  min_experience_years?: number | null;
+  max_experience_years?: number | null;
   posted?: string;
   created_at?: string;
 };
@@ -53,6 +57,7 @@ type AdminJob = {
 const filterStyle: React.CSSProperties = { padding: "9px 11px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.surface, color: C.textSec, fontFamily: F, fontSize: 12, minWidth: 145 };
 
 export default function AdminJobs() {
+  const jobsSyncVersion = useSyncResourceVersion("jobs");
   const [jobs, setJobs] = useState<AdminJob[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
@@ -61,10 +66,13 @@ export default function AdminJobs() {
   const [statusFilter, setStatusFilter] = useState("");
   const [companyFilter, setCompanyFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [categoryOptions, setCategoryOptions] = useState<Array<{ id: number; name: string }>>([]);
   const [dateFilter, setDateFilter] = useState("");
   const [rejectJobId, setRejectJobId] = useState<number | null>(null);
   const [rejectNote, setRejectNote] = useState("");
   const [rejectError, setRejectError] = useState("");
+  const [deleteJobTarget, setDeleteJobTarget] = useState<AdminJob | null>(null);
+  const [deleteError, setDeleteError] = useState("");
 
   const loadJobs = async (showLoading = true) => {
     try {
@@ -89,7 +97,15 @@ export default function AdminJobs() {
 
   useEffect(() => {
     loadJobs();
+    void getAdminCategories().then((response: any) => {
+      const data = response?.data ?? response;
+      setCategoryOptions(Array.isArray(data) ? data : data?.categories ?? data?.data ?? []);
+    }).catch((error) => console.error("Failed to load admin categories:", error));
   }, []);
+
+  useEffect(() => {
+    if (jobsSyncVersion > 0) void loadJobs(false);
+  }, [jobsSyncVersion]);
 
   useEffect(() => {
     const refresh = () => loadJobs(false);
@@ -102,9 +118,8 @@ export default function AdminJobs() {
   }, []);
 
   const companyName = (job: AdminJob) => job.company ?? job.company_name ?? job.company_profile?.company_name ?? "Unknown Company";
-  const categoryName = (job: AdminJob) => typeof job.category === "string" ? job.category : job.category?.name ?? job.category_name ?? job.department ?? "Uncategorized";
+  const categoryName = (job: AdminJob) => typeof job.category === "string" ? job.category : job.category?.name ?? "Uncategorized";
   const companies = useMemo(() => [...new Set(jobs.map(companyName))].sort(), [jobs]);
-  const categories = useMemo(() => [...new Set(jobs.map(categoryName))].sort(), [jobs]);
   const filtered = jobs.filter((job) => {
     const search = query.toLowerCase();
     const matchesSearch = (
@@ -226,6 +241,22 @@ export default function AdminJobs() {
     }
   };
 
+  const confirmDeleteJob = async () => {
+    if (!deleteJobTarget) return;
+    try {
+      setActionLoading(deleteJobTarget.id);
+      setDeleteError("");
+      await deleteAdminJob(deleteJobTarget.id);
+      setJobs((current) => current.filter((item) => item.id !== deleteJobTarget.id));
+      setDeleteJobTarget(null);
+      toast.success("Job deleted successfully", { description: "The listing was permanently removed from the platform." });
+    } catch (error: any) {
+      setDeleteError(error?.response?.data?.message || "The job could not be deleted. Please try again.");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   return (
     <div style={{ fontFamily: F, color: C.text }}>
       <div style={{ marginBottom: 28 }}>
@@ -309,7 +340,7 @@ export default function AdminJobs() {
       <div style={{ display: "flex", gap: 10, margin: "-10px 0 20px", flexWrap: "wrap" }}>
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={filterStyle}><option value="">All statuses</option>{["Open", "Pending Review", "Closed", "Suspended", "Rejected", "Changes Requested"].map((status) => <option key={status}>{status}</option>)}</select>
         <select value={companyFilter} onChange={(e) => setCompanyFilter(e.target.value)} style={filterStyle}><option value="">All companies</option>{companies.map((company) => <option key={company}>{company}</option>)}</select>
-        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} style={filterStyle}><option value="">All categories</option>{categories.map((category) => <option key={category}>{category}</option>)}</select>
+        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} style={filterStyle}><option value="">All categories</option>{categoryOptions.map((category) => <option key={category.id} value={category.name}>{category.name}</option>)}</select>
         <input type="date" aria-label="Filter by posting date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} style={filterStyle}/>
         {(query || statusFilter || companyFilter || categoryFilter || dateFilter) && <Btn v="ghost" size="sm" onClick={() => { setQuery(""); setStatusFilter(""); setCompanyFilter(""); setCategoryFilter(""); setDateFilter(""); }}>Clear filters</Btn>}
       </div>
@@ -396,10 +427,7 @@ export default function AdminJobs() {
               job.company_profile?.company_name ??
               "Unknown Company";
 
-            const department =
-              job.department ??
-              job.dept ??
-              "-";
+            const category = categoryName(job);
 
             const type =
               job.type ??
@@ -465,7 +493,7 @@ export default function AdminJobs() {
                       color: C.textSec,
                     }}
                   >
-                    {department} · {type}
+                    {category} · {type}
                   </p>
                 </div>
 
@@ -607,14 +635,16 @@ export default function AdminJobs() {
                   >
                     View
                   </Btn>
-                  <button title="Delete permanently" disabled={isLoading} onClick={() => handleDelete(job)} style={{ padding: "6px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.errorBg, cursor: isLoading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", opacity: isLoading ? .5 : 1 }}><Trash2 size={13} color={C.error}/></button>
+                  <button title="Delete permanently" disabled={isLoading} onClick={() => { setDeleteJobTarget(job); setDeleteError(""); }} style={{ padding: "6px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.errorBg, cursor: isLoading ? "not-allowed" : "pointer", display: "flex", alignItems: "center", opacity: isLoading ? .5 : 1 }}><Trash2 size={13} color={C.error}/></button>
                 </div>
               </div>
             );
           })
         )}
       </div>
-      {selectedJob && <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setSelectedJob(null)}><div style={{ width: 560, maxWidth: "100%", background: C.surface, borderRadius: 16, padding: 24 }} onClick={(event) => event.stopPropagation()}><div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 16 }}><div><h2 style={{ margin: 0, fontSize: 18 }}>{selectedJob.title ?? "Job details"}</h2><p style={{ margin: "5px 0 0", color: C.textSec, fontSize: 13 }}>{selectedJob.company_name ?? selectedJob.company_profile?.company_name ?? selectedJob.company ?? "—"}</p></div><button type="button" onClick={() => setSelectedJob(null)} style={{ background: "none", border: 0, cursor: "pointer", color: C.textSec }}><X size={20} /></button></div><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, fontSize: 13 }}><div><b>Status</b><p>{selectedJob.status ?? "Pending"}</p></div><div><b>Applicants</b><p>{selectedJob.applicants ?? selectedJob.applications_count ?? 0}</p></div><div><b>Department</b><p>{selectedJob.department ?? selectedJob.dept ?? "—"}</p></div><div><b>Employment type</b><p>{selectedJob.type ?? selectedJob.employment_type ?? "—"}</p></div></div></div></div>}
+      {deleteJobTarget && <div onClick={() => actionLoading === null && setDeleteJobTarget(null)} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.5)", backdropFilter: "blur(2px)", zIndex: 85, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}><div role="alertdialog" aria-modal="true" onClick={(event) => event.stopPropagation()} style={{ width: 430, maxWidth: "100%", padding: 24, borderRadius: 18, background: C.surface, border: `1px solid ${C.border}`, boxShadow: "0 24px 70px rgba(15,23,42,.22)" }}><div style={{ display: "flex", gap: 13, alignItems: "flex-start" }}><div style={{ width: 42, height: 42, borderRadius: 12, background: C.errorBg, color: C.error, display: "grid", placeItems: "center", flexShrink: 0 }}><Trash2 size={19}/></div><div><h2 style={{ margin: "1px 0 6px", fontSize: 18 }}>Delete job listing?</h2><p style={{ margin: 0, color: C.textSec, fontSize: 13, lineHeight: 1.55 }}>You are about to permanently delete <b style={{ color: C.text }}>{deleteJobTarget.title ?? "this job"}</b> from {companyName(deleteJobTarget)}. This action cannot be undone.</p></div></div>{deleteError && <div style={{ display: "flex", gap: 8, marginTop: 16, padding: "10px 12px", borderRadius: 10, background: C.errorBg, color: C.error, fontSize: 12 }}><AlertCircle size={15}/>{deleteError}</div>}<div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 22 }}><Btn v="outline" size="sm" disabled={actionLoading !== null} onClick={() => setDeleteJobTarget(null)}>Cancel</Btn><Btn v="danger" size="sm" disabled={actionLoading !== null} onClick={confirmDeleteJob}>{actionLoading !== null ? "Deleting..." : "Delete permanently"}</Btn></div></div></div>}
+
+      {selectedJob && <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.4)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }} onClick={() => setSelectedJob(null)}><div style={{ width: 560, maxWidth: "100%", background: C.surface, borderRadius: 16, padding: 24 }} onClick={(event) => event.stopPropagation()}><div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 16 }}><div><h2 style={{ margin: 0, fontSize: 18 }}>{selectedJob.title ?? "Job details"}</h2><p style={{ margin: "5px 0 0", color: C.textSec, fontSize: 13 }}>{selectedJob.company_name ?? selectedJob.company_profile?.company_name ?? selectedJob.company ?? "—"}</p></div><button type="button" onClick={() => setSelectedJob(null)} style={{ background: "none", border: 0, cursor: "pointer", color: C.textSec }}><X size={20} /></button></div><div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, fontSize: 13 }}><div><b>Status</b><p>{selectedJob.status ?? "Pending"}</p></div><div><b>Applicants</b><p>{selectedJob.applicants ?? selectedJob.applications_count ?? 0}</p></div><div><b>Category</b><p>{categoryName(selectedJob)}</p></div><div><b>Employment type</b><p>{selectedJob.type ?? selectedJob.employment_type ?? "—"}</p></div><div style={{ gridColumn: "1 / -1" }}><b>Experience requirement</b><p>{formatExperienceRange(selectedJob.min_experience_years, selectedJob.max_experience_years)}</p></div></div></div></div>}
     </div>
   );
 }

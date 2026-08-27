@@ -44,6 +44,8 @@ export default function ResumeUpload() {
   const [loadingResume, setLoadingResume] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [uploaded, setUploaded] = useState(false);
+  const [uploadedResume, setUploadedResume] = useState<any>(null);
+  const [uploadServiceUnavailable, setUploadServiceUnavailable] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -77,8 +79,19 @@ export default function ResumeUpload() {
       return;
     }
 
+    const extension = file.name.split(".").pop()?.toLowerCase();
+    if (!extension || !["pdf", "docx"].includes(extension)) {
+      setError("Please select a PDF or DOCX file.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("The CV must not be larger than 5 MB.");
+      return;
+    }
+
     setLoading(true);
     setError("");
+    setUploadServiceUnavailable(false);
 
     try {
       const formData = new FormData();
@@ -97,6 +110,7 @@ export default function ResumeUpload() {
       console.log("Uploaded Resume:", response.data);
 
       if (response.data?.resume) {
+        setUploadedResume(response.data.resume);
         setExistingResume({
           ...response.data.resume,
           file_path: response.data.file_path,
@@ -115,10 +129,15 @@ export default function ResumeUpload() {
       setUploaded(true);
     } catch (err: any) {
       console.error("Upload CV error:", err);
-
+      const status = err?.response?.status;
+      const fileErrors = err?.response?.data?.errors?.file;
+      setUploadServiceUnavailable(status === 503);
       setError(
-        err?.response?.data?.message ||
-          "Could not upload the CV."
+        status === 503
+          ? "Resume parsing is temporarily unavailable. Please try again."
+          : (Array.isArray(fileErrors) ? fileErrors.join(" ") : fileErrors) ||
+            err?.response?.data?.message ||
+            "Could not upload the CV."
       );
     } finally {
       setLoading(false);
@@ -312,7 +331,7 @@ export default function ResumeUpload() {
           <button
             type="button"
             onClick={() =>
-              navigate("/student/resume/create", { state: { returnTo: resumeReturnTo } })
+                navigate("/student/resume/create", { state: { returnTo: resumeReturnTo, uploadedResume } })
             }
             style={{
               display: "inline-flex",
@@ -656,7 +675,14 @@ export default function ResumeUpload() {
             fontSize: 13,
           }}
         >
-          {error}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <span>{error}</span>
+            {uploadServiceUnavailable && (
+              <button type="button" onClick={handleUpload} disabled={loading} style={{ border: `1px solid ${C.error}`, background: "#fff", color: C.error, borderRadius: 8, padding: "6px 10px", fontFamily: F, fontSize: 12, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer" }}>
+                Retry
+              </button>
+            )}
+          </div>
         </div>
       )}
 

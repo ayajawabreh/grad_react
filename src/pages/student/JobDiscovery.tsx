@@ -3,12 +3,14 @@ import { useNavigate } from "react-router";
 import { C, F } from "../../constants/tokens";
 import {
   fetchJobs,
-  saveJob,
-  unsaveJob,
   UiJob,
 } from "../../imports/jobs";
 import { JobCard } from "../../components/cards/JobCard";
 import { Search, SlidersHorizontal } from "lucide-react";
+import { useSavedJobsCache } from "../../sync/savedJobsStore";
+import { useApplicationsCache } from "../../sync/applicationsStore";
+import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
+import { getJobCategories } from "../../imports/api";
 
 const JOB_TYPES = [
   "Full-Time",
@@ -29,11 +31,39 @@ export default function JobDiscovery() {
   const [query, setQuery] = useState("");
   const [types, setTypes] = useState<string[]>([]);
   const [modes, setModes] = useState<string[]>([]);
+  const [categoryId, setCategoryId] = useState("");
+  const [categories, setCategories] = useState<Array<{ id: number; name: string }>>([]);
   const [jobs, setJobs] = useState<UiJob[]>([]);
   const [total, setTotal] = useState(0);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const { ids: savedJobIds, hydrated: savedJobsHydrated } = useSavedJobsCache();
+  const { jobIds: applicationJobIds, hydrated: applicationsHydrated } = useApplicationsCache();
+  const jobsSyncVersion = useSyncResourceVersion("jobs");
+
+  useEffect(() => {
+    void getJobCategories().then((response: any) => {
+      const data = response?.data ?? response;
+      setCategories(Array.isArray(data) ? data : data?.categories ?? data?.data ?? []);
+    }).catch((error) => console.error("Failed to load job categories:", error));
+  }, []);
+
+  useEffect(() => {
+    if (!savedJobsHydrated) return;
+    setJobs((current) => current.map((job) => ({
+      ...job,
+      saved: savedJobIds.has(String(job.id)),
+    })));
+  }, [savedJobIds, savedJobsHydrated]);
+
+  useEffect(() => {
+    if (!applicationsHydrated) return;
+    setJobs((current) => current.map((job) => ({
+      ...job,
+      applied: applicationJobIds.has(String(job.id)),
+    })));
+  }, [applicationJobIds, applicationsHydrated]);
 
   const toggle = (
     arr: string[],
@@ -53,10 +83,14 @@ export default function JobDiscovery() {
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [query, types, modes]);
+  }, [query, types, modes, categoryId]);
 
-  async function loadJobs() {
-    setLoading(true);
+  useEffect(() => {
+    if (jobsSyncVersion > 0) void loadJobs(false);
+  }, [jobsSyncVersion]);
+
+  async function loadJobs(showLoading = true) {
+    if (showLoading) setLoading(true);
     setError("");
 
     try {
@@ -64,6 +98,7 @@ export default function JobDiscovery() {
         search: query || undefined,
         types: types.length ? types : undefined,
         modes: modes.length ? modes : undefined,
+        categoryId: categoryId ? Number(categoryId) : undefined,
       });
 
       setJobs(res.jobs ?? []);
@@ -72,36 +107,18 @@ export default function JobDiscovery() {
       console.error(err);
       setError("Failed to load jobs, please try again");
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }
 
-  async function handleToggleSave(job: UiJob) {
+  function handleToggleSave(jobId: string | number, isSavedNow: boolean) {
     setJobs((prev) =>
       prev.map((item) =>
-        item.id === job.id
-          ? { ...item, saved: !item.saved }
+        String(item.id) === String(jobId)
+          ? { ...item, saved: isSavedNow }
           : item
       )
     );
-
-    try {
-      if (job.saved) {
-        await unsaveJob(job.id);
-      } else {
-        await saveJob(job.id);
-      }
-    } catch (err) {
-      console.error(err);
-
-      setJobs((prev) =>
-        prev.map((item) =>
-          item.id === job.id
-            ? { ...item, saved: job.saved }
-            : item
-        )
-      );
-    }
   }
 
   return (
@@ -293,6 +310,20 @@ export default function JobDiscovery() {
             ))}
 
             <div
+              style={{ fontSize: 12, fontWeight: 700, marginBottom: 8, color: C.text }}
+            >
+              Category
+            </div>
+            <select
+              value={categoryId}
+              onChange={(event) => setCategoryId(event.target.value)}
+              style={{ width: "100%", padding: "9px 10px", borderRadius: 10, border: `1px solid ${C.border}`, background: C.surface, color: C.textSec, fontFamily: F, fontSize: 12.5 }}
+            >
+              <option value="">All categories</option>
+              {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+            </select>
+
+            <div
               style={{
                 height: 1,
                 background: C.divider,
@@ -414,9 +445,7 @@ export default function JobDiscovery() {
                     onView={() =>
                       nav(`/student/jobs/${job.id}`)
                     }
-                    onSave={() =>
-                      handleToggleSave(job)
-                    }
+                    onSave={handleToggleSave}
                   />
                 ))}
               </div>

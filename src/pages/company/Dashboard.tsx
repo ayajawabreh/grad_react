@@ -7,38 +7,59 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { FileText, Users, CalendarCheck, UserCheck } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { getCompanyDashboard } from "../../imports/api";
+import { getMonthlyApplicationsReport } from "../../imports/reports";
+import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
 
 export default function CompanyDashboard() {
+  const applicationsSyncVersion = useSyncResourceVersion("applications");
+  const profileSyncVersion = useSyncResourceVersion("company");
+  const jobsSyncVersion = useSyncResourceVersion("jobs");
+  const interviewsSyncVersion = useSyncResourceVersion("interviews");
   const nav = useNavigate();
   const { user } = useAuth();
 
   const companyName = user?.name || localStorage.getItem("user_name") || "Company";
 
   const [dashboard, setDashboard] = useState<any>(null);
+  const [monthlyApplications, setMonthlyApplications] = useState<any[]>([]);
 
   useEffect(() => {
     const loadDashboard = async () => {
-      try {
-        const data = await getCompanyDashboard();
-        setDashboard(data);
-      } catch (error) {
-        console.log(error);
-      }
+      const [dashboardResult, monthlyResult] = await Promise.allSettled([
+        getCompanyDashboard(),
+        getMonthlyApplicationsReport(),
+      ]);
+      if (dashboardResult.status === "fulfilled") setDashboard(dashboardResult.value);
+      else console.error("Failed to load company dashboard:", dashboardResult.reason);
+      if (monthlyResult.status === "fulfilled") setMonthlyApplications(Array.isArray(monthlyResult.value) ? monthlyResult.value : []);
+      else console.error("Failed to load monthly applications:", monthlyResult.reason);
     };
 
     loadDashboard();
-  }, []);
+  }, [applicationsSyncVersion, profileSyncVersion, jobsSyncVersion, interviewsSyncVersion]);
 
-  const activityData = dashboard?.activity?.length
-    ? dashboard.activity.map((item: any) => ({
-        month: item.month,
-        v: Number(item.value),
-      }))
-    : [
-        { month: "2026-05", v: 0 },
-        { month: "2026-06", v: 0 },
-        { month: "2026-07", v: 0 },
-      ];
+  const normalizeActivity = (items: any[]) => items
+    .map((item: any) => ({
+      month: String(item.month ?? item.label ?? item.date ?? ""),
+      v: Number(item.value ?? item.applications ?? item.count ?? 0),
+    }))
+    .filter((item) => item.month && Number.isFinite(item.v));
+
+  const dashboardActivity = normalizeActivity(Array.isArray(dashboard?.activity) ? dashboard.activity : []);
+  const reportActivity = normalizeActivity(monthlyApplications);
+  const availableActivity = dashboardActivity.some((item) => item.v > 0)
+    ? dashboardActivity
+    : reportActivity.some((item) => item.v > 0)
+      ? reportActivity
+      : [];
+  const totalApplications = Number(dashboard?.stats?.total_applications ?? 0);
+  const activityData = availableActivity.length > 1
+    ? availableActivity
+    : availableActivity.length === 1
+      ? [{ month: "Start", v: 0 }, ...availableActivity]
+      : totalApplications > 0
+        ? [{ month: "Start", v: 0 }, { month: "Current", v: totalApplications }]
+        : [];
 
   const pipelineData = dashboard?.pipeline || [];
 
@@ -126,6 +147,11 @@ export default function CompanyDashboard() {
           </h2>
 
 
+          {activityData.length === 0 ? (
+            <div style={{ height: 200, display: "flex", alignItems: "center", justifyContent: "center", color: C.textSec, fontSize: 14 }}>
+              No application activity yet.
+            </div>
+          ) : (
           <ResponsiveContainer width="100%" height={200}>
 
             <AreaChart data={activityData}>
@@ -162,6 +188,7 @@ export default function CompanyDashboard() {
             </AreaChart>
 
           </ResponsiveContainer>
+          )}
 
         </div>
 

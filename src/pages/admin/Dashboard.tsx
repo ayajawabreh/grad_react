@@ -21,6 +21,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { getAdminDashboard } from "../../imports/api";
+import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
 
 type DashboardData = {
   statistics?: {
@@ -38,6 +39,10 @@ type DashboardData = {
 };
 
 export default function AdminDashboard() {
+  const applicationsSyncVersion = useSyncResourceVersion("applications");
+  const profileSyncVersion = useSyncResourceVersion("admin");
+  const jobsSyncVersion = useSyncResourceVersion("jobs");
+  const interviewsSyncVersion = useSyncResourceVersion("interviews");
   const nav = useNavigate();
 
   const [data, setData] = useState<DashboardData | null>(null);
@@ -57,7 +62,7 @@ export default function AdminDashboard() {
     };
 
     loadDashboard();
-  }, []);
+  }, [applicationsSyncVersion, profileSyncVersion, jobsSyncVersion, interviewsSyncVersion]);
 
   const statistics = data?.statistics ?? {};
   const needsReview = data?.needs_review ?? {};

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import {
   Save,
@@ -15,11 +15,14 @@ import {
   Check,
   X,
   AlertTriangle,
+  Trophy,
 } from "lucide-react";
 
 import { C, F } from "../../constants/tokens";
 import { API } from "../../imports/api";
+import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
 import { Btn } from "../../components/ui";
+import ClassicResumeTemplate from "../../components/resume/ClassicResumeTemplate";
 
 interface ToastState {
   show: boolean;
@@ -39,6 +42,7 @@ interface EducationItem {
 interface SkillItem {
   id: string;
   name: string;
+  category?: string;
 }
 
 interface ExperienceItem {
@@ -175,24 +179,30 @@ function FieldInput({
   onChange,
   placeholder,
   type = "text",
+  required = false,
+  error,
 }: {
   label: string;
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   placeholder?: string;
   type?: string;
+  required?: boolean;
+  error?: string;
 }) {
   return (
     <div style={{ marginBottom: 10 }}>
-      <label style={smallLabelStyle}>{label}</label>
+      <label style={smallLabelStyle}>{label}{required && <span style={{ color: C.error }}> *</span>}</label>
 
       <input
         type={type}
         value={value}
         onChange={onChange}
         placeholder={placeholder}
-        style={smallInputStyle}
+        required={required}
+        style={{ ...smallInputStyle, borderColor: error ? C.error : smallInputStyle.borderColor }}
       />
+      {error && <div style={{ marginTop: 4, fontSize: 11, color: C.error }}>{error}</div>}
     </div>
   );
 }
@@ -341,11 +351,15 @@ function DynamicSection({
 }
 
 export default function ResumeBuilder() {
+  const resumeSyncVersion = useSyncResourceVersion("resume");
+  const studentSyncVersion = useSyncResourceVersion("student");
   const nav = useNavigate();
   const location = useLocation();
   const resumeReturnTo =
     (location.state as { returnTo?: string } | null)?.returnTo ||
     sessionStorage.getItem("cb_resume_return_to");
+  const uploadedResume = (location.state as { uploadedResume?: any } | null)?.uploadedResume;
+  const uploadedResumeRef = useRef(uploadedResume);
 
   const handleResumeBack = () => {
     if (resumeReturnTo) {
@@ -362,9 +376,13 @@ export default function ResumeBuilder() {
   const [fullName, setFullName] = useState("");
   const [professionalTitle, setProfessionalTitle] = useState("");
   const [summary, setSummary] = useState("");
+  const [includeProfilePhoto, setIncludeProfilePhoto] = useState(true);
 
   const [aiLoading, setAiLoading] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [resumeMetadata, setResumeMetadata] = useState<any>({});
 
   const education = useListState<EducationItem>([]);
   const skills = useListState<SkillItem>([]);
@@ -372,6 +390,7 @@ export default function ResumeBuilder() {
   const projects = useListState<ProjectItem>([]);
   const certificates = useListState<CertificateItem>([]);
   const languages = useListState<LanguageItem>([]);
+  const achievements = useListState<AchievementItem>([]);
 
   const [toast, setToast] = useState<ToastState>({
     show: false,
@@ -380,6 +399,7 @@ export default function ResumeBuilder() {
   });
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [experienceDateErrors, setExperienceDateErrors] = useState<Record<string, { start?: string; end?: string }>>({});
 
   const showToast = (
     type: "success" | "error" | "warning",
@@ -403,7 +423,7 @@ export default function ResumeBuilder() {
 
   useEffect(() => {
     loadResume();
-  }, []);
+  }, [resumeSyncVersion, studentSyncVersion]);
 
   const withLocalIds = <T,>(
     arr: any[]
@@ -416,63 +436,74 @@ export default function ResumeBuilder() {
   const loadResume = async () => {
     try {
       const response = await API.get("/student/resume");
+      const loadedResume = uploadedResumeRef.current ?? response.data ?? {};
+      uploadedResumeRef.current = null;
 
-      console.log("Loaded Resume:", response.data);
+      console.log("Loaded Resume:", loadedResume);
+      setResumeMetadata(loadedResume);
 
-      setResumeId(response.data?.id ?? null);
-      setFullName(response.data?.full_name ?? "");
+      setResumeId(loadedResume?.id ?? response.data?.id ?? null);
+      setFullName(loadedResume?.full_name ?? "");
       setProfessionalTitle(
-        response.data?.professional_title ?? ""
+        loadedResume?.professional_title ?? ""
       );
-      setSummary(response.data?.summary ?? "");
-      setTpl(response.data?.template ?? "executive");
+      setSummary(loadedResume?.summary ?? "");
+      setTpl(loadedResume?.template ?? "executive");
+      setIncludeProfilePhoto(loadedResume?.include_profile_photo !== false && loadedResume?.include_profile_photo !== 0);
 
       education.setItems(
         withLocalIds<EducationItem>(
-          response.data?.education
+          loadedResume?.education ?? []
         )
       );
 
-      skills.setItems(
-        withLocalIds<SkillItem>(
-          response.data?.skills
-        )
-      );
+      skills.setItems(withLocalIds<SkillItem>(loadedResume?.skills ?? []).map((item: any) => ({ ...item, category: item.category ?? item.type ?? item.group ?? "Programming" })));
 
-      experience.setItems(
-        withLocalIds<ExperienceItem>(
-          response.data?.experience
-        )
-      );
+      experience.setItems(withLocalIds<ExperienceItem>(loadedResume?.experience ?? []).map((item: any) => ({ ...item, title: item.title ?? item.position ?? "" })));
 
       projects.setItems(
         withLocalIds<ProjectItem>(
-          response.data?.projects
+          loadedResume?.projects ?? []
         )
       );
 
       certificates.setItems(
         withLocalIds<CertificateItem>(
-          response.data?.certificates
+          loadedResume?.certificates ?? []
         )
       );
 
       languages.setItems(
         withLocalIds<LanguageItem>(
-          response.data?.languages
+          loadedResume?.languages ?? []
         )
       );
+      achievements.setItems(withLocalIds<AchievementItem>(loadedResume?.achievements ?? []));
     } catch (error) {
       console.error("Load resume error:", error);
     }
   };
 
-  const saveResume = async (): Promise<number | null> => {
+  const saveResume = async (showSuccessToast = true): Promise<number | null> => {
+    const dateErrors: Record<string, { start?: string; end?: string }> = {};
+    experience.items.forEach((item) => {
+      const startValid = /^\d{4}-(0[1-9]|1[0-2])$/.test(item.start_date.trim());
+      const end = item.end_date.trim();
+      const endValid = /^\d{4}-(0[1-9]|1[0-2])$/.test(end) || /^present$/i.test(end);
+      if (!startValid) dateErrors[item.id] = { ...dateErrors[item.id], start: "Enter the start date in YYYY-MM format." };
+      if (!endValid) dateErrors[item.id] = { ...dateErrors[item.id], end: "Enter YYYY-MM, or Present for a current role." };
+      else if (startValid && !/^present$/i.test(end) && end < item.start_date.trim()) dateErrors[item.id] = { ...dateErrors[item.id], end: "End date cannot be earlier than the start date." };
+    });
+    setExperienceDateErrors(dateErrors);
+    if (Object.keys(dateErrors).length > 0) {
+      return null;
+    }
     const data = {
       title: "My Resume",
       template: tpl || "executive",
       full_name: fullName || "",
       professional_title: professionalTitle || "",
+      include_profile_photo: includeProfilePhoto,
       summary: summary || "",
       education: education.items,
       skills: skills.items,
@@ -480,9 +511,11 @@ export default function ResumeBuilder() {
       projects: projects.items,
       certificates: certificates.items,
       languages: languages.items,
+      achievements: achievements.items,
       is_public: false,
     };
 
+    setIsSaving(true);
     try {
       console.log("Sending data:", data);
 
@@ -506,10 +539,17 @@ export default function ResumeBuilder() {
 
       setResumeId(savedId);
 
-      showToast(
-        "success",
-        "Resume saved successfully 🎉"
-      );
+      await Promise.allSettled([
+        API.get("/student/profile"),
+        API.get("/student/resume"),
+      ]);
+
+      if (showSuccessToast) {
+        showToast(
+          "success",
+          "Resume saved successfully 🎉"
+        );
+      }
 
       return savedId;
     } catch (error: any) {
@@ -531,6 +571,8 @@ export default function ResumeBuilder() {
       );
 
       return null;
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -538,7 +580,7 @@ export default function ResumeBuilder() {
     setDownloadingPdf(true);
 
     try {
-      const id = await saveResume();
+      const id = await saveResume(false);
 
       if (!id) {
         return;
@@ -575,6 +617,11 @@ export default function ResumeBuilder() {
       link.remove();
 
       window.URL.revokeObjectURL(url);
+
+      showToast(
+        "success",
+        "PDF downloaded successfully."
+      );
     } catch (error: any) {
       console.error(
         "PDF download error:",
@@ -588,6 +635,27 @@ export default function ResumeBuilder() {
     } finally {
       setDownloadingPdf(false);
     }
+  };
+
+  const handlePreview = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setIsPreviewOpen(true);
+  };
+
+  const previewResume = {
+    ...resumeMetadata,
+    full_name: fullName,
+    professional_title: professionalTitle,
+    include_profile_photo: includeProfilePhoto,
+    summary,
+    education: education.items,
+    skills: skills.items,
+    experience: experience.items,
+    projects: projects.items,
+    certificates: certificates.items,
+    achievements: achievements.items,
+    languages: languages.items,
   };
 
   const deleteResume = async () => {
@@ -604,6 +672,7 @@ export default function ResumeBuilder() {
       setFullName("");
       setProfessionalTitle("");
       setSummary("");
+      setIncludeProfilePhoto(true);
       setTpl("executive");
 
       education.setItems([]);
@@ -612,6 +681,7 @@ export default function ResumeBuilder() {
       projects.setItems([]);
       certificates.setItems([]);
       languages.setItems([]);
+      achievements.setItems([]);
 
       showToast(
         "success",
@@ -826,6 +896,15 @@ export default function ResumeBuilder() {
         </div>
       )}
 
+      {isPreviewOpen && (
+        <div onClick={() => setIsPreviewOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 10000, overflowY: "auto", padding: "24px", background: "rgba(20,24,31,.72)", backdropFilter: "blur(4px)" }}>
+          <div style={{ maxWidth: 850, margin: "0 auto 12px", display: "flex", justifyContent: "flex-end" }}>
+            <button type="button" onClick={() => setIsPreviewOpen(false)} aria-label="Close preview" style={{ width: 38, height: 38, borderRadius: 10, border: 0, background: C.surface, color: C.text, display: "grid", placeItems: "center", cursor: "pointer", boxShadow: "0 6px 20px rgba(0,0,0,.2)" }}><X size={19} /></button>
+          </div>
+          <div onClick={(event) => event.stopPropagation()}><ClassicResumeTemplate resume={previewResume} /></div>
+        </div>
+      )}
+
       {showDeleteModal && (
         <div
           style={{
@@ -1006,17 +1085,18 @@ export default function ResumeBuilder() {
           <Btn
             v="outline"
             icon={Save}
-            onClick={saveResume}
+            onClick={() => void saveResume()}
+            type="submit"
+            disabled={isSaving}
           >
-            Save Draft
+            {isSaving ? "Saving..." : "Save Draft"}
           </Btn>
 
           <Btn
             v="dark"
             icon={Eye}
-            onClick={() =>
-              nav("/student/resume/view")
-            }
+            onClick={handlePreview}
+            type="button"
           >
             Preview
           </Btn>
@@ -1032,6 +1112,13 @@ export default function ResumeBuilder() {
               : "Download PDF"}
           </Btn>
         </div>
+      </div>
+
+      <div style={{ maxWidth: 800, margin: "0 auto 16px", padding: "14px 18px", borderRadius: 14, border: `1px solid ${C.border}`, background: C.surface, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+        <div><div style={{ fontSize: 13.5, fontWeight: 700 }}>Include Profile Photo</div><div style={{ marginTop: 3, fontSize: 11.5, color: C.textMuted }}>Use the avatar from your student profile in this CV.</div></div>
+        <button type="button" role="switch" aria-checked={includeProfilePhoto} onClick={() => setIncludeProfilePhoto((current) => !current)} style={{ width: 54, height: 29, padding: 3, border: 0, borderRadius: 99, background: includeProfilePhoto ? C.accent : C.border, cursor: "pointer", transition: "background .2s", flexShrink: 0 }}>
+          <span style={{ display: "block", width: 23, height: 23, borderRadius: "50%", background: C.surface, transform: `translateX(${includeProfilePhoto ? 25 : 0}px)`, transition: "transform .2s", boxShadow: "0 2px 5px rgba(0,0,0,.2)" }} />
+        </button>
       </div>
 
       <div
@@ -1244,6 +1331,7 @@ export default function ResumeBuilder() {
                   placeholder="2026"
                 />
               </div>
+
             </>
           )}
         />
@@ -1256,27 +1344,20 @@ export default function ResumeBuilder() {
           onAdd={() =>
             skills.add({
               name: "",
+              category: "Programming",
             })
           }
           onRemove={skills.remove}
           renderItem={(item: SkillItem) => (
-            <FieldInput
-              label="Skill"
-              value={item.name}
-              onChange={(e) =>
-                skills.update(
-                  item.id,
-                  "name",
-                  e.target.value
-                )
-              }
-              placeholder="e.g. React"
-            />
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+              <FieldInput label="Skill" value={item.name} onChange={(e) => skills.update(item.id, "name", e.target.value)} placeholder="e.g. React" />
+              <div><label style={smallLabelStyle}>Category</label><select value={item.category ?? "Programming"} onChange={(e) => skills.update(item.id, "category", e.target.value)} style={smallInputStyle}><option>Programming</option><option>Frameworks</option><option>Databases</option><option>Tools</option><option>Soft Skills</option><option>Concepts</option><option>Other</option></select></div>
+            </div>
           )}
         />
 
         <DynamicSection
-          title="Experience"
+          title="Work Experience"
           Icon={Briefcase}
           items={experience.items}
           addLabel="Add Experience"
@@ -1334,29 +1415,35 @@ export default function ResumeBuilder() {
                 }}
               >
                 <FieldInput
-                  label="Start Date"
+                  label="Start Date (YYYY-MM)"
+                  required
                   value={item.start_date}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     experience.update(
                       item.id,
                       "start_date",
                       e.target.value
-                    )
-                  }
-                  placeholder="e.g. Jan 2025"
+                    );
+                    setExperienceDateErrors((current) => ({ ...current, [item.id]: { ...current[item.id], start: undefined } }));
+                  }}
+                  placeholder="e.g. 2023-01"
+                  error={experienceDateErrors[item.id]?.start}
                 />
 
                 <FieldInput
-                  label="End Date"
+                  label="End Date (YYYY-MM or Present)"
+                  required
                   value={item.end_date}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     experience.update(
                       item.id,
                       "end_date",
                       e.target.value
-                    )
-                  }
-                  placeholder="e.g. Present"
+                    );
+                    setExperienceDateErrors((current) => ({ ...current, [item.id]: { ...current[item.id], end: undefined } }));
+                  }}
+                  placeholder="e.g. 2024-06 or Present"
+                  error={experienceDateErrors[item.id]?.end}
                 />
               </div>
 
@@ -1497,6 +1584,25 @@ export default function ResumeBuilder() {
         />
 
         <DynamicSection
+          title="Activities & Achievements"
+          Icon={Trophy}
+          items={achievements.items}
+          addLabel="Add Achievement"
+          onAdd={() => achievements.add({ title: "", organization: "", year: "", description: "" })}
+          onRemove={achievements.remove}
+          renderItem={(item: AchievementItem) => (
+            <>
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 10 }}>
+                <FieldInput label="Activity or Achievement" value={item.title} onChange={(e) => achievements.update(item.id, "title", e.target.value)} placeholder="e.g. Hackathon Finalist" />
+                <FieldInput label="Organization" value={item.organization} onChange={(e) => achievements.update(item.id, "organization", e.target.value)} placeholder="e.g. IEEE" />
+                <FieldInput label="Year" value={item.year} onChange={(e) => achievements.update(item.id, "year", e.target.value)} placeholder="2026" />
+              </div>
+              <FieldTextarea label="Description (Optional)" value={item.description} onChange={(e) => achievements.update(item.id, "description", e.target.value)} placeholder="Briefly describe the activity, award, or impact..." />
+            </>
+          )}
+        />
+
+        <DynamicSection
           title="Languages"
           Icon={LanguagesIcon}
           items={languages.items}
@@ -1622,4 +1728,12 @@ export default function ResumeBuilder() {
       </div>
     </div>
   );
+}
+
+interface AchievementItem {
+  id: string;
+  title: string;
+  organization: string;
+  year: string;
+  description: string;
 }

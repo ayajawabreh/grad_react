@@ -21,6 +21,7 @@ import { useAuth } from "../context/AuthContext";
 import { API } from "../imports/api";
 import { getConversations } from "../imports/messages";
 import { supabase } from "../lib/supabase";
+import { useSyncResourceVersion } from "../sync/useSyncResourceVersion";
 
 const NAV = [
   {
@@ -500,6 +501,7 @@ function TopBar({
 }
 
 export default function StudentLayout() {
+  const profileSyncVersion = useSyncResourceVersion("student");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [student, setStudent] = useState(null);
   const [unreadMessages, setUnreadMessages] = useState(0);
@@ -541,7 +543,7 @@ export default function StudentLayout() {
           err
         );
       });
-  }, []);
+  }, [profileSyncVersion]);
 
   useEffect(() => {
     if (role && role !== "student") {

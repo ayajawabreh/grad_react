@@ -15,10 +15,12 @@ import {
   updateCompanyProfile,
   getCompanyJobs,
 } from "../../imports/api";
+import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
 
 type ProfileTab = "Overview" | "Culture" | "Open Roles";
 
 export default function CompanyProfile() {
+  const profileSyncVersion = useSyncResourceVersion("company");
   const [tab, setTab] = useState<ProfileTab>("Overview");
   const [editing, setEditing] = useState(false);
 
@@ -44,7 +46,7 @@ export default function CompanyProfile() {
   useEffect(() => {
     loadCompany();
     loadJobs();
-  }, []);
+  }, [profileSyncVersion]);
 
   const loadCompany = async () => {
     try {

@@ -4,10 +4,13 @@ import { C, F } from "../../constants/tokens";
 import { Btn, SBadge } from "../../components/ui";
 import { Search, Plus, Edit2, Trash2, Briefcase, AlertTriangle, X, AlertCircle } from "lucide-react";
 import { getCompanyJobs, deleteJob } from "../../imports/api";
+import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
 
 const STATUSES = ["All", "Published", "Draft", "Closed"];
 
 export default function ManageJobs() {
+  const applicationsSyncVersion = useSyncResourceVersion("applications");
+  const jobsSyncVersion = useSyncResourceVersion("jobs");
   const nav = useNavigate();
   const [filter, setFilter] = useState("All");
   const [query, setQuery] = useState("");
@@ -44,7 +47,7 @@ export default function ManageJobs() {
 
   useEffect(() => {
     loadJobs();
-  }, []);
+  }, [applicationsSyncVersion, jobsSyncVersion]);
 
   useEffect(() => {
     const refresh = () => loadJobs(false);

@@ -15,6 +15,7 @@ import {
   getOverviewReport,
   getPipelineReport,
 } from "../../imports/reports";
+import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
 
 type Overview = {
   total_jobs: number;
@@ -34,38 +35,22 @@ type MonthlyItem = {
 };
 
 export default function Reports() {
+  const applicationsSyncVersion = useSyncResourceVersion("applications");
+  const jobsSyncVersion = useSyncResourceVersion("jobs");
+  const interviewsSyncVersion = useSyncResourceVersion("interviews");
   const [overview, setOverview] = useState<Overview | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [pipeline, setPipeline] = useState<Record<string, number>>({});
   const [monthly, setMonthly] = useState<MonthlyItem[]>([]);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([
-      getOverviewReport(),
-      getJobsReport(),
-      getPipelineReport(),
-      getMonthlyApplicationsReport(),
-    ])
-      .then(([overviewData, jobsData, pipelineData, monthlyData]) => {
-        setOverview(overviewData);
-        setJobs(jobsData);
-        setPipeline(pipelineData);
-        setMonthly(monthlyData);
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="min-h-[450px] flex items-center justify-center">
-        <div className="flex flex-col items-center space-y-4 text-slate-600 font-semibold text-base">
-          <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
-          <span>Loading analytics...</span>
-        </div>
-      </div>
-    );
-  }
+    let mounted = true;
+    void getOverviewReport().then((data) => mounted && setOverview(data));
+    void getJobsReport().then((data) => mounted && setJobs(data));
+    void getPipelineReport().then((data) => mounted && setPipeline(data));
+    void getMonthlyApplicationsReport().then((data) => mounted && setMonthly(data));
+    return () => { mounted = false; };
+  }, [applicationsSyncVersion, jobsSyncVersion, interviewsSyncVersion]);
 
   const cards = overview
     ? [
@@ -130,7 +115,7 @@ export default function Reports() {
   return (
     <div className="max-w-7xl mx-auto px-6 pb-6 md:px-10 md:pb-10 space-y-10 bg-slate-50 min-h-screen text-slate-900 leading-normal">
       <div className="pb-6 border-b border-slate-200">
-       <h1 className="text-[24px] font-black text-slate-900 tracking-tight">
+       <h1 className="text-slate-900 tracking-tight" style={{ fontSize: 24, fontWeight: 900 }}>
   Reports & Analytics
 </h1>
         <p className="text-sm text-slate-500 mt-1">

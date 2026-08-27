@@ -1,19 +1,74 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { C, F } from "../../constants/tokens";
-import { trendData } from "../../constants/data";
 import { Btn, StatCard } from "../../components/ui";
 import { JobCard } from "../../components/cards/JobCard";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Briefcase, BookOpen, Heart, Eye, Search, FileText, Bot } from "lucide-react";
 import { API } from "../../imports/api";
+import { refreshApplicationsCache, useApplicationsCache } from "../../sync/applicationsStore";
+import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
 
 export default function StudentDashboard() {
+  const profileSyncVersion = useSyncResourceVersion("student");
+  const resumeSyncVersion = useSyncResourceVersion("resume");
+  const jobsSyncVersion = useSyncResourceVersion("jobs");
+  const interviewsSyncVersion = useSyncResourceVersion("interviews");
   const nav = useNavigate();
-  const [userName, setUserName] = useState<string>("Marcus");
+  const [userName, setUserName] = useState<string>("");
   const [stats, setStats] = useState({ applications: "0", interviews: "0", saved: "0", views: "0" });
+  const [dashboardActivity, setDashboardActivity] = useState<Array<{ month: string; applications: number }>>([]);
+  const [trends, setTrends] = useState<{ applications?: number; interviews?: number; profile_views?: number }>({});
   const [recommendedJobs, setRecommendedJobs] = useState<any[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const {
+    applications,
+    stats: applicationStats,
+    hydrated: applicationsHydrated,
+  } = useApplicationsCache();
+
+  useEffect(() => {
+    void refreshApplicationsCache(applicationsHydrated);
+  }, []);
+
+  useEffect(() => {
+    if (!applicationsHydrated) return;
+    setStats((current) => ({ ...current, applications: String(applicationStats.total) }));
+  }, [applicationStats.total, applicationsHydrated]);
+
+  const applicationActivity = useMemo(() => {
+    if (dashboardActivity.some((item) => item.applications > 0)) return dashboardActivity;
+    if (!applicationsHydrated || applicationStats.total === 0) return [];
+
+    const grouped = new Map<string, { date: Date; applications: number }>();
+    let undated = 0;
+    applications.forEach((application) => {
+      const date = new Date(application.date);
+      if (Number.isNaN(date.getTime())) { undated += 1; return; }
+      const monthDate = new Date(date.getFullYear(), date.getMonth(), 1);
+      const key = `${monthDate.getFullYear()}-${monthDate.getMonth()}`;
+      const current = grouped.get(key);
+      grouped.set(key, { date: monthDate, applications: (current?.applications ?? 0) + 1 });
+    });
+
+    const now = new Date();
+    const currentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const currentKey = `${currentMonth.getFullYear()}-${currentMonth.getMonth()}`;
+    if (undated > 0 || grouped.size === 0) {
+      const current = grouped.get(currentKey);
+      grouped.set(currentKey, { date: currentMonth, applications: (current?.applications ?? 0) + (undated || applicationStats.total) });
+    }
+
+    const points = [...grouped.values()]
+      .sort((a, b) => a.date.getTime() - b.date.getTime())
+      .slice(-6)
+      .map((item) => ({ month: item.date.toLocaleDateString("en-US", { month: "short" }), applications: item.applications }));
+
+    if (points.length === 1) {
+      const previous = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1);
+      points.unshift({ month: previous.toLocaleDateString("en-US", { month: "short" }), applications: 0 });
+    }
+    return points;
+  }, [applications, applicationsHydrated, applicationStats.total, dashboardActivity]);
 
   const actions = [
     { label: "Browse Jobs", icon: Search, path: "/student/jobs" },
@@ -23,17 +78,23 @@ export default function StudentDashboard() {
   ];
 
   const fetchDashboardData = async () => {
-    try {
-      const [userRes, dashboardRes, jobsRes] = await Promise.all([
+    const [userResult, dashboardResult, jobsResult] = await Promise.allSettled([
         API.get("/user"),
         API.get("/student/dashboard"),
         API.get("/student/recommended-jobs")
-      ]);
+    ]);
 
+    if (userResult.status === "fulfilled") {
+      const userRes = userResult.value;
       if (userRes.data?.name) {
         setUserName(userRes.data.name);
       }
+    } else {
+      console.error("Error fetching user data:", userResult.reason);
+    }
 
+    if (dashboardResult.status === "fulfilled") {
+      const dashboardRes = dashboardResult.value;
       if (dashboardRes.data?.stats) {
         const s = dashboardRes.data.stats;
         setStats({
@@ -66,21 +127,36 @@ export default function StudentDashboard() {
         });
       }
 
+      const activity = dashboardRes.data?.application_activity ?? dashboardRes.data?.activity ?? [];
+      if (Array.isArray(activity)) {
+        const points = activity.map((item: any) => ({
+          month: String(item.month ?? item.label ?? ""),
+          applications: Number(item.applications ?? item.count ?? item.value ?? 0),
+        })).filter((item: { month: string }) => item.month);
+        if (points.length === 1) points.unshift({ month: "Start", applications: 0 });
+        setDashboardActivity(points);
+      }
+
+      if (dashboardRes.data?.trends) setTrends(dashboardRes.data.trends);
+    } else {
+      console.error("Error fetching dashboard data:", dashboardResult.reason);
+    }
+
+    if (jobsResult.status === "fulfilled") {
+      const jobsRes = jobsResult.value;
       if (Array.isArray(jobsRes.data)) {
         setRecommendedJobs(jobsRes.data);
       } else if (jobsRes.data?.jobs) {
         setRecommendedJobs(jobsRes.data.jobs);
       }
-    } catch (error) {
-      console.error("Error fetching dashboard data:", error);
-    } finally {
-      setLoading(false);
+    } else {
+      console.error("Error fetching recommended jobs:", jobsResult.reason);
     }
   };
 
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, [profileSyncVersion, resumeSyncVersion, jobsSyncVersion, interviewsSyncVersion]);
 
   const handleSaveToggle = (_jobId: string, isSavedNow: boolean) => {
     setStats(prev => ({
@@ -89,32 +165,29 @@ export default function StudentDashboard() {
     }));
   };
 
-  if (loading) {
-    return (
-      <div style={{ fontFamily: F, color: C.textSec, display: "flex", justifyContent: "center", alignItems: "center", minHeight: "50vh", fontSize: 16, fontWeight: 600 }}>
-        Loading Dashboard Data...
-      </div>
-    );
-  }
-
   return (
     <div style={{ fontFamily: F, color: C.text }}>
       <div style={{ marginBottom: 28 }}>
-        <h1 style={{ fontSize: 24, fontWeight: 900, margin: 0 }}>Welcome back, {userName} 👋</h1>
+        <h1 style={{ fontSize: 24, fontWeight: 900, margin: 0 }}>Welcome back{userName ? `, ${userName}` : ""} 👋</h1>
         <p style={{ color: C.textSec, marginTop: 6, fontSize: 14 }}>Here's what's happening with your job search today.</p>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 28 }}>
-        <StatCard label="Applications" value={stats.applications} trend="+12%" icon={Briefcase} color={C.info} />
-        <StatCard label="Interviews" value={stats.interviews} trend="+50%" icon={BookOpen} color={C.purple} />
+        <StatCard label="Applications" value={stats.applications} trend={trends.applications == null ? undefined : `${trends.applications >= 0 ? "+" : ""}${trends.applications}%`} icon={Briefcase} color={C.info} />
+        <StatCard label="Interviews" value={stats.interviews} trend={trends.interviews == null ? undefined : `${trends.interviews >= 0 ? "+" : ""}${trends.interviews}%`} icon={BookOpen} color={C.purple} />
         <StatCard label="Saved Jobs" value={stats.saved} icon={Heart} color={C.accent} />
-        <StatCard label="Profile Views" value={stats.views} trend="+22%" icon={Eye} color={C.success} />
+        <StatCard label="Profile Views" value={stats.views} trend={trends.profile_views == null ? undefined : `${trends.profile_views >= 0 ? "+" : ""}${trends.profile_views}%`} icon={Eye} color={C.success} />
       </div>
 
       <div style={{ background: C.surface, borderRadius: 20, padding: 24, marginBottom: 28, border: `1px solid ${C.border}` }}>
         <h2 style={{ fontSize: 15, fontWeight: 700, margin: "0 0 20px" }}>Application Activity</h2>
+        {applicationActivity.length === 0 ? (
+          <div style={{ height: 200, display: "flex", alignItems: "center", justifyContent: "center", color: C.textSec, fontSize: 14 }}>
+            No application activity yet.
+          </div>
+        ) : (
         <ResponsiveContainer width="100%" height={200}>
-          <AreaChart data={trendData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+          <AreaChart data={applicationActivity} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
             <defs>
               <linearGradient id="appGrad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor={C.accent} stopOpacity={0.25} />
@@ -125,9 +198,10 @@ export default function StudentDashboard() {
             <XAxis dataKey="month" tick={{ fontSize: 12, fill: C.textSec }} />
             <YAxis tick={{ fontSize: 12, fill: C.textSec }} />
             <Tooltip contentStyle={{ borderRadius: 10, border: `1px solid ${C.border}`, fontFamily: F }} />
-            <Area type="monotone" dataKey="v" stroke={C.accent} strokeWidth={2} fill="url(#appGrad)" />
+            <Area type="monotone" dataKey="applications" stroke={C.accent} strokeWidth={2} fill="url(#appGrad)" />
           </AreaChart>
         </ResponsiveContainer>
+        )}
       </div>
 
       <div style={{ marginBottom: 28 }}>

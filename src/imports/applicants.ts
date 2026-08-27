@@ -3,6 +3,11 @@ import { API } from "./api";
 export interface MatchData {
   percentage: number | null;
   reasons?: string[];
+  match?: number | string | null;
+  score?: number | string | null;
+  matching_skills?: string[];
+  missing_skills?: string[];
+  warnings?: string[];
 }
 
 export interface ApiApplicant {
@@ -20,6 +25,10 @@ export interface ApiApplicant {
   skills: string[];
   email: string;
   applied_at: string | null;
+  match_score?: number | null;
+  matching_skills?: string[] | null;
+  missing_skills?: string[] | null;
+  match_analysis?: any;
 }
 
 export interface UiApplicant {
@@ -36,6 +45,10 @@ export interface UiApplicant {
   skills: string[];
   email: string;
   applied_at: string | null;
+  matching_skills: string[];
+  missing_skills: string[];
+  reasons: string[];
+  warnings: string[];
 }
 
 export interface ResumeData {
@@ -44,6 +57,8 @@ export interface ResumeData {
   template?: string;
   full_name?: string;
   professional_title?: string;
+  total_years_experience?: number | null;
+  total_years_of_experience?: number | null;
   summary?: string;
   file_path?: string | null;
   file_url?: string | null;
@@ -61,6 +76,10 @@ export interface ResumeData {
 export type ApplicantDetails = {
   application_id: number;
   status: string;
+  total_years_of_experience?: number | null;
+  total_years_experience?: number | null;
+  job_title?: string;
+  job?: { title?: string } | string;
 
   student: {
     name: string;
@@ -81,10 +100,15 @@ export type ApplicantDetails = {
   skills: string[];
 
   match: {
-    percentage: number;
+    percentage: number | null;
     matching_skills: string[];
     missing_skills: string[];
     reasons: string[];
+    warnings: string[];
+    source?: string | null;
+    recommendation_level?: string | null;
+    available?: boolean | null;
+    breakdown?: Record<string, unknown> | null;
   };
 
   education: any[];
@@ -213,10 +237,13 @@ export function getMatchPercentage(
     typeof match === "object" &&
     match !== null
   ) {
-    return match.percentage ?? 0;
+    const value = match.percentage ?? match.match ?? match.score;
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : 0;
   }
 
-  return match ?? 0;
+  const numeric = Number(match);
+  return Number.isFinite(numeric) ? numeric : 0;
 }
 
 export function getMatchReasons(
@@ -245,10 +272,14 @@ export function mapApiApplicantToUiApplicant(
     avatar: a.avatar,
     job: a.job,
     status: a.status,
-    match: getMatchPercentage(a.match),
+    match: Number(a.match_score ?? getMatchPercentage(a.match) ?? 0),
     skills: a.skills ?? [],
     email: a.email,
     applied_at: a.applied_at,
+    matching_skills: a.matching_skills ?? a.match_analysis?.matching_skills ?? [],
+    missing_skills: a.missing_skills ?? a.match_analysis?.missing_skills ?? [],
+    reasons: a.match_analysis?.reasons ?? getMatchReasons(a.match) ?? [],
+    warnings: a.match_analysis?.warnings ?? [],
   };
 }
 
@@ -262,7 +293,8 @@ export async function fetchApplicants(): Promise<UiApplicant[]> {
     res.data
   );
 
-  return res.data.map(
+  const list = Array.isArray(res.data) ? res.data : res.data?.applicants ?? res.data?.data ?? [];
+  return list.map(
     mapApiApplicantToUiApplicant
   );
 }
@@ -276,7 +308,7 @@ export async function fetchApplicantDetails(
   );
 
   const res = await API.get(
-    `/company/applicants/${id}`
+    `/company/applicants/${id}/details`
   );
 
   console.log(
@@ -284,7 +316,8 @@ export async function fetchApplicantDetails(
     res.data
   );
 
-  const data = res.data;
+  const data = res.data ?? {};
+  const backendMatch = data?.match && typeof data.match === "object" ? data.match : null;
 
   const resume = normalizeResume(
     data.resume
@@ -320,11 +353,11 @@ export async function fetchApplicantDetails(
 
     resume,
 
-    skills: resumeSkills,
+    skills: normalizeSkills(data.skills),
 
     education: resumeEducation,
 
-    experience: resumeExperience,
+    experience: normalizeArray(data.experience).length > 0 ? normalizeArray(data.experience) : resumeExperience,
 
     projects: resumeProjects,
 
@@ -342,19 +375,18 @@ export async function fetchApplicantDetails(
 
     match: {
       percentage:
-        data.match?.percentage ??
-        (typeof data.match === "number"
-          ? data.match
-          : 0),
+        typeof backendMatch?.percentage === "number" ? backendMatch.percentage : null,
 
-      matching_skills:
-        data.match?.matching_skills ?? [],
+      matching_skills: Array.isArray(backendMatch?.matching_skills) ? backendMatch.matching_skills : [],
 
-      missing_skills:
-        data.match?.missing_skills ?? [],
+      missing_skills: Array.isArray(backendMatch?.missing_skills) ? backendMatch.missing_skills : [],
 
-      reasons:
-        data.match?.reasons ?? [],
+      reasons: Array.isArray(backendMatch?.reasons) ? backendMatch.reasons : [],
+      warnings: Array.isArray(backendMatch?.warnings) ? backendMatch.warnings : [],
+      source: backendMatch?.source ?? null,
+      recommendation_level: backendMatch?.recommendation_level ?? null,
+      available: typeof backendMatch?.available === "boolean" ? backendMatch.available : null,
+      breakdown: backendMatch?.breakdown && typeof backendMatch.breakdown === "object" ? backendMatch.breakdown : null,
     },
 
     notes: Array.isArray(data.notes)

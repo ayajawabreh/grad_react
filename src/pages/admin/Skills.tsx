@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, BriefcaseBusiness, Pencil, Plus, Search, Tags, Trash2, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { C, F } from "../../constants/tokens";
@@ -24,6 +24,7 @@ const columns = "100px minmax(220px, 1fr) 130px 130px 150px";
 
 export default function Skills() {
   const [skills, setSkills] = useState<Skill[]>([]);
+  const [totalSkills, setTotalSkills] = useState(0);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -32,19 +33,45 @@ export default function Skills() {
   const [deletingSkill, setDeletingSkill] = useState<Skill | null>(null);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const requestInFlight = useRef(false);
 
-  const loadSkills = async () => {
+  const loadSkills = async (silent = false) => {
+    if (requestInFlight.current) return;
+    requestInFlight.current = true;
     try {
-      setLoading(true); setError("");
+      if (!silent) { setLoading(true); setError(""); }
       const response = await getAdminSkills();
-      const data = response?.data ?? response;
-      setSkills(Array.isArray(data) ? data : data?.skills ?? []);
+      const list = Array.isArray(response)
+        ? response
+        : response?.skills ?? response?.data ?? [];
+      setSkills(list);
+      setTotalSkills(Number(response?.total ?? list.length));
     } catch (err) {
-      console.error(err); setError("Skills could not be loaded. Please try again.");
-    } finally { setLoading(false); }
+      console.error(err);
+      if (!silent) setError("Skills could not be loaded. Please try again.");
+    } finally {
+      requestInFlight.current = false;
+      if (!silent) setLoading(false);
+    }
   };
 
-  useEffect(() => { loadSkills(); }, []);
+  const refreshAfterMutation = async () => {
+    while (requestInFlight.current) {
+      await new Promise((resolve) => window.setTimeout(resolve, 50));
+    }
+    await loadSkills(true);
+  };
+
+  useEffect(() => {
+    loadSkills();
+    const interval = window.setInterval(() => loadSkills(true), 5000);
+    const refreshOnFocus = () => loadSkills(true);
+    window.addEventListener("focus", refreshOnFocus);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshOnFocus);
+    };
+  }, []);
   const filtered = useMemo(() => skills.filter((s) => s.name.toLowerCase().includes(query.trim().toLowerCase())), [skills, query]);
   const studentsTotal = skills.reduce((sum, s) => sum + usage(s, "students"), 0);
   const jobsTotal = skills.reduce((sum, s) => sum + usage(s, "jobs"), 0);
@@ -64,16 +91,11 @@ export default function Skills() {
       setBusy(true); setError("");
       if (editing) {
         await updateAdminSkill(editing.id, { name: clean });
-        setSkills((current) => current.map((skill) => skill.id === editing.id ? { ...skill, name: clean } : skill));
+        await refreshAfterMutation();
         toast.success("Skill updated successfully", { description: `“${editing.name}” was changed to “${clean}”.` });
       } else {
-        const response = await createAdminSkill({ name: clean });
-        const data = response?.data ?? response;
-        const created = data?.skill ?? data;
-        const newSkill: Skill = created?.id
-          ? created
-          : { id: Math.max(0, ...skills.map((skill) => skill.id)) + 1, name: clean };
-        setSkills((current) => current.some((skill) => skill.id === newSkill.id) ? current : [...current, newSkill]);
+        await createAdminSkill({ name: clean });
+        await refreshAfterMutation();
         toast.success("Skill added successfully", { description: `“${clean}” is now available across the platform.` });
       }
       setShowForm(false); setEditing(null); setName("");
@@ -91,7 +113,7 @@ export default function Skills() {
       setBusy(true); setError("");
       const removed = deletingSkill;
       await deleteAdminSkill(removed.id);
-      setSkills((current) => current.filter((skill) => skill.id !== removed.id));
+      await refreshAfterMutation();
       setDeletingSkill(null);
       toast.success("Skill deleted successfully", { description: `“${removed.name}” was removed from the catalog.` });
     } catch (err: any) {
@@ -103,7 +125,7 @@ export default function Skills() {
   };
 
   const stats = [
-    { label: "Total Skills", value: skills.length, icon: Tags, color: C.accent, bg: C.accentLight },
+    { label: "Total Skills", value: totalSkills, icon: Tags, color: C.accent, bg: C.accentLight },
     { label: "Student Uses", value: studentsTotal, icon: Users, color: C.info, bg: C.infoBg },
     { label: "Job Uses", value: jobsTotal, icon: BriefcaseBusiness, color: C.purple, bg: C.purpleBg },
   ];
@@ -131,7 +153,7 @@ export default function Skills() {
 
     <div style={{ ...card, overflow: "hidden" }}>
       <div style={{ padding: 16, borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, flexWrap: "wrap" }}>
-        <div><div style={{ fontSize: 15, fontWeight: 700 }}>Master skills</div><div style={{ color: C.textMuted, fontSize: 12, marginTop: 3 }}>{filtered.length} of {skills.length} skills</div></div>
+        <div><div style={{ fontSize: 15, fontWeight: 700 }}>Master skills</div><div style={{ color: C.textMuted, fontSize: 12, marginTop: 3 }}>{filtered.length} of {totalSkills} skills</div></div>
         <div style={{ position: "relative", width: 290, maxWidth: "100%" }}>
           <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: C.textMuted }} />
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search by skill name..." style={{ width: "100%", padding: "10px 12px 10px 36px", borderRadius: 10, border: `1px solid ${C.border}`, fontFamily: F, fontSize: 13, background: C.bg, boxSizing: "border-box", outline: "none" }} />

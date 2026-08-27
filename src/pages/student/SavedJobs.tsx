@@ -1,53 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router";
 import { C, F } from "../../constants/tokens";
 import { JobCard } from "../../components/cards/JobCard";
-import { API } from "../../imports/api";
+import { refreshSavedJobsCache, setSavedJobState, useSavedJobsCache } from "../../sync/savedJobsStore";
 
 export default function SavedJobs() {
   const nav = useNavigate();
-  const [jobs, setJobs] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const { jobs, loading, error, hydrated } = useSavedJobsCache();
 
   useEffect(() => {
-    load();
+    void refreshSavedJobsCache(hydrated);
   }, []);
-
-  async function load() {
-    setLoading(true);
-    setError("");
-
-    try {
-      const res = await API.get("/student/saved-jobs");
-
-      const data = Array.isArray(res.data)
-        ? res.data
-        : res.data?.jobs || [];
-
-      const formattedJobs = data.map((job: any) => ({
-        ...job,
-        saved: true,
-      }));
-
-      setJobs(formattedJobs);
-    } catch {
-      setError("Failed to load saved jobs");
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function handleToggleSave(
     jobId: string | number,
     isSavedNow: boolean
   ) {
     if (!isSavedNow) {
-      setJobs((prev) =>
-        prev.filter(
-          (x) => String(x.id) !== String(jobId)
-        )
-      );
+      setSavedJobState(jobId, false);
     }
   }
 
