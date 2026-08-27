@@ -1,0 +1,44 @@
+import { Ionicons } from "@expo/vector-icons";
+import { router, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { C, F } from "../../constants/tokens";
+import { fetchApplicantDetails } from "../../imports/applicants";
+import { resolveMediaUrl } from "../../imports/api";
+import { formatExperienceDates } from "../../imports/experience";
+
+const GOLD="#B88A45";
+const array=(value:any):any[]=>{if(Array.isArray(value))return value;if(typeof value==="string")try{const parsed=JSON.parse(value);return Array.isArray(parsed)?parsed:[]}catch{return []}return[]};
+const first=(...values:any[])=>values.find(value=>value!=null&&String(value).trim())??"";
+function Section({title,children}:{title:string;children:React.ReactNode}){return <View style={s.section}><Text style={s.sectionTitle}>{title}</Text><View style={s.goldLine}/>{children}</View>}
+function Description({value}:{value?:string}){const lines=String(value??"").split(/\r?\n/).map(x=>x.trim()).filter(Boolean);return <>{lines.map((line,index)=><Text key={`${line}-${index}`} style={s.body}>{lines.length>1?"• ":""}{line.replace(/^[-•]\s*/,"")}</Text>)}</>}
+
+export default function CompanyResumePreview(){
+ const {applicationId}=useLocalSearchParams<{applicationId:string}>();const [data,setData]=useState<any>(null),[loading,setLoading]=useState(true),[error,setError]=useState(false),[imageFailed,setImageFailed]=useState(false);
+ const load=useCallback(async()=>{try{setLoading(true);setError(false);setData(await fetchApplicantDetails(Number(applicationId)))}catch{setError(true)}finally{setLoading(false)}},[applicationId]);
+ useEffect(()=>{void load()},[load]);
+ if(loading)return <View style={s.center}><ActivityIndicator color={GOLD}/><Text style={s.muted}>Loading resume...</Text></View>;
+ if(error||!data)return <View style={s.center}><Text style={s.emptyTitle}>Could not load resume</Text><Pressable style={s.goldButton} onPress={load}><Text style={s.goldButtonText}>Retry</Text></Pressable></View>;
+ const resume=data.resume??{};const education=array(resume.education??data.education),experience=array(resume.experience??data.experience),skills=array(resume.skills??data.skills),projects=array(resume.projects??data.projects),certificates=array(resume.certificates??data.certificates),languages=array(resume.languages??data.languages),achievements=array(resume.achievements??data.achievements);
+ const student=data.student??{};
+ const resumeAvatar=resolveMediaUrl(first(resume.avatar,resume.profile_image,resume.photo));
+ const studentAvatar=resolveMediaUrl(first(student.avatar,student.profile_image));
+ const includePhoto=resume.include_profile_photo;
+ const photoExplicitlyEnabled=includePhoto===true||includePhoto===1||includePhoto==="1";
+ const photoExplicitlyDisabled=includePhoto===false||includePhoto===0||includePhoto==="0";
+ const avatar=photoExplicitlyEnabled?(resumeAvatar||studentAvatar):resumeAvatar;
+ const showPhoto=!photoExplicitlyDisabled&&!!avatar&&!imageFailed;
+ const name=first(resume.full_name,student.name),title=first(resume.professional_title,student.headline),contact=[first(resume.location,student.location),first(resume.phone,student.phone),first(resume.email,student.email)].filter(Boolean);
+ return <SafeAreaView style={s.safe}><View style={s.toolbar}><Pressable style={s.back} onPress={()=>router.navigate({pathname:"/company/CandidateDetails" as any,params:{id:applicationId}})}><Ionicons name="arrow-back" size={20} color={C.text}/><Text style={s.toolbarText}>Candidate Details</Text></Pressable><Text style={s.previewLabel}>Resume Preview</Text></View><ScrollView contentContainerStyle={s.content}><View style={s.paper}>
+  <View style={s.header}><View style={{flex:1}}><Text style={s.name}>{name}</Text>{title?<Text style={s.jobTitle}>{title}</Text>:null}{contact.length?<Text style={s.contact}>{contact.join("  |  ")}</Text>:null}<View style={s.links}>{[["GitHub",resume.github??student.github],["LinkedIn",resume.linkedin??student.linkedin],["Portfolio",resume.portfolio??student.portfolio]].filter(([,v])=>v).map(([label])=><Text key={String(label)} style={s.link}>{label}</Text>)}</View></View>{showPhoto?<Image source={{uri:avatar!}} style={s.avatar} resizeMode="cover" onError={()=>setImageFailed(true)}/>:null}</View>
+  {resume.summary?<Section title="SUMMARY"><Text style={s.body}>{resume.summary}</Text></Section>:null}
+  {experience.length?<Section title="PROFESSIONAL EXPERIENCE">{experience.map((item,index)=><View key={item.id??index} style={s.entry}><View style={s.entryHeader}><Text style={s.entryTitle}>{first(item.title,item.position,"Experience")}{item.company?` — ${item.company}`:""}</Text><Text style={s.date}>{formatExperienceDates(item.start_date,item.end_date)}</Text></View><Description value={item.description}/></View>)}</Section>:null}
+  {education.length?<Section title="EDUCATION">{education.map((item,index)=><View key={item.id??index} style={s.entry}><Text style={s.entryTitle}>{first(item.degree,"Education")}{item.field_of_study?` in ${item.field_of_study}`:""}</Text><Text style={s.body}>{first(item.university,item.institution)}</Text><Text style={s.date}>{[item.start_date,item.end_date].filter(Boolean).join(" — ")}</Text></View>)}</Section>:null}
+  {skills.length?<Section title="TECHNICAL SKILLS"><View style={s.tags}>{skills.map((item,index)=><Text key={item.id??index} style={s.tag}>{typeof item==="string"?item:first(item.name,item.title)}</Text>)}</View></Section>:null}
+  {projects.length?<Section title="PROJECTS">{projects.map((item,index)=><View key={item.id??index} style={s.entry}><Text style={s.entryTitle}>{first(item.name,item.title,"Project")}</Text><Description value={first(item.description,item.summary)}/></View>)}</Section>:null}
+  {achievements.length?<Section title="ACTIVITIES & ACHIEVEMENTS">{achievements.map((item,index)=><View key={item.id??index} style={s.entry}><Text style={s.entryTitle}>{first(item.title,item.name,"Achievement")}</Text><Description value={item.description}/></View>)}</Section>:null}
+  {(certificates.length||languages.length)?<Section title="ADDITIONAL INFORMATION">{languages.length?<Text style={s.body}><Text style={s.bold}>Languages: </Text>{languages.map(x=>typeof x==="string"?x:first(x.language,x.name)).join(" · ")}</Text>:null}{certificates.length?<Text style={s.body}><Text style={s.bold}>Certificates: </Text>{certificates.map(x=>typeof x==="string"?x:first(x.name,x.title)).join(" · ")}</Text>:null}</Section>:null}
+ </View></ScrollView></SafeAreaView>
+}
+const s=StyleSheet.create({safe:{flex:1,backgroundColor:"#F3F1ED"},center:{flex:1,alignItems:"center",justifyContent:"center",gap:12,backgroundColor:C.bg},muted:{fontFamily:F,color:C.textSec},emptyTitle:{fontFamily:F,fontSize:18,fontWeight:"800",color:C.text},goldButton:{backgroundColor:GOLD,borderRadius:9,paddingHorizontal:16,paddingVertical:10},goldButtonText:{fontFamily:F,fontSize:12,fontWeight:"800",color:"#fff"},toolbar:{minHeight:58,paddingHorizontal:12,flexDirection:"row",alignItems:"center",justifyContent:"space-between",backgroundColor:"#fff",borderBottomWidth:1,borderBottomColor:"#E8E3DA"},back:{minHeight:44,flexDirection:"row",alignItems:"center",gap:6},toolbarText:{fontFamily:F,fontSize:12,fontWeight:"700",color:C.text},previewLabel:{fontFamily:F,fontSize:11,color:C.textSec},content:{padding:14,paddingBottom:40},paper:{width:"100%",maxWidth:760,alignSelf:"center",backgroundColor:"#fff",paddingHorizontal:22,paddingVertical:28},header:{flexDirection:"row",gap:16,paddingBottom:18},name:{fontFamily:F,fontSize:25,lineHeight:31,fontWeight:"900",color:"#24201B",textTransform:"uppercase"},jobTitle:{marginTop:4,fontFamily:F,fontSize:13,fontWeight:"700",color:GOLD,textTransform:"uppercase",letterSpacing:.7},contact:{marginTop:10,fontFamily:F,fontSize:10,lineHeight:16,color:"#625D55"},links:{marginTop:5,flexDirection:"row",gap:12},link:{fontFamily:F,fontSize:10,color:GOLD,textDecorationLine:"underline"},avatar:{width:96,height:96,borderRadius:0,backgroundColor:"#EEEAE4"},section:{marginTop:18},sectionTitle:{fontFamily:F,fontSize:12.5,fontWeight:"900",color:"#2B2722",letterSpacing:1.1},goldLine:{height:2,marginTop:6,marginBottom:10,backgroundColor:GOLD},entry:{marginBottom:12},entryHeader:{flexDirection:"row",flexWrap:"wrap",justifyContent:"space-between",gap:5},entryTitle:{flexShrink:1,fontFamily:F,fontSize:12.5,fontWeight:"800",color:"#29251F"},body:{fontFamily:F,fontSize:11,lineHeight:17,color:"#514C45"},date:{fontFamily:F,fontSize:10,lineHeight:16,color:"#81796E"},bold:{fontWeight:"800",color:"#37322B"},tags:{flexDirection:"row",flexWrap:"wrap",gap:6},tag:{fontFamily:F,fontSize:10.5,color:"#514C45",backgroundColor:"#F3EFE8",paddingHorizontal:8,paddingVertical:5,borderRadius:5}});
