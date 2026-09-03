@@ -1,7 +1,9 @@
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { Briefcase, Sparkles, Building2, Shield, Check, ArrowRight, User } from "lucide-react";
+import { Briefcase, Sparkles, Building2, Shield, ArrowRight, User, BadgeCheck, MapPin } from "lucide-react";
 import { C, F } from "../../constants/tokens";
 import { Btn } from "../../components/ui";
+import { getLandingCompanies } from "../../imports/api";
 
 
 const FEATURES = [
@@ -11,10 +13,142 @@ const FEATURES = [
   { icon: Shield, title: "Verified & Secure", desc: "All companies are verified. Your data is private and protected.", color: C.success },
 ];
 
-const STATS = [
-  { v: "50,000+", l: "Graduate Profiles" }, { v: "500+", l: "Partner Companies" },
-  { v: "12,000+", l: "Successful Hires" }, { v: "94%", l: "Satisfaction Rate" },
-];
+type LandingCompany = {
+  id?: string | number;
+  logo?: string | null;
+  company_name?: string | null;
+  industry?: string | null;
+  location?: string | null;
+  is_verified?: boolean;
+};
+
+function CompaniesCarousel() {
+  const [companies, setCompanies] = useState<LandingCompany[]>([]);
+  const [loading, setLoading] = useState(true);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const pausedRef = useRef(false);
+  const draggingRef = useRef(false);
+  const pointerXRef = useRef(0);
+  const scrollStartRef = useRef(0);
+
+  useEffect(() => {
+    let active = true;
+    getLandingCompanies()
+      .then((response) => {
+        if (active) setCompanies(Array.isArray(response?.companies) ? response.companies : []);
+      })
+      .catch((error) => console.error("Failed to load landing companies:", error))
+      .finally(() => active && setLoading(false));
+    return () => { active = false; };
+  }, []);
+
+  const carouselCompanies = useMemo(() => {
+    if (!companies.length) return [];
+    const repeatCount = Math.max(1, Math.ceil(8 / companies.length));
+    return Array.from({ length: repeatCount }, () => companies).flat();
+  }, [companies]);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    if (!viewport || !carouselCompanies.length) return;
+    let frame = 0;
+    let previousTime = performance.now();
+
+    const animate = (time: number) => {
+      const halfWidth = viewport.scrollWidth / 2;
+      if (!pausedRef.current && !draggingRef.current && halfWidth > 0) {
+        viewport.scrollLeft += Math.min(time - previousTime, 32) * 0.035;
+        if (viewport.scrollLeft >= halfWidth) viewport.scrollLeft -= halfWidth;
+      }
+      previousTime = time;
+      frame = requestAnimationFrame(animate);
+    };
+
+    frame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frame);
+  }, [carouselCompanies]);
+
+  const normalizeScroll = () => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    const halfWidth = viewport.scrollWidth / 2;
+    if (viewport.scrollLeft >= halfWidth) viewport.scrollLeft -= halfWidth;
+    if (viewport.scrollLeft < 0) viewport.scrollLeft += halfWidth;
+  };
+
+  const startDragging = (event: React.PointerEvent<HTMLDivElement>) => {
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+    draggingRef.current = true;
+    pausedRef.current = true;
+    pointerXRef.current = event.clientX;
+    scrollStartRef.current = viewport.scrollLeft;
+    viewport.setPointerCapture(event.pointerId);
+  };
+
+  const drag = (event: React.PointerEvent<HTMLDivElement>) => {
+    const viewport = viewportRef.current;
+    if (!viewport || !draggingRef.current) return;
+    viewport.scrollLeft = scrollStartRef.current - (event.clientX - pointerXRef.current);
+    normalizeScroll();
+  };
+
+  const stopDragging = (event: React.PointerEvent<HTMLDivElement>) => {
+    draggingRef.current = false;
+    pausedRef.current = false;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+  };
+
+  if (loading) {
+    return <div className="landing-companies-status">Loading partner companies...</div>;
+  }
+
+  if (!carouselCompanies.length) {
+    return <div className="landing-companies-status">Partner companies will appear here soon.</div>;
+  }
+
+  const renderCompany = (company: LandingCompany, index: number, copy: number) => {
+    const name = company.company_name?.trim() || "Company";
+    return (
+      <article className="landing-company-card" key={`${copy}-${company.id ?? name}-${index}`}>
+        <div className="landing-company-logo">
+          {company.logo ? (
+            <img src={company.logo} alt={`${name} logo`} draggable={false} />
+          ) : (
+            <span>{name.charAt(0).toUpperCase()}</span>
+          )}
+        </div>
+        <div className="landing-company-details">
+          <div className="landing-company-name">
+            <span>{name}</span>
+            {company.is_verified === true && <BadgeCheck size={17} aria-label="Verified company" />}
+          </div>
+          <p>{company.industry || "Industry not specified"}</p>
+          <div className="landing-company-location"><MapPin size={13} /><span>{company.location || "Location not specified"}</span></div>
+        </div>
+      </article>
+    );
+  };
+
+  return (
+    <div
+      ref={viewportRef}
+      className="landing-companies-carousel"
+      onMouseEnter={() => { pausedRef.current = true; }}
+      onMouseLeave={() => { if (!draggingRef.current) pausedRef.current = false; }}
+      onPointerDown={startDragging}
+      onPointerMove={drag}
+      onPointerUp={stopDragging}
+      onPointerCancel={stopDragging}
+      aria-label="Partner companies"
+    >
+      <div className="landing-companies-track">
+        <div className="landing-companies-set">{carouselCompanies.map((company, index) => renderCompany(company, index, 0))}</div>
+        <div className="landing-companies-set" aria-hidden="true">{carouselCompanies.map((company, index) => renderCompany(company, index, 1))}</div>
+      </div>
+    </div>
+  );
+}
 
 export default function Landing() {
   const nav = useNavigate();
@@ -64,16 +198,13 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Stats */}
-      <section style={{ padding: "48px", borderBottom: `1px solid ${C.border}`, background: C.surface }}>
-        <div style={{ maxWidth: 900, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 24 }}>
-          {STATS.map(({ v, l }) => (
-            <div key={l} style={{ textAlign: "center" }}>
-              <p style={{ fontSize: 36, fontWeight: 900, color: C.text, margin: "0 0 4px", fontFamily: F }}>{v}</p>
-              <p style={{ fontSize: 13, color: C.textSec, margin: 0, fontFamily: F }}>{l}</p>
-            </div>
-          ))}
+      {/* Partner companies */}
+      <section className="landing-companies-section">
+        <div className="landing-companies-heading">
+          <p>Companies on CareerBridge</p>
+          <h2>Meet the teams building what comes next</h2>
         </div>
+        <CompaniesCarousel />
       </section>
 
       {/* Features */}

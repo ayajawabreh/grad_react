@@ -29,6 +29,7 @@ import {
 } from "../../imports/api";
 import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
 import { formatExperienceRange } from "../../utils/experience";
+import { EnglishDatePicker } from "../../components/shared/EnglishDatePicker";
 
 type AdminJob = {
   id: number;
@@ -341,7 +342,13 @@ export default function AdminJobs() {
         <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={filterStyle}><option value="">All statuses</option>{["Open", "Pending Review", "Closed", "Suspended", "Rejected", "Changes Requested"].map((status) => <option key={status}>{status}</option>)}</select>
         <select value={companyFilter} onChange={(e) => setCompanyFilter(e.target.value)} style={filterStyle}><option value="">All companies</option>{companies.map((company) => <option key={company}>{company}</option>)}</select>
         <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} style={filterStyle}><option value="">All categories</option>{categoryOptions.map((category) => <option key={category.id} value={category.name}>{category.name}</option>)}</select>
-        <input type="date" aria-label="Filter by posting date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)} style={filterStyle}/>
+        <div style={{ width: 170 }}>
+          <EnglishDatePicker
+            value={dateFilter}
+            onChange={setDateFilter}
+            minDate={null}
+          />
+        </div>
         {(query || statusFilter || companyFilter || categoryFilter || dateFilter) && <Btn v="ghost" size="sm" onClick={() => { setQuery(""); setStatusFilter(""); setCompanyFilter(""); setCategoryFilter(""); setDateFilter(""); }}>Clear filters</Btn>}
       </div>
 

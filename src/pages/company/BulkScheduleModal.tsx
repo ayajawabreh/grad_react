@@ -11,6 +11,18 @@ interface Props {
   onSuccess?: () => void;
 }
 
+const toEnglishDigits = (value: string) =>
+  value
+    .replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit)))
+    .replace(/[۰-۹]/g, (digit) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(digit)));
+
+const normalizeTime = (value: string) => {
+  const digits = toEnglishDigits(value).replace(/[^0-9]/g, "").slice(0, 4);
+  return digits.length > 2
+    ? `${digits.slice(0, 2)}:${digits.slice(2)}`
+    : digits;
+};
+
 export default function BulkScheduleModal({
   applicationIds,
   onClose,
@@ -59,7 +71,7 @@ export default function BulkScheduleModal({
 
   const isFormValid =
     selectedDate &&
-    startTime &&
+    /^([01]\d|2[0-3]):[0-5]\d$/.test(startTime) &&
     Number(duration) >= 5 &&
     (type === "Online" ? meetingLink : location);
 
@@ -162,6 +174,7 @@ export default function BulkScheduleModal({
                 dateFormat="yyyy-MM-dd"
                 placeholderText="Select Date"
                 className="custom-datepicker-input"
+                customInput={<input lang="en-US" dir="ltr" inputMode="numeric" />}
                 required
               />
             </div>
@@ -172,11 +185,17 @@ export default function BulkScheduleModal({
                 Start Time
               </label>
               <input
-                type="time"
+                type="text"
+                lang="en-US"
+                dir="ltr"
+                inputMode="numeric"
                 required
                 value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                style={inputStyle}
+                onChange={(e) => setStartTime(normalizeTime(e.target.value))}
+                placeholder="HH:MM"
+                maxLength={5}
+                pattern="([01][0-9]|2[0-3]):[0-5][0-9]"
+                style={{ ...inputStyle, direction: "ltr", fontVariantNumeric: "tabular-nums" }}
               />
             </div>
           </div>
@@ -187,12 +206,19 @@ export default function BulkScheduleModal({
               Duration per Interview (minutes)
             </label>
             <input
-              type="number"
-              min={5}
+              type="text"
+              lang="en-US"
+              dir="ltr"
+              inputMode="numeric"
               required
               value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-              style={inputStyle}
+              onChange={(e) =>
+                setDuration(
+                  toEnglishDigits(e.target.value).replace(/[^0-9]/g, "")
+                )
+              }
+              pattern="[0-9]+"
+              style={{ ...inputStyle, direction: "ltr", fontVariantNumeric: "tabular-nums" }}
             />
             <p style={{ margin: "6px 0 0", fontSize: 11, color: "#94a3b8" }}>
               Each interview starts this many minutes after the previous one.

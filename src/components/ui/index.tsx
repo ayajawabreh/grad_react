@@ -86,11 +86,20 @@ interface StatCardProps {
   color: string;
   sub?: string;
   trend?: string;
+  onClick?: () => void;
 }
 
-export function StatCard({ icon: Icon, label, value, delta, color, sub }: StatCardProps) {
+export function StatCard({ icon: Icon, label, value, delta, color, sub, onClick }: StatCardProps) {
   return (
-    <div style={{ padding: 24, borderRadius: 20, border: `1px solid ${C.border}`, background: C.surface, display: "flex", flexDirection: "column", gap: 16 }}>
+    <div
+      onClick={onClick}
+      onKeyDown={(event) => {
+        if (onClick && (event.key === "Enter" || event.key === " ")) onClick();
+      }}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      style={{ padding: 24, borderRadius: 20, border: `1px solid ${C.border}`, background: C.surface, display: "flex", flexDirection: "column", gap: 16, cursor: onClick ? "pointer" : "default" }}
+    >
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
         <div style={{ width: 44, height: 44, borderRadius: 14, background: color + "18", display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Icon size={18} style={{ color }} />

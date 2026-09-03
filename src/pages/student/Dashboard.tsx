@@ -4,7 +4,7 @@ import { C, F } from "../../constants/tokens";
 import { Btn, StatCard } from "../../components/ui";
 import { JobCard } from "../../components/cards/JobCard";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Briefcase, BookOpen, Heart, Eye, Search, FileText, Bot } from "lucide-react";
+import { Briefcase, BookOpen, Heart, Sparkles, Search, FileText, Bot } from "lucide-react";
 import { API } from "../../imports/api";
 import { refreshApplicationsCache, useApplicationsCache } from "../../sync/applicationsStore";
 import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
@@ -16,7 +16,7 @@ export default function StudentDashboard() {
   const interviewsSyncVersion = useSyncResourceVersion("interviews");
   const nav = useNavigate();
   const [userName, setUserName] = useState<string>("");
-  const [stats, setStats] = useState({ applications: "0", interviews: "0", saved: "0", views: "0" });
+  const [stats, setStats] = useState({ applications: "0", interviews: "0", saved: "0" });
   const [dashboardActivity, setDashboardActivity] = useState<Array<{ month: string; applications: number }>>([]);
   const [trends, setTrends] = useState<{ applications?: number; interviews?: number; profile_views?: number }>({});
   const [recommendedJobs, setRecommendedJobs] = useState<any[]>([]);
@@ -108,7 +108,6 @@ export default function StudentDashboard() {
             s.savedJobsCount ??
             "0"
           ),
-          views: String(s.views ?? s.profile_views_count ?? "0"),
         });
       } else if (dashboardRes.data) {
         const d = dashboardRes.data;
@@ -123,7 +122,6 @@ export default function StudentDashboard() {
             d.saved ??
             "0"
           ),
-          views: String(d.profile_views_count ?? d.views ?? "0"),
         });
       }
 
@@ -165,6 +163,16 @@ export default function StudentDashboard() {
     }));
   };
 
+  const jobMatchesCount = recommendedJobs.filter(
+    (job) =>
+      Number(
+        job.match_percentage ??
+        job.match_score ??
+        job.match ??
+        0
+      ) >= 70
+  ).length;
+
   return (
     <div style={{ fontFamily: F, color: C.text }}>
       <div style={{ marginBottom: 28 }}>
@@ -176,7 +184,14 @@ export default function StudentDashboard() {
         <StatCard label="Applications" value={stats.applications} trend={trends.applications == null ? undefined : `${trends.applications >= 0 ? "+" : ""}${trends.applications}%`} icon={Briefcase} color={C.info} />
         <StatCard label="Interviews" value={stats.interviews} trend={trends.interviews == null ? undefined : `${trends.interviews >= 0 ? "+" : ""}${trends.interviews}%`} icon={BookOpen} color={C.purple} />
         <StatCard label="Saved Jobs" value={stats.saved} icon={Heart} color={C.accent} />
-        <StatCard label="Profile Views" value={stats.views} trend={trends.profile_views == null ? undefined : `${trends.profile_views >= 0 ? "+" : ""}${trends.profile_views}%`} icon={Eye} color={C.success} />
+        <StatCard
+          label="Job Matches"
+          value={String(jobMatchesCount)}
+          sub="Jobs matching your skills"
+          icon={Sparkles}
+          color="#7C3AED"
+          onClick={() => nav("/student/recommended")}
+        />
       </div>
 
       <div style={{ background: C.surface, borderRadius: 20, padding: 24, marginBottom: 28, border: `1px solid ${C.border}` }}>

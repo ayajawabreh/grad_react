@@ -35,6 +35,26 @@ export default function Shortlisted() {
   const nav = useNavigate();
   const [applicants, setApplicants] = useState<ShortlistedApplicant[]>([]);
   const [loading, setLoading] = useState(true);
+  const [removingId, setRemovingId] = useState<number | null>(null);
+
+  const removeFromShortlist = async (applicationId: number) => {
+    try {
+      setRemovingId(applicationId);
+      await API.delete(`/company/applications/${applicationId}/shortlist`);
+      setApplicants((current) =>
+        current.filter(
+          (candidate) => String(candidate.id) !== String(applicationId)
+        )
+      );
+    } catch (error: any) {
+      window.alert(
+        error?.response?.data?.message ||
+        "Failed to remove candidate from shortlist."
+      );
+    } finally {
+      setRemovingId(null);
+    }
+  };
 
   const loadShortlisted = (showLoading = true) => {
     if (showLoading) setLoading(true);
@@ -124,6 +144,7 @@ export default function Shortlisted() {
             display: "grid",
             gridTemplateColumns: "repeat(auto-fill,minmax(350px,1fr))",
             gap: 24,
+            alignItems: "stretch",
           }}
         >
           {applicants.map((applicant) => (
@@ -135,6 +156,10 @@ export default function Shortlisted() {
                 borderRadius: 22,
                 padding: 24,
                 boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
+                display: "flex",
+                flexDirection: "column",
+                height: "100%",
+                boxSizing: "border-box",
               }}
             >
               <div
@@ -280,25 +305,37 @@ export default function Shortlisted() {
               <div
                 style={{
                   display: "flex",
-                  justifyContent: "space-between",
                   alignItems: "center",
                   gap: 12,
+                  marginTop: "auto",
+                  paddingTop: 4,
                 }}
               >
-                <span
+                <button
+                  type="button"
+                  onClick={() => void removeFromShortlist(applicant.id)}
+                  disabled={removingId === applicant.id}
                   style={{
                     background: "#DCFCE7",
                     color: "#15803D",
-                    padding: "7px 15px",
-                    borderRadius: 20,
+                    border: "none",
+                    padding: "10px 14px",
+                    borderRadius: 12,
                     fontSize: 13,
                     fontWeight: 600,
+                    cursor: removingId === applicant.id ? "not-allowed" : "pointer",
+                    flex: 1,
+                    fontFamily: F,
+                    opacity: removingId === applicant.id ? 0.65 : 1,
                   }}
                 >
-                  ✓ Shortlisted
-                </span>
+                  {removingId === applicant.id
+                    ? "Removing..."
+                    : "Remove from Shortlist"}
+                </button>
 
                 <button
+                  type="button"
                   onClick={() =>
                     nav(`/company/applicants/${applicant.id}`)
                   }
@@ -310,6 +347,8 @@ export default function Shortlisted() {
                     borderRadius: 12,
                     cursor: "pointer",
                     fontWeight: 600,
+                    flex: 1,
+                    fontFamily: F,
                   }}
                 >
                   View Profile

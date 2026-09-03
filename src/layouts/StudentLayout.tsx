@@ -376,14 +376,14 @@ function TopBar({
       {/* Mobile Menu Button */}
       <button
         onClick={onMenu}
-        className="lg:hidden"
+        className="hidden"
         type="button"
         style={{
           background: "none",
           border: "none",
           cursor: "pointer",
           color: C.textSec,
-          display: "flex",
+          display: "none",
           alignItems: "center",
           justifyContent: "center",
           padding: 4,
@@ -623,7 +623,7 @@ export default function StudentLayout() {
 
       {/* Desktop Sidebar */}
       <div
-        className="hidden lg:flex"
+        className="flex"
         style={{
           width: 240,
           flexShrink: 0,

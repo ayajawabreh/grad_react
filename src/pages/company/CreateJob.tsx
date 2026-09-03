@@ -10,6 +10,7 @@ import { isExperienceYears, numberOrNull } from "../../utils/numbers";
 export default function CreateJob() {
   const nav = useNavigate();
   const [submitting, setSubmitting] = useState(false);
+  const [submittingStatus, setSubmittingStatus] = useState<"Draft" | "Open" | null>(null);
   const [generatingAi, setGeneratingAi] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -145,9 +146,8 @@ export default function CreateJob() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(formData.deadline) || Number.isNaN(new Date(`${formData.deadline}T00:00:00`).getTime())) {
+  const submitJob = async (status: "Draft" | "Open") => {
+    if (status === "Open" && (!/^\d{4}-\d{2}-\d{2}$/.test(formData.deadline) || Number.isNaN(new Date(`${formData.deadline}T00:00:00`).getTime()))) {
       setError("Please enter the deadline in YYYY-MM-DD format.");
       return;
     }
@@ -162,6 +162,7 @@ export default function CreateJob() {
       return;
     }
     setSubmitting(true);
+    setSubmittingStatus(status);
     setError(null);
     setNotification(null);
 
@@ -183,14 +184,17 @@ export default function CreateJob() {
       requirements: formData.requirements,
       skills: formData.skills,
       benefits: formData.benefits,
+      status,
     };
 
     try {
-      await api.post("/company/jobs", payload);
+      const response = await api.post("/company/jobs", payload);
 
       setNotification({
         type: "success",
-        message: "Job position created successfully!",
+        message: response.data?.message || (status === "Draft"
+          ? "Job saved as draft successfully."
+          : "Job position created successfully!"),
       });
 
       setTimeout(() => {
@@ -207,7 +211,13 @@ export default function CreateJob() {
       );
     } finally {
       setSubmitting(false);
+      setSubmittingStatus(null);
     }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    void submitJob("Open");
   };
 
   return (
@@ -579,8 +589,17 @@ export default function CreateJob() {
           <Btn v="ghost" type="button" onClick={() => nav("/company/jobs")}>
             Cancel
           </Btn>
+          <Btn
+            v="outline"
+            type="button"
+            icon={Save}
+            disabled={submitting}
+            onClick={() => void submitJob("Draft")}
+          >
+            {submittingStatus === "Draft" ? "Saving..." : "Save as Draft"}
+          </Btn>
           <Btn v="primary" type="submit" icon={Save} disabled={submitting}>
-            {submitting ? "Publishing..." : "Publish Job"}
+            {submittingStatus === "Open" ? "Publishing..." : "Publish Job"}
           </Btn>
         </div>
       </form>

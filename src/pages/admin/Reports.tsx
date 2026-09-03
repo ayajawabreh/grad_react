@@ -1,51 +1,75 @@
 import { useEffect, useState } from "react";
 import { ArrowRight, CalendarDays, Flag, ShieldAlert } from "lucide-react";
+import { toast } from "sonner";
 import { C, F } from "../../constants/tokens";
 import { Btn } from "../../components/ui";
 import { dismissAdminAbuseReport, getAdminAbuseReports, resolveAdminAbuseReport } from "../../imports/api";
-
-const CACHE_KEY = "careerbridge:admin-reports";
+import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
 
 export default function AdminReports() {
+  const reportsSyncVersion = useSyncResourceVersion("reports");
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const cached = sessionStorage.getItem(CACHE_KEY);
-        if (cached) {
-          setReports(JSON.parse(cached).abuseReports ?? []);
-          setLoading(false);
-        }
-      } catch { sessionStorage.removeItem(CACHE_KEY); }
+  const loadReports = async (showLoading = true) => {
+    try {
+      if (showLoading) setLoading(true);
+      const response = await getAdminAbuseReports({ status: "Pending" });
+      const data = response?.data ?? response;
+      const list = Array.isArray(data) ? data : data?.recent_reports ?? data?.reports ?? data?.data ?? [];
+      setReports(
+        list.filter((item: any) =>
+          !["resolved", "dismissed", "closed"].includes(
+            String(item.status ?? "pending").toLowerCase()
+          )
+        )
+      );
+    } catch (error) {
+      console.error("Failed to load abuse reports:", error);
+    } finally {
+      if (showLoading) setLoading(false);
+    }
+  };
 
-      try {
-        const response = await getAdminAbuseReports();
-        const data = response?.data ?? response;
-        const next = Array.isArray(data) ? data : data?.recent_reports ?? data?.reports ?? data?.data ?? [];
-        setReports(next);
-        sessionStorage.setItem(CACHE_KEY, JSON.stringify({ abuseReports: next }));
-      } catch (error) {
-        console.error("Failed to load abuse reports:", error);
-      } finally { setLoading(false); }
-    };
-    load();
-  }, []);
+  useEffect(() => {
+    void loadReports();
+  }, [reportsSyncVersion]);
 
   const handleAction = async (id: number, action: "resolve" | "dismiss") => {
     try {
       setUpdatingId(id);
       if (action === "resolve") await resolveAdminAbuseReport(id);
       else await dismissAdminAbuseReport(id);
-      setReports((current) => {
-        const next = current.filter((item) => item.id !== id);
-        sessionStorage.setItem(CACHE_KEY, JSON.stringify({ abuseReports: next }));
-        return next;
-      });
-    } catch (error) {
+      setReports((current) => current.filter((item) => item.id !== id));
+      toast.success(
+        action === "resolve"
+          ? "Report resolved successfully"
+          : "Report dismissed successfully",
+        {
+          description:
+            action === "resolve"
+              ? "The report was marked as resolved and removed from the open reports list."
+              : "The report was dismissed and removed from the open reports list.",
+        }
+      );
+    } catch (error: any) {
       console.error(`Failed to ${action} abuse report:`, error);
+      const message = String(error?.response?.data?.message || "");
+      if (/already closed/i.test(message)) {
+        setReports((current) => current.filter((item) => item.id !== id));
+        toast.info("Report was already closed", {
+          description: "The reports list has been updated.",
+        });
+        void loadReports(false);
+        return;
+      }
+      toast.error(
+        action === "resolve"
+          ? "Could not resolve the report"
+          : "Could not dismiss the report",
+        { description: error?.response?.data?.message }
+      );
     } finally { setUpdatingId(null); }
   };
 
@@ -93,8 +117,8 @@ export default function AdminReports() {
               </div>
 
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 9, marginTop: 16 }}>
-                <Btn size="sm" v="outline" onClick={() => handleAction(item.id, "dismiss")} disabled={updatingId === item.id}>Dismiss</Btn>
-                <Btn size="sm" v="secondary" onClick={() => handleAction(item.id, "resolve")} disabled={updatingId === item.id}>Resolve Report</Btn>
+                <Btn size="sm" v="outline" onClick={() => handleAction(item.id, "dismiss")} disabled={updatingId === item.id}>{updatingId === item.id ? "Updating..." : "Dismiss"}</Btn>
+                <Btn size="sm" v="secondary" onClick={() => handleAction(item.id, "resolve")} disabled={updatingId === item.id}>{updatingId === item.id ? "Updating..." : "Resolve Report"}</Btn>
               </div>
             </article>
           );

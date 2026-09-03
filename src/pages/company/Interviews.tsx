@@ -157,7 +157,7 @@ export default function CompanyInterviews() {
         cancelInterview(id).then(() => {
           loadData();
           setConfirmModal((prev) => ({ ...prev, isOpen: false }));
-          showToast("Interview cancelled successfully", "danger");
+          showToast("Interview cancelled successfully. The candidate notification has been processed.", "success");
         });
       },
     });
@@ -228,12 +228,12 @@ export default function CompanyInterviews() {
     updateInterview(selectedInterview.id, {
       interview_date: fullDateTime,
       type: editData.type,
-      meeting_link: editData.meeting_link,
-      location: editData.location,
+      meeting_link: editData.type === "Online" ? editData.meeting_link || null : null,
+      location: editData.type === "Onsite" ? editData.location || null : null,
     }).then(() => {
       loadData();
       setEditMode(false);
-      showToast("Interview updated successfully", "success");
+      showToast("Interview rescheduled successfully. The candidate notification has been processed.", "success");
     });
   };
 
@@ -243,7 +243,7 @@ export default function CompanyInterviews() {
     setFeedbackData({
       technical_score: feedback?.technical_score?.toString() || "",
       communication_score: feedback?.communication_score?.toString() || "",
-      decision: feedback?.decision || "Hire",
+      decision: feedback?.final_decision || feedback?.decision || "Accepted",
       notes: feedback?.notes || "",
     });
     setFeedbackMode(true);
@@ -259,29 +259,30 @@ export default function CompanyInterviews() {
   notes: feedbackData.notes,
 };
 
-  console.log("Payload:", payload);
-
   const action = feedback
   ? updateInterviewFeedback(selectedInterview.id, payload)
   : createInterviewFeedback(selectedInterview.id, payload);
 
 action
   .then((res: any) => {
-    console.log(
-  "FINAL DECISION VALUE:",
-  res.data.feedback.final_decision
-);
+    const savedFeedback =
+      res.data?.feedback ??
+      res.data?.data?.feedback ??
+      res.data?.data ??
+      res.data;
 
     setFeedback({
-    ...res.data.feedback,
-    final_decision: res.data.feedback.final_decision,
-  });
+      ...savedFeedback,
+      decision: savedFeedback?.final_decision ?? feedbackData.decision,
+      final_decision: savedFeedback?.final_decision ?? feedbackData.decision,
+    });
     setFeedbackMode(false);
+    loadData();
 
     showToast(
       feedback
         ? "Feedback updated successfully"
-        : "Feedback added successfully",
+        : "Feedback added successfully. The candidate notification has been processed.",
       "success"
     );
   })

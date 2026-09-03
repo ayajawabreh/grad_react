@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { C, F } from "../../constants/tokens";
 import { Btn } from "../../components/ui";
 import { API } from "../../imports/api";
-import { downloadCsv } from "../../lib/download";
 import {
   Search,
   Filter,
@@ -64,6 +63,7 @@ export default function AdminStudents() {
   const [selectedStudent, setSelectedStudent] =
     useState<StudentDetails | null>(null);
   const [viewLoading, setViewLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const loadStudents = async (showLoading = true) => {
     try {
@@ -143,32 +143,32 @@ export default function AdminStudents() {
     }
   };
 
-  const handleExport = () => {
-    if (!students.length) {
-      return;
+  const handleExport = async () => {
+    try {
+      setExporting(true);
+      const response = await API.get("/admin/students/export", {
+        responseType: "blob",
+        params: {
+          search: query.trim() || undefined,
+          status: statusFilter || undefined,
+        },
+      });
+
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "students.csv";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error: any) {
+      window.alert(
+        error?.response?.data?.message || "Failed to download students report."
+      );
+    } finally {
+      setExporting(false);
     }
-
-    const exportData = students.map((student, index) => ({
-      No: index + 1,
-      Name: student.name || "Unknown Student",
-      Email: student.email || "",
-      University: student.university || "",
-      Major: student.major || "",
-      "Graduation Year": student.graduation_year ?? "",
-      "Verification Status": student.verification_status || "Pending",
-      "Account Status": student.account_status || "Active",
-      "Verification Score": student.verification_score ?? "",
-      "Email Verified": student.email_verified ? "Yes" : "No",
-      Phone: student.phone || "",
-      "Profile Completion":
-        student.profile_completion !== null &&
-        student.profile_completion !== undefined
-          ? `${student.profile_completion}%`
-          : "",
-      Joined: student.joined || "",
-    }));
-
-    downloadCsv(exportData, "CareerBridge_Students_Report.csv");
   };
 
   const statusColor = (
@@ -507,8 +507,9 @@ export default function AdminStudents() {
             v="outline"
             icon={Download}
             onClick={handleExport}
+            disabled={exporting}
           >
-            Export Excel
+            {exporting ? "Downloading..." : "Download Excel"}
           </Btn>
         </div>
       </div>

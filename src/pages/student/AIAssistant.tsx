@@ -77,6 +77,14 @@ interface AttemptSummary { attempt_id: number; status: string; percentage: numbe
 
 type AIState = "idle" | "checking_saved_job" | "generating_questions" | "quiz_open" | "submitting" | "completed" | "retaking" | "loading_history" | "error";
 
+function getAIErrorMessage(err: any, fallback: string) {
+  if (err?.response?.status === 503) {
+    return "The AI service is temporarily unavailable. Please try again in a moment.";
+  }
+
+  return err?.response?.data?.message || err?.message || fallback;
+}
+
 const TOOLS = [
   {
     icon: FileSearch,
@@ -406,12 +414,7 @@ export default function AIAssistant() {
         setShowJobSelection(true);
       }
     } catch (err: any) {
-      console.error(err);
-
-      setError(
-        err?.response?.data?.message ||
-          "Something went wrong. Please try again."
-      );
+      setError(getAIErrorMessage(err, "Something went wrong. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -457,13 +460,7 @@ export default function AIAssistant() {
       setAiState("quiz_open");
       await loadHistory(jobId);
     } catch (err: any) {
-      console.error(err);
-
-      setError(
-        err?.response?.data?.message ||
-          err?.message ||
-          "Failed to generate interview questions."
-      );
+      setError(getAIErrorMessage(err, "Failed to generate interview questions."));
 
       setShowJobSelection(true);
       setAiState("error");

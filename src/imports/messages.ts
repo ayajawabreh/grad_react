@@ -64,19 +64,9 @@ export const getCurrentUser = () => {
 };
 
 export const getConversations = async () => {
-  const [conversationResult, legacyResult] = await Promise.allSettled([
-    apiRequest<any>("/conversations", { method: "GET" }),
-    apiRequest<any>("/messages", { method: "GET" }),
-  ]);
-
-  const conversationResponse =
-    conversationResult.status === "fulfilled"
-      ? conversationResult.value
-      : null;
-  const legacyResponse =
-    legacyResult.status === "fulfilled"
-      ? legacyResult.value
-      : [];
+  const conversationResponse = await apiRequest<any>("/conversations", {
+    method: "GET",
+  });
 
   const extractConversationList = (response: any): any[] => {
     if (Array.isArray(response)) return response;
@@ -87,7 +77,6 @@ export const getConversations = async () => {
   };
 
   const persistentList = extractConversationList(conversationResponse);
-  const legacyList = extractConversationList(legacyResponse);
 
   const normalize = (conversation: any): ApiConversation => {
     const participant =
@@ -135,26 +124,7 @@ export const getConversations = async () => {
     };
   };
 
-  const merged = new Map<number, ApiConversation>();
-  legacyList.map(normalize).forEach((conversation) => {
-    if (conversation.user_id) merged.set(conversation.user_id, conversation);
-  });
-  persistentList.map(normalize).forEach((conversation) => {
-    if (!conversation.user_id) return;
-    const legacy = merged.get(conversation.user_id);
-    merged.set(conversation.user_id, {
-      ...legacy,
-      ...conversation,
-      last_message:
-        conversation.last_message || legacy?.last_message || "",
-      last_time: conversation.last_time || legacy?.last_time || "",
-      activity_at:
-        conversation.activity_at || legacy?.activity_at || null,
-      unread: Math.max(conversation.unread, legacy?.unread ?? 0),
-    });
-  });
-
-  return Array.from(merged.values());
+  return persistentList.map(normalize);
 };
 
 export const startConversation = (recipientId: number) => {
@@ -242,14 +212,14 @@ export const sendMessage = async (
   });
 };
 
-export const deleteConversation = (userId: number) => {
-  return apiRequest(`/messages/${userId}`, {
+export const deleteConversation = (conversationId: number) => {
+  return apiRequest(`/conversations/${conversationId}`, {
     method: "DELETE",
   });
 };
 
-export const blockUser = (userId: number) => {
-  return apiRequest(`/messages/${userId}/block`, {
+export const blockUser = (conversationId: number) => {
+  return apiRequest(`/conversations/${conversationId}/block`, {
     method: "POST",
   });
 };

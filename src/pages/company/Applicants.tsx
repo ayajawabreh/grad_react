@@ -170,8 +170,12 @@ export default function Applicants() {
 
   const handleBulkScheduleSuccess = () => {
     clearSelection();
-    showToast("Interviews scheduled successfully");
-    nav("/company/interviews");
+    setShowBulkSchedule(false);
+    showToast("Interviews scheduled successfully. Candidate notifications have been processed.");
+
+    window.setTimeout(() => {
+      nav("/company/interviews");
+    }, 1500);
   };
 
 
@@ -385,7 +389,7 @@ export default function Applicants() {
 
   try{
 
-    await shortlistApplicant(candidate.id);
+    await shortlistApplicant(candidate.application_id);
 
     setCandidates(prev =>
       prev.map(c =>
@@ -585,7 +589,7 @@ export default function Applicants() {
           }}
 
           onSuccess={()=>{
-            showToast("Interview scheduled successfully");
+            showToast("Interview scheduled successfully. The candidate notification has been processed.");
           }}
 
         />

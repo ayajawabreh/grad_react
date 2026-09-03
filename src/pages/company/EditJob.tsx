@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router";
 import { C, F } from "../../constants/tokens";
 import { Btn } from "../../components/ui";
 import { ArrowLeft, Save, Sparkles, Plus, X, CheckCircle2, AlertCircle } from "lucide-react";
-import { getCompanyJobs, updateJob, generateJobDescription, getJobCategories } from "../../imports/api";
+import { getCompanyJobForEdit, updateJob, generateJobDescription, getJobCategories } from "../../imports/api";
 import { EnglishDatePicker } from "../../components/shared/EnglishDatePicker";
 import { isExperienceYears, numberOrNull } from "../../utils/numbers";
 
@@ -12,7 +12,9 @@ export default function EditJob() {
   const nav = useNavigate();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [submittingStatus, setSubmittingStatus] = useState<"Draft" | "Open" | "Closed" | null>(null);
   const [generatingAi, setGeneratingAi] = useState(false);
+  const [job, setJob] = useState<any>(null);
   const [originalStatus, setOriginalStatus] = useState("");
   const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
   const [categories, setCategories] = useState<Array<{ id: number; name: string }>>([]);
@@ -56,10 +58,15 @@ export default function EditJob() {
   useEffect(() => {
     const fetchJob = async () => {
       try {
-        const jobs = await getCompanyJobs();
-        const currentJob = jobs.find((j: any) => String(j.id) === String(id));
+        if (!id) {
+          throw new Error("Missing job id");
+        }
+
+        const response: any = await getCompanyJobForEdit(id);
+        const currentJob = response?.data?.job ?? response?.job;
 
         if (currentJob) {
+          setJob(currentJob);
           setOriginalStatus(currentJob.status || "");
           setFormData({
             title: currentJob.title || "",
@@ -78,9 +85,14 @@ export default function EditJob() {
             skills: Array.isArray(currentJob.skills) ? currentJob.skills : [],
             benefits: Array.isArray(currentJob.benefits) ? currentJob.benefits : [],
           });
+        } else {
+          throw new Error("Job was not returned by the server");
         }
-      } catch (e) {
-        console.log(e);
+      } catch (e: any) {
+        setNotification({
+          type: "error",
+          message: e?.response?.data?.message || "Could not load the job details.",
+        });
       } finally {
         setLoading(false);
       }
@@ -169,8 +181,7 @@ export default function EditJob() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitJob = async (status?: "Draft" | "Open" | "Closed") => {
     if (formData.deadline && (!/^\d{4}-\d{2}-\d{2}$/.test(formData.deadline) || Number.isNaN(new Date(`${formData.deadline}T00:00:00`).getTime()))) {
       setNotification({ type: "error", message: "Please enter the deadline in YYYY-MM-DD format." });
       return;
@@ -186,6 +197,7 @@ export default function EditJob() {
       return;
     }
     setSubmitting(true);
+    setSubmittingStatus(status ?? "Open");
     setNotification(null);
 
     const salaryValue = formData.salary;
@@ -206,14 +218,25 @@ export default function EditJob() {
       requirements: formData.requirements,
       skills: formData.skills,
       benefits: formData.benefits,
+      ...(status ? { status } : {}),
     };
 
     try {
       const response = id ? await updateJob(id, payload) : null;
+      const updatedJob = response?.data?.job ?? response?.job;
+
+      if (updatedJob) {
+        setJob(updatedJob);
+        setOriginalStatus(updatedJob.status || status || originalStatus);
+      }
 
       setNotification({
         type: "success",
-        message: response?.message || (originalStatus.toLowerCase() === "rejected"
+        message: response?.message || (status === "Draft"
+          ? "Job saved as draft successfully."
+          : status === "Closed"
+          ? "Job closed successfully."
+          : originalStatus.toLowerCase() === "rejected"
           ? "Job resubmitted successfully!"
           : "Job position updated successfully!"),
       });
@@ -232,7 +255,13 @@ export default function EditJob() {
       });
     } finally {
       setSubmitting(false);
+      setSubmittingStatus(null);
     }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    void submitJob();
   };
 
   if (loading) {
@@ -900,10 +929,31 @@ export default function EditJob() {
             Cancel
           </Btn>
 
+          <Btn
+            v="outline"
+            type="button"
+            icon={Save}
+            disabled={submitting}
+            onClick={() => void submitJob("Draft")}
+          >
+            {submittingStatus === "Draft" ? "Saving..." : "Save as Draft"}
+          </Btn>
+
+          {String(job?.status ?? originalStatus).toLowerCase() === "open" && (
+            <Btn
+              v="outline"
+              type="button"
+              disabled={submitting}
+              onClick={() => void submitJob("Closed")}
+            >
+              {submittingStatus === "Closed" ? "Closing..." : "Close Job"}
+            </Btn>
+          )}
+
           <Btn v="primary" type="submit" icon={Save} disabled={submitting}>
             {originalStatus.toLowerCase() === "rejected"
-              ? (submitting ? "Resubmitting..." : "Resubmit Job")
-              : (submitting ? "Saving..." : "Save Changes")}
+              ? (submittingStatus === "Open" ? "Resubmitting..." : "Resubmit Job")
+              : (submittingStatus === "Open" ? "Saving..." : "Save Changes")}
           </Btn>
         </div>
       </form>

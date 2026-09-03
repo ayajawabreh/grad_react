@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router";
+import { toast } from "sonner";
 import { C, F } from "../../constants/tokens";
 import { Btn, MatchRing } from "../../components/ui";
 import {
@@ -33,6 +34,7 @@ import {
 } from "../../imports/applicants";
 import { API } from "../../imports/api";
 import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
+import { resolveExperienceYears } from "../../utils/experience";
 
 const TABS = ["Profile", "Resume", "Notes"] as const;
 const STATUS_OPTIONS = [
@@ -78,11 +80,12 @@ export default function CandidateDetails() {
 
     const applicantId = Number(id);
 
-    Promise.all([
-      fetchApplicantDetails(applicantId),
-      fetchApplicantNotes(applicantId).catch(() => [])
-    ])
-      .then(([applicant, notesData]) => {
+    fetchApplicantDetails(applicantId)
+      .then(async (applicant) => {
+        const notesData = applicant?.application_id
+          ? await fetchApplicantNotes(applicant.application_id).catch(() => [])
+          : [];
+
         setCandidate(applicant);
 
         setNotes(
@@ -186,14 +189,52 @@ export default function CandidateDetails() {
   };
 
   const handleAddNote = async () => {
-    if (!newNote.trim() || !id) return;
+    if (!newNote.trim() || !candidate?.application_id) return;
+
+    const noteText = newNote.trim();
+    const optimisticId = -Date.now();
+    const optimisticNote: CompanyNote = {
+      id: optimisticId,
+      note: noteText,
+      created_at: new Date().toISOString(),
+    };
+
+    setNotes((prev) => [optimisticNote, ...prev]);
+    setNewNote("");
 
     try {
-      const added = await addApplicantNote(Number(id), newNote.trim());
-      setNotes((prev) => [added, ...prev]);
-      setNewNote("");
-    } catch (e) {
-      console.error(e);
+      const added = await addApplicantNote(
+        candidate.application_id,
+        noteText
+      );
+      setNotes((prev) => {
+        const withoutOptimistic = prev.filter(
+          (note) => note.id !== optimisticId
+        );
+        const alreadySynced = withoutOptimistic.some(
+          (note) => note.id === added.id ||
+            (note.note === added.note && note.id > 0)
+        );
+        return alreadySynced
+          ? withoutOptimistic
+          : [added, ...withoutOptimistic];
+      });
+      toast.success("Note added successfully.", {
+        description: "The note is now visible in the candidate record.",
+      });
+    } catch (e: any) {
+      console.error("Add note failed:", e?.response?.data ?? e);
+      setNotes((prev) => prev.filter((note) => note.id !== optimisticId));
+      setNewNote(noteText);
+      const validationErrors = Object.values(
+        e?.response?.data?.errors || {}
+      ).flat() as string[];
+
+      toast.error(
+        e?.response?.data?.message ||
+        validationErrors[0] ||
+        "Failed to add note."
+      );
     }
   };
 
@@ -333,7 +374,7 @@ export default function CandidateDetails() {
   const missingSkills = Array.isArray(candidate.match?.missing_skills) ? candidate.match.missing_skills : [];
   const displaySkills = studentSkills;
   const jobTitle = candidate.job_title || (typeof candidate.job === "object" ? candidate.job?.title : candidate.job) || "Job title unavailable";
-  const totalExperience = candidate.total_years_of_experience ?? candidate.total_years_experience ?? resume?.total_years_of_experience ?? resume?.total_years_experience ?? null;
+  const explicitTotalExperience = candidate.total_years_of_experience ?? candidate.total_years_experience ?? resume?.total_years_of_experience ?? resume?.total_years_experience;
 
   const experiencesList =
     resumeExperience.length > 0
@@ -343,6 +384,7 @@ export default function CandidateDetails() {
       : Array.isArray((candidate as any)?.experiences)
       ? (candidate as any).experiences
       : [];
+  const totalExperience = resolveExperienceYears(explicitTotalExperience, experiencesList);
 
   return (
     <div
@@ -1692,13 +1734,14 @@ export default function CandidateDetails() {
                   <Btn
                     v="primary"
                     icon={Plus}
+                    type="button"
                     onClick={handleAddNote}
                     style={{
                       height: 34,
                       padding: "0 14px"
                     }}
                   >
-                    Add
+                    Add Note
                   </Btn>
                 </div>
 
@@ -1709,8 +1752,8 @@ export default function CandidateDetails() {
                     gap: 8
                   }}
                 >
-                  {notes.length > 0 ? (
-                    notes.map((note) => (
+                  {notes.some((note) => note.note?.trim()) ? (
+                    notes.filter((note) => note.note?.trim()).map((note) => (
                       <div
                         key={note.id}
                         style={{

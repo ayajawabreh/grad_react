@@ -129,6 +129,31 @@ export interface CompanyNote {
   updated_at?: string;
 }
 
+function normalizeCompanyNote(value: any): CompanyNote | null {
+  if (!value || typeof value !== "object") return null;
+
+  const rawText = value.note ?? value.content ?? value.text ?? value.body ?? "";
+  const note = typeof rawText === "string" ? rawText.trim() : String(rawText ?? "").trim();
+  const id = Number(value.id ?? value.note_id);
+
+  if (!Number.isFinite(id) || !note) return null;
+
+  return {
+    id,
+    note,
+    created_at: value.created_at,
+    updated_at: value.updated_at,
+  };
+}
+
+function unwrapCompanyNoteList(payload: any): any[] {
+  const value = payload?.data ?? payload?.notes ?? payload;
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value?.data)) return value.data;
+  if (Array.isArray(value?.notes)) return value.notes;
+  return value ? [value] : [];
+}
+
 function parseResumeField(value: any, fallback: any = []) {
   if (value === null || value === undefined || value === "") {
     return fallback;
@@ -453,46 +478,57 @@ export async function fetchApplicantAISummary(
 export async function fetchApplicantNotes(
   applicationId: number
 ): Promise<CompanyNote[]> {
-  const res =
-    await API.get<CompanyNote[]>(
-      `/company/applicants/${applicationId}/notes`
-    );
+  const res = await API.get(
+    `/company/applicants/${applicationId}/notes`
+  );
 
-  return res.data;
+  return unwrapCompanyNoteList(res.data)
+    .map(normalizeCompanyNote)
+    .filter((note): note is CompanyNote => note !== null);
 }
 
 export async function addApplicantNote(
   applicationId: number,
   note: string
 ): Promise<CompanyNote> {
-  const res = await API.post<{
-    message: string;
-    note: CompanyNote;
-  }>(
+  const res = await API.post(
     `/company/applicants/${applicationId}/notes`,
     {
       note,
     }
   );
 
-  return res.data.note;
+  const payload = res.data?.note ?? res.data?.data?.note ?? res.data?.data ?? res.data;
+  const normalized = normalizeCompanyNote(payload);
+
+  // A successful 2xx response is enough. Some backend responses do not wrap
+  // the created note, so keep the UI responsive until the next notes sync.
+  return normalized ?? {
+    id: -Date.now(),
+    note: note.trim(),
+    created_at: new Date().toISOString(),
+  };
 }
 
 export async function updateApplicantNote(
   id: number,
   note: string
 ): Promise<CompanyNote> {
-  const res = await API.put<{
-    message: string;
-    note: CompanyNote;
-  }>(
+  const res = await API.put(
     `/company/notes/${id}`,
     {
       note,
     }
   );
 
-  return res.data.note;
+  const payload = res.data?.note ?? res.data?.data?.note ?? res.data?.data ?? res.data;
+  const normalized = normalizeCompanyNote(payload);
+
+  if (!normalized) {
+    throw new Error("The note API returned an invalid note object.");
+  }
+
+  return normalized;
 }
 
 export function deleteApplicantNote(

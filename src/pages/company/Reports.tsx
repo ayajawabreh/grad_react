@@ -34,6 +34,20 @@ type MonthlyItem = {
   applications: number;
 };
 
+const MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+const getMonthIndex = (value: string) => {
+  const raw = String(value ?? "").trim();
+  const isoMonth = /^\d{4}-(\d{1,2})/.exec(raw);
+  if (isoMonth) return Number(isoMonth[1]) - 1;
+  if (/^(?:[1-9]|1[0-2])$/.test(raw)) return Number(raw) - 1;
+  const normalized = raw.slice(0, 3).toLowerCase();
+  return MONTHS.findIndex((month) => month.toLowerCase() === normalized);
+};
+
 export default function Reports() {
   const applicationsSyncVersion = useSyncResourceVersion("applications");
   const jobsSyncVersion = useSyncResourceVersion("jobs");
@@ -110,7 +124,20 @@ export default function Reports() {
 
   const pipelineValues = pipelineConfig.map((item) => pipeline[item.key] || 0);
   const pipelineMax = Math.max(...pipelineValues, 1);
-  const monthlyMax = Math.max(...monthly.map((m) => m.applications), 1);
+  const displayedMonthly = MONTHS.map((month, index) => ({
+    month,
+    applications: monthly.reduce(
+      (total, item) =>
+        getMonthIndex(item.month) === index
+          ? total + Number(item.applications || 0)
+          : total,
+      0
+    ),
+  }));
+  const monthlyMax = Math.max(
+    ...displayedMonthly.map((item) => item.applications),
+    1
+  );
 
   return (
     <div className="max-w-7xl mx-auto px-6 pb-6 md:px-10 md:pb-10 space-y-10 bg-slate-50 min-h-screen text-slate-900 leading-normal">
@@ -261,24 +288,28 @@ export default function Reports() {
             No monthly data available.
           </div>
         ) : (
-          <div className="flex items-end justify-between gap-3 md:gap-6 h-52 pt-8 px-2 border-b border-slate-200">
-            {monthly.map((item) => {
+          <div className="flex items-end justify-between gap-3 md:gap-6 h-60 pt-4 px-2 border-b border-slate-200">
+            {displayedMonthly.map((item) => {
               const heightPercent = Math.round(
                 (item.applications / monthlyMax) * 100
               );
+              const barHeight = Math.max(12, Math.round((heightPercent / 100) * 144));
               return (
                 <div
                   key={item.month}
-                  className="flex-1 flex flex-col items-center h-full justify-end group"
+                  className="flex-1 flex flex-col items-center justify-end group"
                 >
-                  <span className="opacity-0 group-hover:opacity-100 transition-opacity mb-2 text-xs font-medium text-indigo-900 bg-indigo-100 px-2 py-0.5 rounded">
+                  <span className="mb-2 text-xs font-semibold text-indigo-900 bg-indigo-100 px-2 py-0.5 rounded">
                     {item.applications}
                   </span>
 
-                  <div className="w-full max-w-[48px] bg-slate-100 rounded-t-xl h-full flex items-end overflow-hidden">
+                  <div
+                    className="w-full max-w-[56px] bg-slate-100 rounded-t-xl flex items-end overflow-hidden"
+                    style={{ height: 144 }}
+                  >
                     <div
                       className="w-full bg-indigo-600 group-hover:bg-indigo-500 rounded-t-xl transition-all duration-500 ease-out"
-                      style={{ height: `${heightPercent}%` }}
+                      style={{ height: barHeight }}
                     />
                   </div>
 

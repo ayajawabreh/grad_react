@@ -41,6 +41,24 @@ export interface MessageResponse {
   message: string;
 }
 
+export interface CompanySettingsResponse {
+  account: {
+    email: string;
+    role: string;
+  };
+  company: {
+    company_name: string;
+    approval_status: string;
+  };
+}
+
+export const getCompanySettings = () => {
+  return apiRequest<CompanySettingsResponse | { data: CompanySettingsResponse }>(
+    "/settings/company",
+    { method: "GET" }
+  );
+};
+
 // ==================== Password ====================
 
 export const changePassword = (data: ChangePasswordPayload) => {

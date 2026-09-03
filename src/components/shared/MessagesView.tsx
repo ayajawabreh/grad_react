@@ -105,23 +105,6 @@ function formatConversationTime(value?: string | null): string {
   });
 }
 
-function mergeConversationLists(saved: ApiConversation[], fresh: ApiConversation[]) {
-  const merged = new Map<number, ApiConversation>();
-  saved.forEach((conversation) => conversation.user_id && merged.set(conversation.user_id, conversation));
-  fresh.forEach((conversation) => {
-    if (!conversation.user_id) return;
-    const previous = merged.get(conversation.user_id);
-    merged.set(conversation.user_id, {
-      ...previous,
-      ...conversation,
-      last_message: conversation.last_message || previous?.last_message || "",
-      last_time: conversation.last_time || previous?.last_time || "",
-      activity_at: conversation.activity_at || previous?.activity_at || null,
-    });
-  });
-  return Array.from(merged.values());
-}
-
 const conversationCacheKey = (userId: number) =>
   `careerbridge:conversations:${userId}`;
 
@@ -498,13 +481,12 @@ export function MessagesView({
           ? data
           : (data as any)?.data ?? [];
 
-        const mergedConversations = mergeConversationLists(cachedConversations, convos);
-        setConversations(mergedConversations);
+        setConversations(convos);
 
-        if (mergedConversations.length > 0) {
-          setActiveUserId(mergedConversations[0].user_id);
-          activeUserIdRef.current = mergedConversations[0].user_id;
-          const conversationId = Number(mergedConversations[0].conversation_id ?? mergedConversations[0].id);
+        if (convos.length > 0) {
+          setActiveUserId(convos[0].user_id);
+          activeUserIdRef.current = convos[0].user_id;
+          const conversationId = Number(convos[0].conversation_id ?? convos[0].id);
           setActiveConversationId(conversationId);
           activeConversationIdRef.current = conversationId;
         }
@@ -590,7 +572,7 @@ export function MessagesView({
       if (!affectsMessages) return;
 
       void getConversations().then((fresh) => {
-        setConversations((current) => mergeConversationLists(current, fresh));
+        setConversations(fresh);
       }).catch(() => undefined);
 
       const userId = activeUserIdRef.current;
@@ -619,14 +601,11 @@ export function MessagesView({
         const data = await getConversations();
         if (cancelled) return;
         const convos = Array.isArray(data) ? data : (data as any)?.data ?? [];
-        setConversations((current) =>
-          mergeConversationLists(
-            current,
-            convos.map((conversation: ApiConversation) =>
-              conversation.user_id === activeUserIdRef.current
-                ? { ...conversation, unread: 0 }
-                : conversation
-            )
+        setConversations(
+          convos.map((conversation: ApiConversation) =>
+            conversation.user_id === activeUserIdRef.current
+              ? { ...conversation, unread: 0 }
+              : conversation
           )
         );
       } catch {
@@ -1203,12 +1182,13 @@ export function MessagesView({
 
     try {
       if (confirmDialog === "delete") {
-        await deleteConversation(activeUserId);
+        if (activeConversationId == null) return;
+        await deleteConversation(activeConversationId);
 
         setConversations((prev) =>
           prev.filter(
             (conversation) =>
-              conversation.user_id !== activeUserId
+              Number(conversation.id ?? conversation.conversation_id) !== activeConversationId
           )
         );
 
@@ -1219,12 +1199,13 @@ export function MessagesView({
         setMessages([]);
         setConfirmDialog(null);
       } else if (confirmDialog === "block") {
-        await blockUser(activeUserId);
+        if (activeConversationId == null) return;
+        await blockUser(activeConversationId);
 
         setConversations((prev) =>
           prev.filter(
             (conversation) =>
-              conversation.user_id !== activeUserId
+              Number(conversation.id ?? conversation.conversation_id) !== activeConversationId
           )
         );
 

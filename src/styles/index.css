@@ -2,3 +2,114 @@
 @import './tailwind.css';
 @import './theme.css';
 @import './globals.css';
+
+.landing-companies-section {
+  overflow: hidden;
+  padding: 44px 0 52px;
+  border-bottom: 1px solid #e4e3df;
+  background: #fff;
+}
+
+.landing-companies-heading {
+  margin: 0 auto 28px;
+  padding: 0 48px;
+  text-align: center;
+}
+
+.landing-companies-heading p {
+  margin: 0 0 8px;
+  color: #d49735;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+.landing-companies-heading h2 {
+  margin: 0;
+  color: #191b1f;
+  font-size: clamp(24px, 3vw, 32px);
+  font-weight: 850;
+  letter-spacing: -.025em;
+}
+
+.landing-companies-carousel {
+  width: 100%;
+  overflow-x: scroll;
+  scrollbar-width: none;
+  cursor: grab;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 5%, #000 95%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 5%, #000 95%, transparent);
+}
+
+.landing-companies-carousel::-webkit-scrollbar { display: none; }
+.landing-companies-carousel:active { cursor: grabbing; }
+
+.landing-companies-track,
+.landing-companies-set {
+  display: flex;
+  width: max-content;
+}
+
+.landing-companies-set { gap: 16px; padding-right: 16px; }
+
+.landing-company-card {
+  box-sizing: border-box;
+  width: clamp(270px, 27vw, 330px);
+  min-height: 132px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid #e4e3df;
+  border-radius: 18px;
+  background: #fdfdfc;
+  box-shadow: 0 6px 20px rgba(20, 24, 31, .045);
+  transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+.landing-company-card:hover {
+  border-color: #d5a24f;
+  box-shadow: 0 12px 30px rgba(20, 24, 31, .09);
+  transform: translateY(-2px);
+}
+
+.landing-company-logo {
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid #e8e6e1;
+  border-radius: 16px;
+  background: #f3eee4;
+  color: #a96f19;
+  font-size: 25px;
+  font-weight: 850;
+}
+
+.landing-company-logo img { width: 100%; height: 100%; object-fit: contain; padding: 7px; box-sizing: border-box; }
+.landing-company-details { min-width: 0; }
+.landing-company-name { display: flex; align-items: center; gap: 6px; color: #191b1f; font-size: 16px; font-weight: 750; }
+.landing-company-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.landing-company-name svg { flex: 0 0 auto; color: #3478c7; }
+.landing-company-details p { margin: 7px 0 9px; overflow: hidden; color: #686d76; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.landing-company-location { display: flex; align-items: center; gap: 5px; min-width: 0; color: #858a92; font-size: 12px; }
+.landing-company-location span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.landing-company-location svg { flex: 0 0 auto; }
+.landing-companies-status { min-height: 132px; display: grid; place-items: center; color: #777c84; font-size: 13px; }
+
+@media (max-width: 640px) {
+  .landing-companies-section { padding: 36px 0 42px; }
+  .landing-companies-heading { margin-bottom: 22px; padding: 0 20px; }
+  .landing-company-card { width: min(82vw, 300px); min-height: 118px; padding: 16px; }
+  .landing-company-logo { width: 56px; height: 56px; flex-basis: 56px; border-radius: 14px; }
+  .landing-companies-carousel { -webkit-mask-image: linear-gradient(to right, transparent, #000 3%, #000 97%, transparent); mask-image: linear-gradient(to right, transparent, #000 3%, #000 97%, transparent); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-company-card { transition: none; }
+}

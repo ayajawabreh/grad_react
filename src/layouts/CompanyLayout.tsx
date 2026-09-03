@@ -344,13 +344,13 @@ function TopBar({ onMenu }: { onMenu: () => void }) {
     >
       <button
         onClick={onMenu}
-        className="lg:hidden"
+        className="hidden"
         style={{
           background: "none",
           border: "none",
           cursor: "pointer",
           color: C.textSec,
-          display: "flex",
+          display: "none",
           alignItems: "center",
           justifyContent: "center",
         }}
@@ -558,7 +558,7 @@ export default function CompanyLayout() {
       )}
 
       <div
-        className="hidden lg:flex"
+        className="flex"
         style={{
           width: 256,
           flexShrink: 0,

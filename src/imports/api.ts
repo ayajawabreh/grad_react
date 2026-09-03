@@ -1,4 +1,5 @@
 import axios, { AxiosRequestConfig } from "axios";
+import { SYNC_EVENT_NAME, type SyncEventDetail } from "../sync/syncEvents";
 
 const API_URL = "http://127.0.0.1:8000/api";
 
@@ -8,6 +9,18 @@ export const API = axios.create({
     Accept: "application/json",
   },
 });
+
+const PUBLIC_API = axios.create({
+  baseURL: API_URL,
+  headers: {
+    Accept: "application/json",
+  },
+});
+
+export const getLandingCompanies = async () => {
+  const response = await PUBLIC_API.get("/landing/companies");
+  return response.data;
+};
 
 export const forgotPassword = (email: string) =>
   apiRequest<{ message: string }>("/forgot-password", {
@@ -52,6 +65,53 @@ API.interceptors.request.use(
   },
   (error) => Promise.reject(error)
 );
+
+const resourcesForPath = (path: string) => {
+  const normalized = path.toLowerCase();
+  const resources = new Set<string>();
+
+  if (normalized.includes("/jobs")) resources.add("jobs");
+  if (normalized.includes("/applications") || normalized.includes("/applicants")) {
+    resources.add("applications");
+  }
+  if (normalized.includes("/interviews")) resources.add("interviews");
+  if (normalized.includes("/company/profile") || normalized.includes("/settings/company")) {
+    resources.add("company");
+  }
+  if (normalized.includes("/student/profile")) resources.add("student");
+  if (normalized.includes("/resume")) resources.add("resume");
+  if (normalized.includes("/notifications")) resources.add("notifications");
+  if (normalized.includes("/reports")) resources.add("reports");
+  if (normalized.includes("/messages")) resources.add("messages");
+  if (normalized.includes("/conversations")) resources.add("conversations");
+  if (normalized.includes("/saved-jobs")) resources.add("saved_jobs");
+
+  return [...resources];
+};
+
+API.interceptors.response.use((response) => {
+  const method = String(response.config.method || "get").toLowerCase();
+  if (!["post", "put", "patch", "delete"].includes(method)) return response;
+
+  const path = String(response.config.url || "");
+  const resources = resourcesForPath(path);
+  if (!resources.length || typeof window === "undefined") return response;
+
+  const events = resources.map((resource, index) => ({
+    id: Date.now() + index,
+    resource,
+    action: method,
+    path,
+  }));
+
+  window.dispatchEvent(
+    new CustomEvent<SyncEventDetail>(SYNC_EVENT_NAME, {
+      detail: { events, resources, paths: [path] },
+    })
+  );
+
+  return response;
+});
 
 async function apiRequest<T = any>(
   path: string,
@@ -186,6 +246,12 @@ export const createCompanyJob = async (data: any) => {
   return apiRequest("/company/jobs", {
     method: "POST",
     data,
+  });
+};
+
+export const getCompanyJobForEdit = async (id: string | number) => {
+  return apiRequest(`/company/jobs/${id}/edit`, {
+    method: "GET",
   });
 };
 

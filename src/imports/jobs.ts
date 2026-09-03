@@ -310,6 +310,9 @@ export async function fetchJobs(params?: {
     )
   );
 
+  if (params?.categoryId)
+    query.append("category_id", String(params.categoryId));
+
 
 
   if (params?.page)
@@ -372,9 +375,6 @@ export async function saveJob(
   await API.post(
     `/jobs/${id}/save`
   );
-
-  if (params?.categoryId)
-    query.append("category_id", String(params.categoryId));
 
   setSavedJobState(id, true);
   void refreshSavedJobsCache(true);

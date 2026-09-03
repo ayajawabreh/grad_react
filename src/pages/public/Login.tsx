@@ -16,6 +16,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const [loading, setLoading] = useState(false);
   const [verificationData, setVerificationData] = useState<{ userId: number; email: string } | null>(null);
 
@@ -25,10 +26,17 @@ export default function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setFieldErrors({});
     setVerificationData(null);
 
-    if (!email || !password) {
-      setError("Please fill in all fields.");
+    const cleanEmail = email.trim();
+    const nextErrors: { email?: string; password?: string } = {};
+    if (!cleanEmail) nextErrors.email = "Email address is required.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) nextErrors.email = "Enter a valid email address.";
+    if (!password) nextErrors.password = "Password is required.";
+
+    if (nextErrors.email || nextErrors.password) {
+      setFieldErrors(nextErrors);
       return;
     }
 
@@ -42,7 +50,7 @@ export default function Login() {
           "Accept": "application/json",
         },
         body: JSON.stringify({
-          email,
+          email: cleanEmail,
           password,
           role,
         }),
@@ -51,7 +59,12 @@ export default function Login() {
       const data = await response.json();
 
       if (!response.ok) {
-        if (String(data.message || "").toLowerCase().includes("verify your email")) {
+        const message = String(data.message || data.error || "");
+        const normalizedMessage = message.toLowerCase();
+        const errorCode = String(data.code || data.error_code || "").toLowerCase();
+        const apiErrors = data.errors || {};
+
+        if (normalizedMessage.includes("verify your email")) {
           let saved: { userId?: number; email?: string } | null = null;
           try {
             saved = JSON.parse(sessionStorage.getItem("cb_verification") || "null");
@@ -59,14 +72,35 @@ export default function Login() {
             saved = null;
           }
 
-          const userId = Number(data.user_id || (saved?.email === email ? saved?.userId : 0));
+          const userId = Number(data.user_id || (saved?.email === cleanEmail ? saved?.userId : 0));
           if (userId) {
-            const pending = { userId, email };
+            const pending = { userId, email: cleanEmail };
             sessionStorage.setItem("cb_verification", JSON.stringify(pending));
             setVerificationData(pending);
           }
         }
-        throw new Error(data.message || "Invalid credentials");
+
+        const emailMessage = Array.isArray(apiErrors.email) ? apiErrors.email[0] : apiErrors.email;
+        const passwordMessage = Array.isArray(apiErrors.password) ? apiErrors.password[0] : apiErrors.password;
+        if (emailMessage || passwordMessage) {
+          setFieldErrors({
+            email: emailMessage ? String(emailMessage) : undefined,
+            password: passwordMessage ? String(passwordMessage) : undefined,
+          });
+          return;
+        }
+
+        if (errorCode === "email_not_found" || /email.*(not found|does not exist|not registered|unknown)/i.test(message)) {
+          setFieldErrors({ email: "No account was found with this email address." });
+          return;
+        }
+
+        if (errorCode === "invalid_password" || errorCode === "wrong_password" || /(incorrect|invalid|wrong).*password|password.*(incorrect|invalid|wrong)/i.test(message)) {
+          setFieldErrors({ password: "The password you entered is incorrect." });
+          return;
+        }
+
+        throw new Error(message || "The email address or password is incorrect.");
       }
 
       if (data.token && data.user && data.user.role) {
@@ -167,7 +201,7 @@ export default function Login() {
               <button 
                 type="button" 
                 key={key} 
-                onClick={() => { setRole(key); setError(null); setVerificationData(null); }}
+                onClick={() => { setRole(key); setError(null); setFieldErrors({}); setVerificationData(null); }}
                 style={{
                   flex: 1,
                   padding: "16px 12px",
@@ -196,27 +230,28 @@ export default function Login() {
           <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 20 }}>
             <div>
               <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6, fontFamily: F }}>Email Address</label>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderRadius: 12, border: `1px solid ${C.border}`, background: C.surface }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderRadius: 12, border: `1px solid ${fieldErrors.email ? C.error : C.border}`, background: C.surface }}>
                 <Mail size={15} style={{ color: C.textMuted, flexShrink: 0 }} />
                 <input 
                   type="email" 
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => { setEmail(e.target.value); setFieldErrors((current) => ({ ...current, email: undefined })); }}
                   placeholder="you@example.com" 
                   required
                   style={{ flex: 1, border: "none", outline: "none", fontSize: 14, color: C.text, background: "transparent", fontFamily: F }} 
                 />
               </div>
+              {fieldErrors.email && <p role="alert" style={{ margin: "6px 2px 0", color: C.error, fontSize: 12, fontWeight: 600 }}>{fieldErrors.email}</p>}
             </div>
 
             <div>
               <label style={{ fontSize: 12, fontWeight: 600, color: C.text, display: "block", marginBottom: 6, fontFamily: F }}>Password</label>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderRadius: 12, border: `1px solid ${C.border}`, background: C.surface, position: "relative" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderRadius: 12, border: `1px solid ${fieldErrors.password ? C.error : C.border}`, background: C.surface, position: "relative" }}>
                 <Lock size={15} style={{ color: C.textMuted, flexShrink: 0 }} />
                 <input 
                   type={showPassword ? "text" : "password"} 
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => { setPassword(e.target.value); setFieldErrors((current) => ({ ...current, password: undefined })); }}
                   placeholder="••••••••" 
                   required
                   style={{ flex: 1, border: "none", outline: "none", fontSize: 14, color: C.text, background: "transparent", fontFamily: F, paddingRight: 32 }} 
@@ -229,6 +264,7 @@ export default function Login() {
                   {showPassword ? <EyeOff size={16} color={C.textSec} /> : <Eye size={16} color={C.textSec} />}
                 </button>
               </div>
+              {fieldErrors.password && <p role="alert" style={{ margin: "6px 2px 0", color: C.error, fontSize: 12, fontWeight: 600 }}>{fieldErrors.password}</p>}
             </div>
           </div>
 

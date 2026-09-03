@@ -60,7 +60,14 @@ export default function ManageJobs() {
   }, []);
 
   const openDeleteModal = (id: number) => {
-    setErrorMessage(null);
+    const selectedJob = jobs.find((job) => String(job.id) === String(id));
+    const hasApplicants = Number(
+      selectedJob?.applicants ?? selectedJob?.applicants_count ?? 0
+    ) > 0;
+
+    setErrorMessage(
+      hasApplicants ? "Cannot delete a job that has applicants." : null
+    );
     setDeleteModal({ open: true, jobId: id });
   };
 
@@ -78,11 +85,13 @@ export default function ManageJobs() {
       setErrorMessage(null);
       await deleteJob(deleteModal.jobId);
 
-      setJobs((prev) => prev.filter((job) => job.id !== deleteModal.jobId));
+      setJobs((prev) =>
+        prev.filter((job) => String(job.id) !== String(deleteModal.jobId))
+      );
       closeDeleteModal();
     } catch (e: any) {
       setIsDeleting(false);
-      const msg = e.response?.data?.message || "Failed to delete job listing.";
+      const msg = e?.response?.data?.message || "Failed to delete the job.";
       setErrorMessage(msg);
     }
   };
@@ -213,7 +222,9 @@ export default function ManageJobs() {
               <div style={{ display: "flex", gap: 8 }}>
                 <Btn v="primary" size="sm" onClick={() => nav(`/company/jobs/${job.id}`)}>View</Btn>
                 <Btn v="outline" size="sm" icon={Edit2} onClick={() => nav(`/company/jobs/edit/${job.id}`)}>Edit</Btn>
-                <Btn v="ghost" size="sm" icon={Trash2} onClick={() => openDeleteModal(job.id)}>Delete</Btn>
+                <Btn v="ghost" size="sm" icon={Trash2} onClick={() => openDeleteModal(job.id)}>
+                  Delete
+                </Btn>
               </div>
             </div>
           ))}
@@ -285,7 +296,7 @@ export default function ManageJobs() {
             </h3>
             
             <p style={{ margin: "0 0 16px", fontSize: 14, color: C.textSec, lineHeight: 1.5 }}>
-              Are you sure you want to delete this job posting? This action cannot be undone.
+              Jobs with applicants cannot be deleted. You can close the job instead.
             </p>
 
             {/* كارت عرض الخطأ البصري */}
@@ -323,7 +334,7 @@ export default function ManageJobs() {
                   fontFamily: F
                 }}
               >
-                {errorMessage ? "Close" : "Cancel"}
+                Cancel
               </button>
               
               {!errorMessage && (

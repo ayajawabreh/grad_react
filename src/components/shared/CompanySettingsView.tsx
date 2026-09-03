@@ -10,6 +10,7 @@ import {
   getPrivacySettings,
   updatePrivacySettings,
   deleteAccount,
+  getCompanySettings,
 } from "../../imports/settings";
 
 interface CompanySettingsViewProps {
@@ -110,6 +111,12 @@ export function CompanySettingsView({
 }: CompanySettingsViewProps) {
   const [tab, setTab] = useState("account");
   const [saved, setSaved] = useState(false);
+  const [accountData, setAccountData] = useState({
+    companyName: name,
+    email,
+    role: "Company",
+    status: accountStatus,
+  });
 
   const [notifSettings, setNotifSettings] =
     useState<CompanyNotificationSettings | null>(null);
@@ -136,6 +143,25 @@ export function CompanySettingsView({
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
+
+  useEffect(() => {
+    getCompanySettings()
+      .then((response: any) => {
+        const data = response?.data ?? response;
+        const account = data?.account ?? {};
+        const company = data?.company ?? {};
+
+        setAccountData({
+          companyName: company.company_name ?? "",
+          email: account.email ?? "",
+          role: account.role ?? "Company",
+          status: company.approval_status ?? "pending",
+        });
+      })
+      .catch(() => {
+        // Keep the authenticated-user values as a fallback.
+      });
+  }, []);
 
   useEffect(() => {
     if (tab === "notifications" && !notifSettings) {
@@ -255,9 +281,10 @@ export function CompanySettingsView({
     }
   };
 
-  const statusLabel = accountStatus === "approved" ? "Approved" : "Pending";
-  const statusColor = accountStatus === "approved" ? C.success : "#d97706";
-  const statusBackground = accountStatus === "approved" ? C.successBg : "#fef3c7";
+  const isApproved = String(accountData.status).toLowerCase() === "approved";
+  const statusLabel = isApproved ? "Approved" : "Pending";
+  const statusColor = isApproved ? C.success : "#d97706";
+  const statusBackground = isApproved ? C.successBg : "#fef3c7";
 
   return (
     <div>
@@ -411,7 +438,7 @@ export function CompanySettingsView({
                     Company Name
                   </label>
                   <input
-                    value={name || ""}
+                    value={accountData.companyName || ""}
                     readOnly
                     style={{
                       width: "100%",
@@ -441,7 +468,7 @@ export function CompanySettingsView({
                     Email Address
                   </label>
                   <input
-                    value={email || ""}
+                    value={accountData.email || ""}
                     readOnly
                     style={{
                       width: "100%",
@@ -471,7 +498,7 @@ export function CompanySettingsView({
                     Role
                   </label>
                   <input
-                    value="Company"
+                    value={accountData.role || ""}
                     readOnly
                     style={{
                       width: "100%",

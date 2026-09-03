@@ -101,18 +101,13 @@ export default function CompanyProfile() {
         formData.append("logo", logo);
       }
 
-      console.log("FORM DATA:");
-
-      for (const pair of formData.entries()) {
-        console.log(pair[0], pair[1]);
-      }
-
       const response = await updateCompanyProfile(formData);
+      const updatedCompany =
+        response?.data?.company ?? response?.company;
 
-      console.log("RESPONSE:", response);
-      console.log("UPDATED COMPANY:", response.company);
-
-      await loadCompany();
+      if (updatedCompany) {
+        setCompany(updatedCompany);
+      }
       setSaveSuccess("Company profile updated successfully.");
       setEditing(false);
       setLogo(null);
@@ -180,11 +175,7 @@ export default function CompanyProfile() {
           >
             {company.logo ? (
               <img
-                src={
-                  company.logo.startsWith("http")
-                    ? company.logo
-                    : `http://127.0.0.1:8000/storage/${company.logo}`
-                }
+                src={company.logo}
                 alt={company.name}
                 style={{
                   width: "100%",
@@ -348,24 +339,51 @@ export default function CompanyProfile() {
               Logo
             </label>
 
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                if (e.target.files?.[0]) {
-                  setLogo(e.target.files[0]);
-                }
-              }}
+            <label
               style={{
                 width: "100%",
-                padding: "8px 14px",
                 borderRadius: 10,
                 border: `1px solid ${C.border}`,
                 fontFamily: F,
                 fontSize: 13,
                 background: C.bg,
+                display: "flex",
+                alignItems: "center",
+                overflow: "hidden",
+                cursor: "pointer",
               }}
-            />
+            >
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  setLogo(e.target.files?.[0] ?? null);
+                }}
+                style={{ display: "none" }}
+              />
+              <span
+                style={{
+                  padding: "8px 14px",
+                  background: C.surface,
+                  borderRight: `1px solid ${C.border}`,
+                  fontWeight: 600,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Choose File
+              </span>
+              <span
+                style={{
+                  padding: "8px 14px",
+                  color: C.textSec,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {logo?.name || "No file chosen"}
+              </span>
+            </label>
           </div>
 
           <div

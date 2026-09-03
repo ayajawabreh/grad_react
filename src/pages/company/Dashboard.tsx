@@ -5,7 +5,6 @@ import { Btn, StatCard } from "../../components/ui";
 import { CandidateCard } from "../../components/cards/CandidateCard";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { FileText, Users, CalendarCheck, UserCheck } from "lucide-react";
-import { useAuth } from "../../context/AuthContext";
 import { getCompanyDashboard } from "../../imports/api";
 import { getMonthlyApplicationsReport } from "../../imports/reports";
 import { useSyncResourceVersion } from "../../sync/useSyncResourceVersion";
@@ -16,9 +15,6 @@ export default function CompanyDashboard() {
   const jobsSyncVersion = useSyncResourceVersion("jobs");
   const interviewsSyncVersion = useSyncResourceVersion("interviews");
   const nav = useNavigate();
-  const { user } = useAuth();
-
-  const companyName = user?.name || localStorage.getItem("user_name") || "Company";
 
   const [dashboard, setDashboard] = useState<any>(null);
   const [monthlyApplications, setMonthlyApplications] = useState<any[]>([]);
@@ -29,7 +25,10 @@ export default function CompanyDashboard() {
         getCompanyDashboard(),
         getMonthlyApplicationsReport(),
       ]);
-      if (dashboardResult.status === "fulfilled") setDashboard(dashboardResult.value);
+      if (dashboardResult.status === "fulfilled") {
+        const dashboardData = (dashboardResult.value as any)?.data ?? dashboardResult.value;
+        setDashboard(dashboardData);
+      }
       else console.error("Failed to load company dashboard:", dashboardResult.reason);
       if (monthlyResult.status === "fulfilled") setMonthlyApplications(Array.isArray(monthlyResult.value) ? monthlyResult.value : []);
       else console.error("Failed to load monthly applications:", monthlyResult.reason);
@@ -76,7 +75,9 @@ export default function CompanyDashboard() {
     fontFamily: F,
   }}
 >
-  Good morning, {companyName} 👋
+  {dashboard
+    ? `${dashboard.greeting}, ${dashboard.company?.name ?? ""} 👋`
+    : "Loading dashboard..."}
 </h1>
 
         <p style={{ color: C.textSec, marginTop: 6, fontSize: 14 }}>
@@ -361,7 +362,7 @@ export default function CompanyDashboard() {
               alignItems:"center",
               justifyContent:"center"
             }}>
-              {companyName[0]}
+              {dashboard?.company?.name?.charAt(0) ?? ""}
             </div>
 
 

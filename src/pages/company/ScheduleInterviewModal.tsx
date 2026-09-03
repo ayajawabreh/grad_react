@@ -36,9 +36,8 @@ export default function ScheduleInterviewModal({
       await scheduleInterview(applicationId, {
         interview_date: `${formattedDate} ${time}`,
         type,
-        location: type === "Onsite" ? location : "",
-        meeting_link: type === "Online" ? meetingLink : "",
-        status: "Scheduled",
+        location: type === "Onsite" ? location : null,
+        meeting_link: type === "Online" ? meetingLink : null,
       });
 
       onSuccess?.();

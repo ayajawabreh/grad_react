@@ -3,7 +3,6 @@ import { useLocation } from "react-router";
 import { C, F } from "../../constants/tokens";
 import { Btn } from "../../components/ui";
 import { API } from "../../imports/api";
-import { downloadCsv } from "../../lib/download";
 import {
   Search,
   Filter,
@@ -69,6 +68,7 @@ export default function AdminCompanies() {
   const [selectedCompany, setSelectedCompany] =
     useState<CompanyDetails | null>(null);
   const [viewLoading, setViewLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [rejectCompanyId, setRejectCompanyId] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectError, setRejectError] = useState("");
@@ -270,38 +270,31 @@ export default function AdminCompanies() {
     }
   };
 
-  const handleExport = () => {
-    if (!companies.length) return;
+  const handleExport = async () => {
+    try {
+      setExporting(true);
+      const response = await API.get("/admin/companies/export", {
+        responseType: "blob",
+        params: {
+          status: statusFilter || undefined,
+        },
+      });
 
-    const exportData = companies.map((company, index) => ({
-      "#": index + 1,
-      Company: company.company_name || "Unknown Company",
-      Industry: company.industry || "",
-      Email:
-        company.email ||
-        company.user?.email ||
-        "",
-      Phone: company.phone || "",
-      Website: company.website || "",
-      Location: company.location || "",
-      "Job Posts": company.job_posts_count ?? 0,
-      "Verification Status":
-        company.approval_status || "Pending",
-      "Verification Score":
-        company.verification_score ?? "",
-      "Risk Level": company.risk_level || "",
-      "Reports Count": company.reports_count ?? 0,
-      "Account Verified": company.is_verified
-        ? "Yes"
-        : "No",
-      Joined:
-        company.joined ||
-        (company.created_at
-          ? company.created_at.substring(0, 10)
-          : ""),
-    }));
-
-    downloadCsv(exportData, "Companies_Report.csv");
+      const url = URL.createObjectURL(response.data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "companies.xlsx";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error: any) {
+      window.alert(
+        error?.response?.data?.message || "Failed to download companies report."
+      );
+    } finally {
+      setExporting(false);
+    }
   };
 
   const statusColor = (status: string) => {
@@ -519,8 +512,9 @@ export default function AdminCompanies() {
             v="outline"
             icon={Download}
             onClick={handleExport}
+            disabled={exporting}
           >
-            Export Excel
+            {exporting ? "Downloading..." : "Download Excel"}
           </Btn>
         </div>
       </div>
