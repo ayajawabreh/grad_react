@@ -1,117 +1,65 @@
 import { createBrowserRouter, redirect } from "react-router";
-
-import StudentLayout from "../layouts/StudentLayout";
-import CompanyLayout from "../layouts/CompanyLayout";
-import AdminLayout from "../layouts/AdminLayout";
-
-import Landing from "../pages/public/Landing";
-import Login from "../pages/public/Login";
-import Register from "../pages/public/Register";
-import ForgotPassword from "../pages/public/ForgotPassword";
-import VerifyEmail from "../pages/public/VerifyEmail";
-
-import StudentDashboard from "../pages/student/Dashboard";
-import StudentProfile from "../pages/student/Profile";
-import StudentResume from "../pages/student/MyResume";
-import StudentResumeView from "../pages/student/ResumeView";
-import JobDiscovery from "../pages/student/JobDiscovery";
-import StudentJobDetails from "../pages/student/JobDetails";
-import Applications from "../pages/student/Applications";
-import SavedJobs from "../pages/student/SavedJobs";
-import RecommendedJobs from "../pages/student/Recommended";
-import StudentMessages from "../pages/student/Messages";
-import StudentNotifications from "../pages/student/Notifications";
-import StudentSettings from "../pages/student/Settings";
-import AIAssistant from "../pages/student/AIAssistant";
-
-import CompanyDashboard from "../pages/company/Dashboard";
-import CompanyProfile from "../pages/company/Profile";
-import CreateJob from "../pages/company/CreateJob";
-import EditJob from "../pages/company/EditJob";
-import ManageJobs from "../pages/company/ManageJobs";
-import CompanyJobDetails from "../pages/company/JobDetails";
-import Applicants from "../pages/company/Applicants";
-import CandidateDetails from "../pages/company/CandidateDetails";
-import RecommendedCandidates from "../pages/company/RecommendedCandidates";
-import Interviews from "../pages/company/Interviews";
-import CompanyMessages from "../pages/company/Messages";
-import CompanyNotifications from "../pages/company/Notifications";
-import CompanySettings from "../pages/company/Settings";
-
-import AdminDashboard from "../pages/admin/Dashboard";import AdminStudents from "../pages/admin/Students";
-import AdminCompanies from "../pages/admin/Companies";
-import AdminJobs from "../pages/admin/Jobs";
-import AdminApplications from "../pages/admin/Applications";
-import AdminAnalytics from "../pages/admin/Analytics";
-import AdminReports from "../pages/admin/Reports";
-import AdminNotifications from "../pages/admin/Notifications";
-import AdminSettings from "../pages/admin/Settings";
-import AdminCategories from "../pages/admin/Categories";
-import AdminSystemLogs from "../pages/admin/SystemLogs";
-import AdminSkills from "../pages/admin/Skills";
-import Shortlisted from "../pages/company/Shortlisted";
-import Reports from "../pages/company/Reports";
-import MyResume from "../pages/student/MyResume";
-import ResumeUpload from "../pages/student/ResumeUpload";
-import ResumeBuilder from "../pages/student/Resume";
+import type { ComponentType } from "react";
 import RouteErrorBoundary from "./RouteErrorBoundary";
 
+const lazyRoute = (load: () => Promise<{ default: ComponentType<any> }>) =>
+  async () => ({ Component: (await load()).default });
 
 export const router = createBrowserRouter([
-  { path: "/", Component: Landing, ErrorBoundary: RouteErrorBoundary },
-  { path: "/login", Component: Login },
-  { path: "/register", Component: Register },
-  { path: "/forgot-password", Component: ForgotPassword },
-  { path: "/verify-email", Component: VerifyEmail },
+  { path: "/", lazy: lazyRoute(() => import("../pages/public/Landing")), ErrorBoundary: RouteErrorBoundary },
+  { path: "/login", lazy: lazyRoute(() => import("../pages/public/Login")) },
+  { path: "/register", lazy: lazyRoute(() => import("../pages/public/Register")) },
+  { path: "/forgot-password", lazy: lazyRoute(() => import("../pages/public/ForgotPassword")) },
+  { path: "/verify-email", lazy: lazyRoute(() => import("../pages/public/VerifyEmail")) },
 
   
 {
   path: "/student",
-  Component: StudentLayout,
+  lazy: lazyRoute(() => import("../layouts/StudentLayout")),
   ErrorBoundary: RouteErrorBoundary,
   children: [
     { index: true, loader: () => redirect("/student/dashboard") },
-    { path: "dashboard", Component: StudentDashboard },
-    { path: "profile", Component: StudentProfile },
+    { path: "dashboard", lazy: lazyRoute(() => import("../pages/student/Dashboard")) },
+    { path: "profile", lazy: lazyRoute(() => import("../pages/student/Profile")) },
 
-    { path: "resume", Component: StudentResume },
-    { path: "resume/create", Component: ResumeBuilder },
-    { path: "resume/upload", Component: ResumeUpload },
-    { path: "resume/view", Component: StudentResumeView },
+    { path: "resume", lazy: lazyRoute(() => import("../pages/student/MyResume")) },
+    { path: "resume/create", lazy: lazyRoute(() => import("../pages/student/Resume")) },
+    { path: "resume/upload", lazy: lazyRoute(() => import("../pages/student/ResumeUpload")) },
+    { path: "resume/view", lazy: lazyRoute(() => import("../pages/student/ResumeView")) },
 
-    { path: "jobs", Component: JobDiscovery },
-    { path: "jobs/:id", Component: StudentJobDetails },
-    { path: "applications", Component: Applications },
-    { path: "saved", Component: SavedJobs },
-    { path: "recommended", Component: RecommendedJobs },
-    { path: "messages", Component: StudentMessages },
-    { path: "notifications", Component: StudentNotifications },
-    { path: "settings", Component: StudentSettings },
-    { path: "ai", Component: AIAssistant },
+    { path: "jobs", lazy: lazyRoute(() => import("../pages/student/JobDiscovery")) },
+    { path: "jobs/:id", lazy: lazyRoute(() => import("../pages/student/JobDetails")) },
+    { path: "applications", lazy: lazyRoute(() => import("../pages/student/Applications")) },
+    { path: "saved", lazy: lazyRoute(() => import("../pages/student/SavedJobs")) },
+    { path: "recommended", lazy: lazyRoute(() => import("../pages/student/Recommended")) },
+    { path: "messages", lazy: lazyRoute(() => import("../pages/student/Messages")) },
+    { path: "notifications", lazy: lazyRoute(() => import("../pages/student/Notifications")) },
+    { path: "settings", lazy: lazyRoute(() => import("../pages/student/Settings")) },
+    { path: "ai", lazy: lazyRoute(() => import("../pages/student/AIAssistant")) },
   ],
 },
   {
     path: "/company",
-    Component: CompanyLayout,
+    lazy: lazyRoute(() => import("../layouts/CompanyLayout")),
     ErrorBoundary: RouteErrorBoundary,
     children: [
       { index: true, loader: () => redirect("/company/dashboard") },
-      { path: "dashboard", Component: CompanyDashboard },
-      { path: "profile", Component: CompanyProfile },
-      { path: "jobs", Component: ManageJobs },
-      { path: "jobs/create", Component: CreateJob },
-      { path: "jobs/edit/:id", Component: EditJob },
-      { path: "jobs/:id", Component: CompanyJobDetails },
-      { path: "applicants", Component: Applicants },
-      { path: "shortlisted", Component: Shortlisted },
-      { path: "applicants/:id", Component: CandidateDetails },
-      { path: "recommended", Component: RecommendedCandidates },
-      { path: "interviews", Component: Interviews },
-      { path: "reports", Component: Reports },
-      { path: "messages", Component: CompanyMessages },
-      { path: "notifications", Component: CompanyNotifications },
-      { path: "settings", Component: CompanySettings },
-     { path: "jobs/:id/shortlisted", Component: Shortlisted },
+      { path: "dashboard", lazy: lazyRoute(() => import("../pages/company/Dashboard")) },
+      { path: "profile", lazy: lazyRoute(() => import("../pages/company/Profile")) },
+      { path: "jobs", lazy: lazyRoute(() => import("../pages/company/ManageJobs")) },
+      { path: "jobs/create", lazy: lazyRoute(() => import("../pages/company/CreateJob")) },
+      { path: "jobs/edit/:id", lazy: lazyRoute(() => import("../pages/company/EditJob")) },
+      { path: "jobs/:id", lazy: lazyRoute(() => import("../pages/company/JobDetails")) },
+      { path: "applicants", lazy: lazyRoute(() => import("../pages/company/Applicants")) },
+      { path: "shortlisted", lazy: lazyRoute(() => import("../pages/company/Shortlisted")) },
+      { path: "applicants/:id", lazy: lazyRoute(() => import("../pages/company/CandidateDetails")) },
+      { path: "recommended", lazy: lazyRoute(() => import("../pages/company/RecommendedCandidates")) },
+      { path: "interviews", lazy: lazyRoute(() => import("../pages/company/Interviews")) },
+      { path: "reports", lazy: lazyRoute(() => import("../pages/company/Reports")) },
+      { path: "messages", lazy: lazyRoute(() => import("../pages/company/Messages")) },
+      { path: "notifications", lazy: lazyRoute(() => import("../pages/company/Notifications")) },
+      { path: "settings", lazy: lazyRoute(() => import("../pages/company/Settings")) },
+      { path: "jobs/:id/shortlisted", lazy: lazyRoute(() => import("../pages/company/Shortlisted")) },
      
     ],
   },
@@ -119,21 +67,22 @@ export const router = createBrowserRouter([
   {
     
   path: "/admin",
-  Component: AdminLayout,
+  lazy: lazyRoute(() => import("../layouts/AdminLayout")),
   ErrorBoundary: RouteErrorBoundary,
   children: [
     { index: true, loader: () => redirect("/admin/dashboard") },
-{ path: "dashboard", Component: AdminDashboard },    { path: "students", Component: AdminStudents },
-    { path: "companies", Component: AdminCompanies },
-    { path: "categories", Component: AdminCategories },
-    { path: "skills", Component: AdminSkills },
-    { path: "jobs", Component: AdminJobs },
-    { path: "applications", Component: AdminApplications },
-    { path: "analytics", Component: AdminAnalytics },
-    { path: "system-logs", Component: AdminSystemLogs },
-    { path: "reports", Component: AdminReports },
-    { path: "notifications", Component: AdminNotifications },
-    { path: "settings", Component: AdminSettings },
+    { path: "dashboard", lazy: lazyRoute(() => import("../pages/admin/Dashboard")) },
+    { path: "students", lazy: lazyRoute(() => import("../pages/admin/Students")) },
+    { path: "companies", lazy: lazyRoute(() => import("../pages/admin/Companies")) },
+    { path: "categories", lazy: lazyRoute(() => import("../pages/admin/Categories")) },
+    { path: "skills", lazy: lazyRoute(() => import("../pages/admin/Skills")) },
+    { path: "jobs", lazy: lazyRoute(() => import("../pages/admin/Jobs")) },
+    { path: "applications", lazy: lazyRoute(() => import("../pages/admin/Applications")) },
+    { path: "analytics", lazy: lazyRoute(() => import("../pages/admin/Analytics")) },
+    { path: "system-logs", lazy: lazyRoute(() => import("../pages/admin/SystemLogs")) },
+    { path: "reports", lazy: lazyRoute(() => import("../pages/admin/Reports")) },
+    { path: "notifications", lazy: lazyRoute(() => import("../pages/admin/Notifications")) },
+    { path: "settings", lazy: lazyRoute(() => import("../pages/admin/Settings")) },
   ],
   },
 

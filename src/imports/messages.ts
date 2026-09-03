@@ -151,27 +151,10 @@ export const findUserByEmail = async (email: string) => {
 export const searchMessageRecipient = findUserByEmail;
 
 export const getConversation = async (
-  conversationId: number,
-  recipientId?: number
+  otherUserId: number
 ) => {
-  try {
-    const response = await apiRequest<any>(
-      `/conversations/${conversationId}/messages`,
-      { method: "GET" }
-    );
-    const messages = Array.isArray(response)
-      ? response
-      : response?.messages ?? response?.data ?? [];
-
-    if (messages.length > 0 || recipientId == null) {
-      return response;
-    }
-  } catch (error) {
-    if (recipientId == null) throw error;
-  }
-
-  // Compatibility with messages created before the conversations endpoint.
-  return apiRequest<ApiChatMessage[]>(`/messages/${recipientId}`, {
+  // The backend currently identifies a conversation by the other user's ID.
+  return apiRequest<any>(`/conversations/${otherUserId}/messages`, {
     method: "GET",
   });
 };

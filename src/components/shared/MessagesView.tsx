@@ -108,6 +108,30 @@ function formatConversationTime(value?: string | null): string {
 const conversationCacheKey = (userId: number) =>
   `careerbridge:conversations:${userId}`;
 
+const messageCacheKey = (currentUserId: number, otherUserId: number) =>
+  `careerbridge:messages:${currentUserId}:${otherUserId}`;
+
+function reconcileConversations(
+  current: ApiConversation[],
+  fresh: ApiConversation[],
+  activeUserId: number | null
+): ApiConversation[] {
+  if (activeUserId == null) return fresh;
+
+  const hasActiveConversation = fresh.some(
+    (conversation) => Number(conversation.user_id) === Number(activeUserId)
+  );
+  if (hasActiveConversation) return fresh;
+
+  const activeConversation = current.find(
+    (conversation) => Number(conversation.user_id) === Number(activeUserId)
+  );
+
+  // A background response can briefly be stale/empty. Do not let it close the
+  // conversation the user is currently reading.
+  return activeConversation ? [activeConversation, ...fresh] : fresh;
+}
+
 function normalizeApiMessage(
   message: any,
   currentUserId: number | null
@@ -233,6 +257,7 @@ export function MessagesView({
   const currentUserIdRef = useRef<number | null>(null);
   const activeUserIdRef = useRef<number | null>(null);
   const activeConversationIdRef = useRef<number | null>(null);
+  const conversationsRef = useRef<ApiConversation[]>([]);
   const cacheHydratedUserRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -255,6 +280,10 @@ export function MessagesView({
   useEffect(() => {
     activeUserIdRef.current = activeUserId;
   }, [activeUserId]);
+
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
 
   const totalUnreadMessages = conversations.reduce(
     (total, conversation) => total + (conversation.unread || 0),
@@ -310,6 +339,7 @@ export function MessagesView({
           event: "INSERT",
           schema: "public",
           table: "message_events",
+          filter: `receiver_id=eq.${currentUserId}`,
         },
         (payload) => {
           const newMessage = payload.new as any;
@@ -441,9 +471,61 @@ export function MessagesView({
                 return 0;
               });
           });
+
+          // The event already updates known conversations immediately. Only hit
+          // Laravel when this is a brand-new conversation or event data is incomplete.
+          const conversationIsKnown = conversationsRef.current.some(
+            (conversation) =>
+              Number(conversation.user_id) === Number(conversationUserId)
+          );
+          if (!conversationIsKnown) {
+            void getConversations()
+              .then((fresh) =>
+                setConversations((current) =>
+                  reconcileConversations(current, fresh, activeUserIdRef.current)
+                )
+              )
+              .catch((error) =>
+                console.error("[message_events] Failed to refresh conversations:", error)
+              );
+          }
+
+          if (isActiveConversation && !messageId) {
+            void getConversation(conversationUserId)
+              .then((response) => {
+                const list = Array.isArray(response)
+                  ? response
+                  : response?.messages ?? response?.data ?? [];
+                setMessages(
+                  list.map((message: ApiChatMessage) =>
+                    normalizeApiMessage(message, currentUserIdRef.current)
+                  )
+                );
+              })
+              .catch((error) => {
+                console.error(
+                  "[message_events] Failed to refresh active messages:",
+                  error
+                );
+              });
+          }
         }
       )
-      .subscribe();
+      .subscribe((status, error) => {
+        if (status === "SUBSCRIBED") {
+          console.info(
+            `[message_events] SUBSCRIBED for receiver_id=${currentUserId}`
+          );
+          return;
+        }
+
+        if (error || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          console.error(
+            `[message_events] Subscription ${status} for receiver_id=${currentUserId}`,
+            error
+          );
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
@@ -515,10 +597,24 @@ export function MessagesView({
     let cancelled = false;
 
     (async () => {
-      setLoadingMessages(true);
+      let cachedMessages: ApiChatMessage[] = [];
+      const viewerId = currentUserIdRef.current;
+      if (viewerId != null) {
+        try {
+          const cached = localStorage.getItem(
+            messageCacheKey(viewerId, activeUserId)
+          );
+          cachedMessages = cached ? JSON.parse(cached) : [];
+        } catch {
+          cachedMessages = [];
+        }
+      }
+
+      if (cachedMessages.length > 0) setMessages(cachedMessages);
+      setLoadingMessages(cachedMessages.length === 0);
 
       try {
-        const res = await getConversation(activeConversationId, activeUserId);
+        const res = await getConversation(activeUserId);
 
         if (!cancelled) {
           const messageList = Array.isArray(res)
@@ -532,6 +628,16 @@ export function MessagesView({
           );
 
           setMessages(normalizedMessages);
+          if (viewerId != null) {
+            try {
+              localStorage.setItem(
+                messageCacheKey(viewerId, activeUserId),
+                JSON.stringify(normalizedMessages)
+              );
+            } catch {
+              // Cache is only a speed optimization.
+            }
+          }
 
           setConversations((prev) =>
             prev.map((conversation) =>
@@ -572,13 +678,15 @@ export function MessagesView({
       if (!affectsMessages) return;
 
       void getConversations().then((fresh) => {
-        setConversations(fresh);
+        setConversations((current) =>
+          reconcileConversations(current, fresh, activeUserIdRef.current)
+        );
       }).catch(() => undefined);
 
       const userId = activeUserIdRef.current;
       const conversationId = activeConversationIdRef.current;
       if (userId != null && conversationId != null) {
-        void getConversation(conversationId, userId).then((response) => {
+        void getConversation(userId).then((response) => {
           const list = Array.isArray(response)
             ? response
             : (response as any)?.messages ?? (response as any)?.data ?? [];
@@ -601,11 +709,15 @@ export function MessagesView({
         const data = await getConversations();
         if (cancelled) return;
         const convos = Array.isArray(data) ? data : (data as any)?.data ?? [];
-        setConversations(
-          convos.map((conversation: ApiConversation) =>
+        setConversations((current) =>
+          reconcileConversations(
+            current,
+            convos.map((conversation: ApiConversation) =>
             conversation.user_id === activeUserIdRef.current
               ? { ...conversation, unread: 0 }
               : conversation
+            ),
+            activeUserIdRef.current
           )
         );
       } catch {
@@ -613,7 +725,7 @@ export function MessagesView({
       }
     };
 
-    const interval = window.setInterval(refreshConversations, 5000);
+    const interval = window.setInterval(refreshConversations, 15000);
     window.addEventListener("focus", refreshConversations);
     return () => {
       cancelled = true;
@@ -628,7 +740,7 @@ export function MessagesView({
 
     const refreshActiveMessages = async () => {
       try {
-        const response = await getConversation(activeConversationId, activeUserId);
+        const response = await getConversation(activeUserId);
         if (cancelled) return;
         const list = Array.isArray(response) ? response : (response as any)?.messages ?? (response as any)?.data ?? [];
         const normalized = list.map((message: ApiChatMessage) =>
@@ -647,7 +759,7 @@ export function MessagesView({
       }
     };
 
-    const interval = window.setInterval(refreshActiveMessages, 2500);
+    const interval = window.setInterval(refreshActiveMessages, 10000);
     window.addEventListener("focus", refreshActiveMessages);
     return () => {
       cancelled = true;
@@ -671,7 +783,7 @@ export function MessagesView({
   }, []);
 
   const activeConvo = conversations.find(
-    (c) => c.user_id === activeUserId
+    (c) => Number(c.user_id) === Number(activeUserId)
   );
 
   const filteredConversations = [...conversations]
@@ -750,7 +862,7 @@ export function MessagesView({
   const refreshMessages = async () => {
     if (activeUserId == null || activeConversationId == null) return;
 
-    const res = await getConversation(activeConversationId, activeUserId);
+    const res = await getConversation(activeUserId);
 
     const messageList = Array.isArray(res)
       ? res
