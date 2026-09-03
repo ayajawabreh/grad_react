@@ -174,6 +174,16 @@ export default function CompanyJobDetails() {
         )}%`
       : "0%";
 
+  const responsibilities = String(job.responsibilities ?? "")
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const requirements = String(job.requirements ?? "")
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
   return (
     <View style={styles.container}>
       <ScrollView
@@ -302,6 +312,35 @@ export default function CompanyJobDetails() {
             </Pressable>
           </View>
         </View>
+
+        {(job.description || responsibilities.length > 0 || requirements.length > 0) && (
+          <View style={styles.detailsCard}>
+            {job.description ? (
+              <View style={styles.detailSection}>
+                <Text style={styles.sectionTitle}>Job Description</Text>
+                <Text style={styles.detailText}>{job.description}</Text>
+              </View>
+            ) : null}
+
+            {responsibilities.length > 0 ? (
+              <View style={styles.detailSection}>
+                <Text style={styles.sectionTitle}>Key Responsibilities</Text>
+                {responsibilities.map((item, index) => (
+                  <Text key={`${item}-${index}`} style={styles.bulletText}>• {item}</Text>
+                ))}
+              </View>
+            ) : null}
+
+            {requirements.length > 0 ? (
+              <View style={styles.detailSection}>
+                <Text style={styles.sectionTitle}>Candidate Requirements</Text>
+                {requirements.map((item, index) => (
+                  <Text key={`${item}-${index}`} style={styles.bulletText}>• {item}</Text>
+                ))}
+              </View>
+            ) : null}
+          </View>
+        )}
 
         {/* =====================================================
             APPLICATION PIPELINE
@@ -927,6 +966,34 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
+  },
+
+  detailsCard: {
+    marginBottom: 22,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 16,
+    backgroundColor: C.surface,
+  },
+
+  detailSection: {
+    marginBottom: 16,
+  },
+
+  detailText: {
+    fontFamily: F,
+    fontSize: 13,
+    lineHeight: 20,
+    color: C.textSec,
+  },
+
+  bulletText: {
+    marginBottom: 7,
+    fontFamily: F,
+    fontSize: 13,
+    lineHeight: 20,
+    color: C.textSec,
   },
 
   performanceCard: {

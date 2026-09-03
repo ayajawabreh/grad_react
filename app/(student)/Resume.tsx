@@ -1,5 +1,4 @@
-import React, { useEffect, useState } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -11,6 +10,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   Save,
   Eye,
@@ -374,10 +374,6 @@ export default function ResumeBuilder() {
     }, 3500);
   };
 
-  useEffect(() => {
-    loadResume();
-  }, []);
-
   const withLocalIds = <T,>(
     arr: any[]
   ): (T & { id: string })[] =>
@@ -390,17 +386,15 @@ export default function ResumeBuilder() {
       })
     );
 
-  const loadResume = async () => {
+  const loadResume = useCallback(async () => {
     try {
       setLoading(true);
 
-      const response = await API.get("/student/resume");
-      const uploadedDraft = await AsyncStorage.getItem("cb_resume_upload_draft");
-      const data = uploadedDraft ? JSON.parse(uploadedDraft) : (response.data ?? {});
-      if (uploadedDraft) {
-        await AsyncStorage.removeItem("cb_resume_upload_draft");
-      }
-
+      const response = await API.get("/student/resume", {
+        params: { _: Date.now() },
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+      });
+      const data = response.data ?? {};
       console.log(
         "Loaded Resume:",
         response.data
@@ -423,7 +417,7 @@ export default function ResumeBuilder() {
         data?.summary ?? ""
       );
       setIncludeProfilePhoto(
-        data?.include_profile_photo !== false && data?.include_profile_photo !== 0
+        ![false, 0, "0", null].includes(data?.include_profile_photo)
       );
       setTotalExperience(Number(
         data?.total_years_of_experience ??
@@ -443,9 +437,19 @@ export default function ResumeBuilder() {
       );
 
       skills.setItems(
-        withLocalIds<SkillItem>(
-          data?.skills
-        ).map((item) => ({ ...item, category: item.category ?? "Other" }))
+        (Array.isArray(data?.skills) ? data.skills : [])
+          .map((item: any) => ({
+            id: item && typeof item === "object" && item.id
+              ? String(item.id)
+              : genId(),
+            name: typeof item === "string"
+              ? item
+              : item?.name ?? item?.skill ?? "",
+            category: typeof item === "object"
+              ? item?.category ?? item?.category_name ?? "Other"
+              : "Other",
+          }))
+          .filter((item: SkillItem) => Boolean(item.name.trim()))
       );
 
       experience.setItems(
@@ -475,7 +479,16 @@ export default function ResumeBuilder() {
         )
       );
       achievements.setItems(
-        withLocalIds<AchievementItem>(data?.achievements)
+        withLocalIds<AchievementItem>([
+          ...(Array.isArray(data?.activities) ? data.activities : []),
+          ...(Array.isArray(data?.achievements) ? data.achievements : []),
+        ]).map((item: any) => ({
+          ...item,
+          title: typeof item === "string" ? item : item.title ?? item.name ?? "",
+          organization: item.organization ?? item.issuer ?? "",
+          year: item.year ?? "",
+          description: item.description ?? "",
+        }))
       );
     } catch (error: any) {
       console.error(
@@ -485,13 +498,20 @@ export default function ResumeBuilder() {
     } finally {
       setLoading(false);
     }
-  };
+  // List setters are stable for this screen; re-creating this callback would cause focus reload loops.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useFocusEffect(useCallback(() => {
+    void loadResume();
+  }, [loadResume]));
 
   useSyncRefresh(["resume", "student"], loadResume);
 
   const saveResume =
-    async (): Promise<number | null> => {
-      const datePattern = /^\d{4}-(0[1-9]|1[0-2])$/;
+    async (validateExperienceDates = true): Promise<number | null> => {
+      const datePattern = /^\d{4}(?:-(0[1-9]|1[0-2]))?$/;
+      const monthPattern = /^\d{4}-(0[1-9]|1[0-2])$/;
       const nextErrors: Record<string, { start_date?: string; end_date?: string }> = {};
 
       experience.items.forEach((item) => {
@@ -499,21 +519,24 @@ export default function ResumeBuilder() {
         const end = item.end_date.trim();
         const errors: { start_date?: string; end_date?: string } = {};
 
-        if (!start) errors.start_date = "Start Date is required.";
-        else if (!datePattern.test(start)) errors.start_date = "Use YYYY-MM, for example 2023-01.";
+        if (start && !datePattern.test(start)) {
+          errors.start_date = "Use YYYY or YYYY-MM, for example 2023 or 2023-01.";
+        }
 
-        if (!end) errors.end_date = "End Date is required.";
-        else if (end.toLowerCase() !== "present" && !datePattern.test(end)) {
-          errors.end_date = 'Use YYYY-MM or "Present" for a current role.';
-        } else if (datePattern.test(start) && datePattern.test(end) && end < start) {
+        if (end && end.toLowerCase() !== "present" && !datePattern.test(end)) {
+          errors.end_date = 'Use YYYY, YYYY-MM, or "Present" for a current role.';
+        } else if (monthPattern.test(start) && monthPattern.test(end) && end < start) {
           errors.end_date = "End Date cannot be earlier than Start Date.";
         }
 
         if (errors.start_date || errors.end_date) nextErrors[item.id] = errors;
       });
 
-      setExperienceErrors(nextErrors);
-      if (Object.keys(nextErrors).length > 0) return null;
+      setExperienceErrors(validateExperienceDates ? nextErrors : {});
+      if (validateExperienceDates && Object.keys(nextErrors).length > 0) {
+        showToast("error", "Please check the highlighted experience dates.");
+        return null;
+      }
 
       const data = {
         title: "My Resume",
@@ -537,7 +560,32 @@ export default function ResumeBuilder() {
         projects: projects.items,
         certificates: certificates.items,
         languages: languages.items,
-        achievements: achievements.items,
+        achievements: achievements.items
+          .filter((item) =>
+            Boolean(
+              item.title?.trim() ||
+                item.organization?.trim() ||
+                item.year?.trim() ||
+                item.description?.trim()
+            )
+          )
+          .map((item) => {
+            const details = [item.organization?.trim(), item.year?.trim()]
+              .filter(Boolean)
+              .join(" — ");
+            const description = [details, item.description?.trim()]
+              .filter(Boolean)
+              .join(" — ");
+
+            return {
+              title: item.title?.trim() || "Achievement",
+              name: item.title?.trim() || "Achievement",
+              organization: item.organization?.trim() || "",
+              year: item.year?.trim() || "",
+              description,
+            };
+          }),
+        activities: [],
         is_public: false,
       };
 
@@ -621,9 +669,19 @@ export default function ResumeBuilder() {
           error?.response?.data
         );
 
+        const validationErrors = error?.response?.data?.errors;
+        const firstValidationError = validationErrors
+          ? Object.values(validationErrors).flat()[0]
+          : null;
+
         showToast(
           "error",
-          "Error saving resume."
+          String(
+            firstValidationError ??
+              error?.response?.data?.message ??
+              error?.message ??
+              "Error saving resume."
+          )
         );
 
         return null;
@@ -632,20 +690,50 @@ export default function ResumeBuilder() {
       }
     };
 
+  const handlePreview = async () => {
+    const savedId = await saveResume(false);
+    const previewResumeId = savedId ?? resumeId;
+
+    if (!previewResumeId) {
+      showToast("error", "Save your resume before opening the preview.");
+      return;
+    }
+
+    try {
+      // Persist this preference independently so false is never lost when
+      // another optional resume field cannot be saved.
+      await API.put(`/student/resume/${previewResumeId}`, {
+        include_profile_photo: Boolean(includeProfilePhoto),
+      });
+
+      router.push("/(student)/ResumeView");
+    } catch (error: any) {
+      const validationErrors = error?.response?.data?.errors;
+      const firstValidationError = validationErrors
+        ? Object.values(validationErrors).flat()[0]
+        : null;
+
+      showToast(
+        "error",
+        String(
+          firstValidationError ??
+            error?.response?.data?.message ??
+            error?.message ??
+            "Could not open resume preview."
+        )
+      );
+    }
+  };
+
   const handleDownloadPdf =
     async () => {
-      if (!resumeId) {
-        showToast(
-          "warning",
-          "Save your resume once before downloading the PDF."
-        );
-        return;
-      }
-
       try {
         setDownloadingPdf(true);
 
-        await downloadAndOpenResumePdf(resumeId, fullName);
+        const savedId = await saveResume();
+        if (!savedId) return;
+
+        await downloadAndOpenResumePdf(savedId, fullName);
 
         Alert.alert(
           "PDF Ready",
@@ -660,7 +748,9 @@ export default function ResumeBuilder() {
 
         showToast(
           "error",
-          "Failed to generate PDF."
+          error?.response?.data?.message ??
+            error?.message ??
+            "Failed to generate PDF."
         );
       } finally {
         setDownloadingPdf(false);
@@ -940,7 +1030,7 @@ export default function ResumeBuilder() {
             style={styles.actions}
           >
             <TouchableOpacity
-              onPress={saveResume}
+              onPress={() => void saveResume()}
               disabled={saving}
               style={
                 styles.outlineButton
@@ -963,11 +1053,8 @@ export default function ResumeBuilder() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() =>
-                router.push(
-                  "/(student)/ResumeView"
-                )
-              }
+              onPress={handlePreview}
+              disabled={saving}
               style={
                 styles.darkButton
               }
@@ -982,7 +1069,9 @@ export default function ResumeBuilder() {
                   styles.darkButtonText
                 }
               >
-                Preview
+                {saving
+                  ? "Saving..."
+                  : "Preview"}
               </Text>
             </TouchableOpacity>
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   Upload,
   FileText,
@@ -40,6 +41,7 @@ interface ExistingResume {
   projects?: any[];
   certificates?: any[];
   languages?: any[];
+  activities?: any[];
   achievements?: any[];
 }
 
@@ -77,31 +79,32 @@ export default function ResumeUpload() {
   const [error, setError] = useState("");
   const [canRetry, setCanRetry] = useState(false);
 
-  useEffect(() => {
-    loadResume();
-  }, []);
-
-  const loadResume = async () => {
+  const loadResume = useCallback(async () => {
     try {
       setLoadingResume(true);
       setError("");
 
-      const response = await API.get("/student/resume");
-
-      console.log("Existing resume:", response.data);
+      const response = await API.get("/student/resume", {
+        params: { _: Date.now() },
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+      });
 
       if (response.data?.file_path || response.data?.file_url) {
         setExistingResume(response.data);
       } else {
         setExistingResume(null);
       }
-    } catch (err) {
-      console.error("Failed to load resume:", err);
+    } catch (err: any) {
       setExistingResume(null);
+      setError(err?.response?.data?.message ?? "Failed to load resume.");
     } finally {
       setLoadingResume(false);
     }
-  };
+  }, []);
+
+  useFocusEffect(useCallback(() => {
+    void loadResume();
+  }, [loadResume]));
 
   const pickFile = async () => {
     try {
@@ -166,6 +169,13 @@ export default function ResumeUpload() {
       setError("");
       setCanRetry(false);
 
+      console.log("Uploading CV asset:", {
+        uri: file.uri,
+        name: file.name,
+        mimeType: file.mimeType,
+        size: file.size,
+      });
+
       const formData = new FormData();
 
       formData.append("file", {
@@ -178,50 +188,82 @@ export default function ResumeUpload() {
             : "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
       } as any);
 
-      const response = await API.post(
-        "/student/resume/upload",
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
+      const token =
+        (await AsyncStorage.getItem("cb_token")) ||
+        (await AsyncStorage.getItem("token"));
 
-      console.log("Uploaded Resume:", response.data);
+      if (!token) {
+        throw new Error("Please sign in again before uploading your CV.");
+      }
 
-      if (response.data?.resume) {
-        const resume = response.data.resume;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 120000);
+      let uploadResponse: Response;
+
+      try {
+        uploadResponse = await fetch(
+          `${API.defaults.baseURL}/student/resume/upload`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              Accept: "application/json",
+            },
+            body: formData,
+            signal: controller.signal,
+          }
+        );
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      const responseData = await uploadResponse.json();
+
+      if (!uploadResponse.ok) {
+        console.log("Upload status:", uploadResponse.status);
+        console.log("Upload response:", responseData);
+
+        const firstError = responseData?.errors
+          ? Object.values(responseData.errors).flat()[0]
+          : responseData?.message;
+        const uploadError: any = new Error(
+          String(firstError || "Failed to upload CV.")
+        );
+        uploadError.status = uploadResponse.status;
+        uploadError.data = responseData;
+        throw uploadError;
+      }
+
+      if (responseData?.resume) {
+        const resume = responseData.resume;
         setExistingResume({
           ...resume,
           full_name: resume.full_name ?? "",
           professional_title: resume.professional_title ?? "",
           summary: resume.summary ?? "",
           education: resume.education ?? [],
-          skills: resume.skills ?? [],
+          skills: Array.isArray(resume.skills) ? resume.skills : [],
           experience: resume.experience ?? [],
           projects: resume.projects ?? [],
           certificates: resume.certificates ?? [],
           languages: resume.languages ?? [],
-          achievements: resume.achievements ?? [],
-          file_path: response.data.file_path ?? null,
-          file_url: response.data.file_url ?? null,
+          activities: Array.isArray(resume.activities) ? resume.activities : [],
+          achievements: Array.isArray(resume.achievements) ? resume.achievements : [],
+          file_path: resume.file_path ?? responseData.file_path ?? null,
+          file_url: resume.file_url ?? responseData.file_url ?? null,
           file_name:
-            response.data.file_name || file.name,
+            resume.file_name || responseData.file_name || file.name,
         });
       }
 
-      await AsyncStorage.setItem(
-        "cb_resume_upload_draft",
-        JSON.stringify(response.data?.resume ?? {})
-      );
+      await loadResume();
       setFile(null);
-      setUploaded(false);
+      setUploaded(true);
     } catch (err: any) {
       console.error("Upload CV error:", err);
 
-      const status = err?.response?.status;
-      const data = err?.response?.data;
+      const status = err?.status ?? err?.response?.status;
+      const data = err?.data ?? err?.response?.data;
       const fileError = Array.isArray(data?.errors?.file)
         ? data.errors.file[0]
         : undefined;
@@ -231,7 +273,7 @@ export default function ResumeUpload() {
         setError("Resume analysis is temporarily unavailable. Please try again.");
       } else {
         setCanRetry(false);
-        setError(fileError || data?.message || "Could not upload the CV.");
+        setError(fileError || data?.message || err?.message || "Could not upload the CV.");
       }
     } finally {
       setLoading(false);
@@ -294,7 +336,7 @@ export default function ResumeUpload() {
   };
 
   const openFile = async () => {
-    const path = existingResume?.file_url || existingResume?.file_path;
+    const path = existingResume?.file_path;
 
     if (!path) {
       Alert.alert(
@@ -306,9 +348,14 @@ export default function ResumeUpload() {
 
     try {
       await openUploadedResumeFile(path, existingResume?.file_name || "resume.pdf");
-    } catch (error) {
+    } catch (error: any) {
       console.warn("Open CV error:", error);
-      Alert.alert("Error", "Could not open the uploaded CV.");
+      Alert.alert(
+        "Error",
+        error?.response?.data?.message ??
+          error?.message ??
+          "Could not open the uploaded CV."
+      );
     }
   };
 

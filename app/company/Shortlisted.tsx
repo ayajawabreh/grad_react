@@ -1,56 +1,74 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import { ActivityIndicator, Alert, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { C, F } from "../../constants/tokens";
-import { getShortlistedApplicants } from "../../imports/api";
+import { API, resolveMediaUrl } from "../../imports/api";
 import { useSyncRefresh } from "../../context/SyncContext";
 
-function unwrapApplicants(value: any): any[] {
-  const result = value?.data?.data ?? value?.data ?? value?.applicants ?? value ?? [];
-  return Array.isArray(result) ? result : [];
-}
+type ShortlistedCandidate = {
+  id: number;
+  status: string;
+  job?: { id?: number; title?: string | null } | null;
+  student?: { name?: string | null; email?: string | null; avatar?: string | null; headline?: string | null; university?: string | null; major?: string | null; gpa?: string | null; location?: string | null } | null;
+  skills?: unknown[];
+  shortlisted_at?: string | null;
+};
 
-function candidateFrom(item: any) {
-  const student = item.student ?? item.user ?? item.applicant ?? {};
-  const name = student.name ?? item.name ?? "Candidate";
-  return {
-    id: item.application_id ?? item.id ?? student.id,
-    name,
-    email: student.email ?? item.email ?? "",
-    headline: student.headline ?? student.major ?? item.headline ?? "Shortlisted candidate",
-    university: student.university ?? item.university ?? "",
-    match: Number(item.match_score ?? item.match ?? item.ai_match_score ?? 0),
-    status: item.status ?? "Shortlisted",
-  };
+function CandidateAvatar({ item }: { item: ShortlistedCandidate }) {
+  const [failed, setFailed] = useState(false);
+  const uri = resolveMediaUrl(item.student?.avatar);
+  const initial = item.student?.name?.trim()?.charAt(0)?.toUpperCase() || "?";
+
+  useEffect(() => setFailed(false), [uri]);
+
+  if (!uri || failed) {
+    return <View style={styles.avatar}><Text style={styles.avatarText}>{initial}</Text></View>;
+  }
+
+  return <Image source={{ uri }} style={styles.avatarImage} resizeMode="cover" onError={() => setFailed(true)} />;
 }
 
 export default function Shortlisted() {
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const [applicants, setApplicants] = useState<any[]>([]);
+  const [applicants, setApplicants] = useState<ShortlistedCandidate[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async (refresh = false) => {
-    if (!id) {
-      setApplicants([]);
-      setLoading(false);
-      return;
-    }
     if (refresh) setRefreshing(true); else setLoading(true);
     try {
-      setApplicants(unwrapApplicants(await getShortlistedApplicants(Number(id))));
-    } catch {
-      Alert.alert("Unable to load candidates", "Please try again.");
+      const response = await API.get("/company/shortlisted", { params: { _: Date.now() } });
+      setApplicants(Array.isArray(response.data) ? response.data : []);
+    } catch (error: any) {
+      Alert.alert("Unable to load candidates", error?.response?.data?.message ?? "Failed to load shortlisted candidates.");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [id]);
+  }, []);
   useSyncRefresh("applications", () => load(false));
+  useFocusEffect(useCallback(() => { void load(); }, [load]));
 
-  useEffect(() => { void load(); }, [load]);
+  const remove = (item: ShortlistedCandidate) => Alert.alert(
+    "Remove from shortlist?",
+    `${item.student?.name || "This candidate"} will return to Applied status.`,
+    [
+      { text: "Cancel", style: "cancel" },
+      { text: "Remove", style: "destructive", onPress: async () => {
+        const previous = applicants;
+        setApplicants((current) => current.filter((candidate) => candidate.id !== item.id));
+        try {
+          await API.delete(`/company/applications/${item.id}/shortlist`);
+        } catch (error: any) {
+          setApplicants(previous);
+          Alert.alert("Unable to remove candidate", error?.response?.data?.message ?? "Please try again.");
+        }
+      } },
+    ],
+  );
 
   if (loading) {
     return <View style={styles.center}><ActivityIndicator size="large" color={C.accent} /><Text style={styles.loadingText}>Loading shortlisted candidates...</Text></View>;
@@ -89,26 +107,27 @@ export default function Shortlisted() {
           </Pressable>
         </View>
       ) : applicants.map((item) => {
-        const candidate = candidateFrom(item);
+        const student = item.student ?? {};
         return (
-          <View key={String(candidate.id)} style={styles.card}>
+          <View key={String(item.id)} style={styles.card}>
             <View style={styles.cardHeader}>
-              <View style={styles.avatar}><Text style={styles.avatarText}>{candidate.name.charAt(0).toUpperCase()}</Text></View>
+              <CandidateAvatar item={item} />
               <View style={styles.candidateCopy}>
-                <Text style={styles.name} numberOfLines={1}>{candidate.name}</Text>
-                <Text style={styles.headline} numberOfLines={2}>{candidate.headline}</Text>
+                <Text style={styles.name} numberOfLines={1}>{student.name || "Candidate"}</Text>
+                <Text style={styles.headline} numberOfLines={2}>{student.headline || "Candidate"}</Text>
               </View>
-              <View style={styles.shortlistedBadge}><Ionicons name="bookmark" size={11} color={C.accentHover} /><Text style={styles.shortlistedText}>{candidate.status}</Text></View>
+              <View style={styles.shortlistedBadge}><Ionicons name="bookmark" size={11} color={C.accentHover} /><Text style={styles.shortlistedText}>{item.status || "Shortlisted"}</Text></View>
             </View>
 
-            {!!candidate.university && <View style={styles.infoRow}><Ionicons name="school-outline" size={15} color={C.textMuted} /><Text style={styles.infoText}>{candidate.university}</Text></View>}
-            {!!candidate.email && <View style={styles.infoRow}><Ionicons name="mail-outline" size={15} color={C.textMuted} /><Text style={styles.infoText} numberOfLines={1}>{candidate.email}</Text></View>}
+            {!!item.job?.title && <View style={styles.infoRow}><Ionicons name="briefcase-outline" size={15} color={C.textMuted} /><Text style={styles.infoText}>{item.job.title}</Text></View>}
+            {!!student.university && <View style={styles.infoRow}><Ionicons name="school-outline" size={15} color={C.textMuted} /><Text style={styles.infoText}>{[student.university, student.major].filter(Boolean).join(" · ")}</Text></View>}
+            {!!student.email && <View style={styles.infoRow}><Ionicons name="mail-outline" size={15} color={C.textMuted} /><Text style={styles.infoText} numberOfLines={1}>{student.email}</Text></View>}
 
             <View style={styles.cardFooter}>
-              <View style={styles.matchBadge}><Ionicons name="sparkles-outline" size={14} color={C.accentHover} /><Text style={styles.matchText}>{candidate.match}% match</Text></View>
+              <Pressable style={styles.removeButton} onPress={() => remove(item)}><Ionicons name="bookmark-outline" size={14} color={C.error} /><Text style={styles.removeText}>Remove</Text></Pressable>
               <Pressable
                 style={styles.viewButton}
-                onPress={() => router.push({ pathname: "/company/CandidateDetails", params: { id: String(candidate.id) } })}
+                onPress={() => router.push({ pathname: "/company/CandidateDetails", params: { id: String(item.id) } })}
               >
                 <Text style={styles.viewText}>View Profile</Text><Ionicons name="arrow-forward" size={15} color="#FFFFFF" />
               </Pressable>
@@ -122,6 +141,6 @@ export default function Shortlisted() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: C.bg }, content: { padding: 16, paddingBottom: 40 }, center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, backgroundColor: C.bg, padding: 24 }, loadingText: { color: C.textSec, fontSize: 12, fontFamily: F }, backRow: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", gap: 7, marginBottom: 16 }, backText: { color: C.text, fontSize: 12, fontWeight: "700", fontFamily: F }, header: { flexDirection: "row", alignItems: "center", gap: 11, marginBottom: 18 }, headerIcon: { width: 46, height: 46, borderRadius: 13, backgroundColor: C.accentLight, alignItems: "center", justifyContent: "center" }, headerCopy: { flex: 1 }, heading: { color: C.text, fontSize: 22, fontWeight: "900", fontFamily: F }, subtitle: { color: C.textSec, fontSize: 11, lineHeight: 16, marginTop: 3, fontFamily: F }, countBadge: { minWidth: 34, height: 34, borderRadius: 17, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, alignItems: "center", justifyContent: "center" }, countText: { color: C.text, fontSize: 13, fontWeight: "900", fontFamily: F },
-  card: { backgroundColor: C.surface, borderColor: C.border, borderWidth: 1, borderRadius: 17, padding: 15, marginBottom: 12 }, cardHeader: { flexDirection: "row", alignItems: "flex-start", gap: 11 }, avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: C.accentLight, alignItems: "center", justifyContent: "center" }, avatarText: { color: C.accentHover, fontSize: 18, fontWeight: "900", fontFamily: F }, candidateCopy: { flex: 1 }, name: { color: C.text, fontSize: 15, fontWeight: "800", fontFamily: F }, headline: { color: C.textSec, fontSize: 11, lineHeight: 16, marginTop: 4, fontFamily: F }, shortlistedBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.accentLight, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8 }, shortlistedText: { color: C.accentHover, fontSize: 9, fontWeight: "800", fontFamily: F }, infoRow: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 11 }, infoText: { flex: 1, color: C.textSec, fontSize: 11, fontFamily: F }, cardFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 15, paddingTop: 13, borderTopWidth: 1, borderTopColor: C.divider }, matchBadge: { flexDirection: "row", alignItems: "center", gap: 5 }, matchText: { color: C.accentHover, fontSize: 11, fontWeight: "800", fontFamily: F }, viewButton: { minHeight: 39, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: C.accent, borderRadius: 10, paddingHorizontal: 13 }, viewText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800", fontFamily: F },
+  card: { backgroundColor: C.surface, borderColor: C.border, borderWidth: 1, borderRadius: 17, padding: 15, marginBottom: 12 }, cardHeader: { flexDirection: "row", alignItems: "flex-start", gap: 11 }, avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: C.accentLight, alignItems: "center", justifyContent: "center" }, avatarImage: { width: 48, height: 48, borderRadius: 24, backgroundColor: "#F1F5F9" }, avatarText: { color: C.accentHover, fontSize: 18, fontWeight: "900", fontFamily: F }, candidateCopy: { flex: 1 }, name: { color: C.text, fontSize: 15, fontWeight: "800", fontFamily: F }, headline: { color: C.textSec, fontSize: 11, lineHeight: 16, marginTop: 4, fontFamily: F }, shortlistedBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: C.accentLight, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 8 }, shortlistedText: { color: C.accentHover, fontSize: 9, fontWeight: "800", fontFamily: F }, infoRow: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 11 }, infoText: { flex: 1, color: C.textSec, fontSize: 11, fontFamily: F }, cardFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 15, paddingTop: 13, borderTopWidth: 1, borderTopColor: C.divider }, removeButton: { minHeight: 39, flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 8 }, removeText: { color: C.error, fontSize: 11, fontWeight: "800", fontFamily: F }, viewButton: { minHeight: 39, flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: C.accent, borderRadius: 10, paddingHorizontal: 13 }, viewText: { color: "#FFFFFF", fontSize: 11, fontWeight: "800", fontFamily: F },
   emptyCard: { alignItems: "center", backgroundColor: C.surface, borderColor: C.border, borderWidth: 1, borderRadius: 18, paddingHorizontal: 24, paddingVertical: 38 }, emptyIcon: { width: 64, height: 64, borderRadius: 32, backgroundColor: C.accentLight, alignItems: "center", justifyContent: "center" }, emptyTitle: { color: C.text, fontSize: 16, fontWeight: "800", marginTop: 15, fontFamily: F }, emptyText: { color: C.textSec, fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 7, fontFamily: F }, applicantsButton: { minHeight: 42, justifyContent: "center", backgroundColor: C.accent, borderRadius: 10, paddingHorizontal: 16, marginTop: 18 }, applicantsButtonText: { color: "#FFFFFF", fontSize: 12, fontWeight: "800", fontFamily: F },
 });

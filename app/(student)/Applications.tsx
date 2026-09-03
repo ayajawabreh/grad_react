@@ -41,47 +41,24 @@ function pickColor(seed: number) {
   return COLORS[Math.abs(seed) % COLORS.length];
 }
 
-function getStatusColor(status: string) {
-  switch (status) {
-    case "Applied":
-      return C.info;
-    case "Shortlisted":
-      return C.purple;
-    case "Interview":
-      return C.warning;
-    case "Hired":
-      return C.success;
-    case "Rejected":
-      return C.danger;
-    default:
-      return C.textSec;
-  }
-}
-
-function getStatusBackground(status: string) {
-  switch (status) {
-    case "Applied":
-      return C.infoBg;
-    case "Shortlisted":
-      return C.purpleBg;
-    case "Interview":
-      return C.warningBg;
-    case "Hired":
-      return C.successBg;
-    case "Rejected":
-      return C.dangerBg;
-    default:
-      return C.bg;
-  }
-}
+const statusColors: Record<string, { text: string; background: string }> = {
+  Rejected: { text: "#DC2626", background: "#FEE2E2" },
+  Shortlisted: { text: "#B7791F", background: "#FEF3C7" },
+  Applied: { text: "#15803D", background: "#DCFCE7" },
+};
 
 function StatusBadge({ status }: { status: string }) {
+  const colors = statusColors[status] ?? {
+    text: "#475569",
+    background: "#F1F5F9",
+  };
+
   return (
     <View
       style={[
         styles.statusBadge,
         {
-          backgroundColor: getStatusBackground(status),
+          backgroundColor: colors.background,
         },
       ]}
     >
@@ -89,7 +66,7 @@ function StatusBadge({ status }: { status: string }) {
         style={[
           styles.statusText,
           {
-            color: getStatusColor(status),
+            color: colors.text,
           },
         ]}
       >
@@ -609,9 +586,9 @@ const styles = StyleSheet.create({
   },
 
   statusBadge: {
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 99,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
   },
 
   statusText: {

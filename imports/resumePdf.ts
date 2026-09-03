@@ -17,14 +17,20 @@ export async function openUploadedResumeFile(path: string, fileName = "resume.pd
 
   const token = await getToken();
   const safeName = fileName.replace(/[^a-zA-Z0-9_.-]+/g, "_") || "resume.pdf";
-  const destination = new File(Paths.cache, safeName);
-  if (destination.exists) {
-    destination.delete();
-  }
+  const extension = safeName.toLowerCase().split(".").pop();
+  const nameWithoutExtension = safeName.replace(/\.[^.]+$/, "") || "resume";
+  const destination = new File(
+    Paths.cache,
+    `${nameWithoutExtension}_${Date.now()}.${extension || "pdf"}`
+  );
   const file = await File.downloadFileAsync(`${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}`, destination, {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
-  const extension = safeName.toLowerCase().split(".").pop();
+
+  if (!file.exists || file.size <= 0) {
+    throw new Error("The uploaded CV file is empty.");
+  }
+
   const mimeType = extension === "docx"
     ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     : "application/pdf";
@@ -39,35 +45,60 @@ export async function openUploadedResumeFile(path: string, fileName = "resume.pd
     return;
   }
 
-  await Linking.openURL(file.uri);
+  if (!(await Sharing.isAvailableAsync())) {
+    throw new Error("File opening is not available on this device.");
+  }
+
+  await Sharing.shareAsync(file.uri, {
+    mimeType,
+    UTI: extension === "docx"
+      ? "org.openxmlformats.wordprocessingml.document"
+      : "com.adobe.pdf",
+    dialogTitle: "Open or share CV",
+  });
 }
 
 export async function downloadAndOpenResumePdf(resumeId: number, fullName?: string) {
-  const url = `${API.defaults.baseURL}/student/resume/${resumeId}/pdf?v=${Date.now()}`;
-
   if (Platform.OS === "web") {
+    const url = `${API.defaults.baseURL}/student/resume/${resumeId}/pdf?v=${Date.now()}`;
     await Linking.openURL(url);
     return;
   }
 
+  const file = await downloadResumePdf(resumeId, fullName);
+
+  await shareResumePdf(file.uri);
+}
+
+export async function downloadResumePdf(resumeId: number, fullName?: string) {
+  const url = `${API.defaults.baseURL}/student/resume/${resumeId}/pdf?v=${Date.now()}`;
+
   const token = await getToken();
+  if (!token) throw new Error("Please sign in again to access your CV.");
   const safeName = (fullName || "Resume").trim().replace(/[^a-zA-Z0-9_-]+/g, "_");
-  const destination = new File(Paths.cache, `${safeName || "Resume"}.pdf`);
-  if (destination.exists) {
-    destination.delete();
-  }
+  const destination = new File(
+    Paths.cache,
+    `${safeName || "Resume"}_resume_${Date.now()}.pdf`
+  );
   const file = await File.downloadFileAsync(url, destination, {
-    headers: token ? { Authorization: `Bearer ${token}`, Accept: "application/pdf" } : undefined,
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/pdf" },
   });
 
-  if (!(await Sharing.isAvailableAsync())) {
-    await Linking.openURL(file.uri);
-    return;
+  if (!file.exists || file.size <= 0) {
+    throw new Error("The downloaded CV file is empty.");
   }
 
-  await Sharing.shareAsync(file.uri, {
+  return file;
+}
+
+export async function shareResumePdf(fileUri: string) {
+  if (!(await Sharing.isAvailableAsync())) {
+    throw new Error("File sharing is not available on this device.");
+  }
+
+  await Sharing.shareAsync(fileUri, {
     mimeType: "application/pdf",
     UTI: "com.adobe.pdf",
-    dialogTitle: "Open or save resume PDF",
+    dialogTitle: "Open or share CV",
   });
 }

@@ -11,13 +11,27 @@ import {
   ScrollView,
   ActivityIndicator,
 } from "react-native";
-import { router } from "expo-router";
+import { Href, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API } from "../../imports/api";
 import { useAuth } from "../../context/AuthContext";
 
 type Role = "student" | "company" | "admin";
+
+const isRole = (value: unknown): value is Role =>
+  value === "student" || value === "company" || value === "admin";
+
+const firstValidationError = (errors: unknown): string | null => {
+  if (!errors || typeof errors !== "object") return null;
+
+  for (const value of Object.values(errors)) {
+    if (Array.isArray(value) && value.length > 0) return String(value[0]);
+    if (typeof value === "string" && value) return value;
+  }
+
+  return null;
+};
 const COLORS = {
   bg: "#F8F8F6",
   surface: "#FFFFFF",
@@ -78,9 +92,9 @@ export default function Login() {
       await AsyncStorage.multiRemove(["cb_token", "token"]);
 
       const response = await API.post("/login", {
-        email: email.trim(),
+        email: email.trim().toLowerCase(),
         password,
-        role,
+        role: role.toLowerCase(),
       });
 
       const data = response.data;
@@ -142,20 +156,45 @@ export default function Login() {
       throw new Error("Unsupported account role.");
     } catch (err: any) {
       const status = err?.response?.status;
+      const data = err?.response?.data;
+      const errorCode = data?.error_code;
+
+      console.log("LOGIN STATUS:", status ?? "NETWORK_ERROR");
+      console.log("LOGIN RESPONSE:", data ?? err?.message);
 
       if (!status || status >= 500) {
         console.error("LOGIN ERROR:", err);
       }
 
+      if (status === 422) {
+        setError(
+          firstValidationError(data?.errors) ||
+            data?.message ||
+            "Please check the entered information."
+        );
+        return;
+      }
+
       const message =
-        (status === 401
-          ? "The email, password, or selected account type is incorrect."
-          : err?.response?.data?.message) ||
-        err?.response?.data?.error ||
+        data?.message ||
+        data?.error ||
         err?.message ||
-        "Something went wrong. Please try again.";
+        "Unable to log in. Please try again.";
 
       setError(message);
+
+      if (errorCode === "role_mismatch" && isRole(data?.expected_role)) {
+        setRole(data.expected_role);
+      }
+
+      if (errorCode === "email_not_verified" && data?.user_id) {
+        const pendingUserId = String(data.user_id);
+        await AsyncStorage.setItem("pending_verification_user_id", pendingUserId);
+        router.push({
+          pathname: "/(auth)/verify-email",
+          params: { userId: pendingUserId },
+        } as unknown as Href);
+      }
     } finally {
       setLoading(false);
     }
@@ -299,6 +338,8 @@ export default function Login() {
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
+              allowFontScaling={false}
+              maxFontSizeMultiplier={1}
               style={styles.input}
             />
           </View>
@@ -319,11 +360,13 @@ export default function Login() {
             <TextInput
               value={password}
               onChangeText={setPassword}
-              placeholder="••••••••"
+              placeholder="Password"
               placeholderTextColor={COLORS.textMuted}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
               autoCorrect={false}
+              allowFontScaling={false}
+              maxFontSizeMultiplier={1}
               style={styles.input}
             />
 
@@ -475,6 +518,7 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: 18,
     fontWeight: "800",
+    letterSpacing: 0,
   },
 
   header: {
@@ -486,12 +530,14 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     color: COLORS.text,
     marginBottom: 8,
+    letterSpacing: 0,
   },
 
   subtitle: {
     fontSize: 14,
     color: COLORS.textSec,
     lineHeight: 21,
+    letterSpacing: 0,
   },
 
   rolesContainer: {
@@ -520,6 +566,7 @@ const styles = StyleSheet.create({
   roleTitle: {
     fontSize: 12,
     fontWeight: "700",
+    letterSpacing: 0,
   },
 
   errorBox: {
@@ -548,6 +595,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
     marginBottom: 7,
+    letterSpacing: 0,
   },
 
   inputContainer: {
@@ -566,6 +614,9 @@ const styles = StyleSheet.create({
     flex: 1,
     color: COLORS.text,
     fontSize: 14,
+    fontWeight: "400",
+    letterSpacing: 0,
+    paddingVertical: 0,
   },
 
   forgotButton: {

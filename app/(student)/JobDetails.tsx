@@ -24,18 +24,21 @@ import { C, F } from "@/constants/tokens";
 
 import {
   fetchJob,
+  mapApiJobToUiJob,
   saveJob,
   unsaveJob,
   formatExperienceRange,
   type UiJob,
 } from "@/imports/jobs";
 import { useApplications } from "@/context/ApplicationsContext";
+import { useSavedJobs } from "@/context/SavedJobsContext";
 import { useSyncRefresh } from "@/context/SyncContext";
 
 export default function JobDetails() {
   const router = useRouter();
   const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
   const { appliedJobIds, setJobApplied } = useApplications();
+  const { jobs: savedJobs } = useSavedJobs();
 
   const [job, setJob] = useState<UiJob | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,13 +70,30 @@ export default function JobDetails() {
     setError("");
     try {
       setJob(await fetchJob(id));
-    } catch (err) {
-      console.error("Failed to load job:", err);
-      setError("Failed to load job details");
+    } catch (err: any) {
+      const status = err?.response?.status;
+      const savedJob = from === "saved"
+        ? savedJobs.find((item) => String(item.id) === String(id))
+        : null;
+
+      if (status === 404 && savedJob) {
+        setJob(mapApiJobToUiJob(savedJob as any));
+        setError("");
+      } else {
+        console.warn(
+          "Failed to load job:",
+          status,
+          err?.response?.data ?? err?.message
+        );
+        setError(
+          err?.response?.data?.message ??
+            "Failed to load job details"
+        );
+      }
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [from, id, savedJobs]);
 
   useEffect(() => { void loadJob(); }, [loadJob]);
   useSyncRefresh("jobs", loadJob, { jobId: id });
@@ -167,14 +187,14 @@ export default function JobDetails() {
 
   const responsibilities: string[] = job.responsibilities
     ? job.responsibilities
-        .split(",")
+        .split(/\r?\n/)
         .map((item: string) => item.trim())
         .filter(Boolean)
     : [];
 
   const requirements: string[] = job.requirements
     ? job.requirements
-        .split(",")
+        .split(/\r?\n/)
         .map((item: string) => item.trim())
         .filter(Boolean)
     : [];
@@ -315,19 +335,21 @@ export default function JobDetails() {
               ) : (
                 <Pressable
                   onPress={handleApply}
-                  disabled={applying}
+                  disabled={applying || job.status !== "Open"}
                   style={[
                     styles.applyButton,
                     {
                       backgroundColor: C.accent,
-                      opacity: applying ? 0.6 : 1,
+                      opacity: applying || job.status !== "Open" ? 0.6 : 1,
                     },
                   ]}
                 >
                   <Text style={styles.buttonText}>
                     {applying
                       ? "Applying..."
-                      : "Apply Now"}
+                      : job.status !== "Open"
+                        ? "Job Closed"
+                        : "Apply Now"}
                   </Text>
                 </Pressable>
               )}

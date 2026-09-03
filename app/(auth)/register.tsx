@@ -10,12 +10,12 @@ import {
   Platform,
   ActivityIndicator,
 } from "react-native";
-import { router } from "expo-router";
+import { Href, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { postPublicJson } from "../../imports/api";
 
 type Role = "student" | "company";
-
-const API_URL = "http://10.0.0.8:8000/api";
 
 const COLORS = {
   bg: "#F8F8F6",
@@ -35,6 +35,7 @@ export default function Register() {
 
   const [name, setName] = useState("");
   const [university, setUniversity] = useState("");
+  const [industry, setIndustry] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -73,6 +74,14 @@ export default function Register() {
       return;
     }
 
+    if (role === "company" && !industry.trim()) {
+      setNotification({
+        type: "error",
+        message: "Please enter your company industry.",
+      });
+      return;
+    }
+
     if (password !== confirmPassword) {
       setNotification({
         type: "error",
@@ -92,37 +101,28 @@ export default function Register() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
+      const data = await postPublicJson<{ message?: string; user_id?: number }>("/register", {
           name: name.trim(),
           email: email.trim(),
           password,
+          password_confirmation: confirmPassword,
           role,
           university:
             role === "student" ? university.trim() : undefined,
-        }),
+          industry:
+            role === "company" ? industry.trim() : undefined,
+        
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.message || "Registration failed. Please try again."
-        );
-      }
+      if (!data?.user_id) throw new Error("Server did not return a user_id.");
+      await AsyncStorage.setItem("pending_verification_user_id", String(data.user_id));
 
       setNotification({
         type: "success",
-        message: "Account created successfully! Redirecting...",
+        message: data.message || "Account created successfully! Redirecting...",
       });
 
       setTimeout(() => {
-        router.replace("/(auth)/login");
+        router.replace({ pathname: "/(auth)/verify-email", params: { userId: String(data.user_id) } } as unknown as Href);
       }, 1500);
     } catch (err: any) {
       setNotification({
@@ -316,6 +316,15 @@ export default function Register() {
               placeholder="University Name"
               value={university}
               onChangeText={setUniversity}
+            />
+          )}
+
+          {role === "company" && (
+            <Input
+              icon="briefcase-outline"
+              placeholder="Industry"
+              value={industry}
+              onChangeText={setIndustry}
             />
           )}
 

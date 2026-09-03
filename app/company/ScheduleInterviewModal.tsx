@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Modal,
   View,
@@ -9,6 +9,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
+  KeyboardAvoidingView,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
@@ -36,6 +37,7 @@ export default function ScheduleInterviewModal({
   onClose,
   onSuccess,
 }: Props) {
+  const scrollRef = useRef<ScrollView>(null);
   const [selectedDate, setSelectedDate] =
     useState<Date | null>(null);
 
@@ -135,12 +137,11 @@ export default function ScheduleInterviewModal({
         location:
           type === "Onsite"
             ? location.trim()
-            : "",
+            : null,
         meeting_link:
           type === "Online"
             ? meetingLink.trim()
-            : "",
-        status: "Scheduled",
+            : null,
       });
 
       onSuccess?.();
@@ -169,11 +170,20 @@ export default function ScheduleInterviewModal({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
-        <View style={styles.modal}>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoider}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
+      >
+        <View style={styles.overlay}>
+          <View style={styles.modal}>
           <ScrollView
+            ref={scrollRef}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+            automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+            contentContainerStyle={styles.scrollContent}
           >
             {/* Header */}
             <View style={styles.header}>
@@ -399,6 +409,7 @@ export default function ScheduleInterviewModal({
                   autoCapitalize="none"
                   autoCorrect={false}
                   style={styles.input}
+                  onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 250)}
                 />
               </View>
             )}
@@ -420,6 +431,7 @@ export default function ScheduleInterviewModal({
                   placeholder="e.g. HQ Office, Room 402"
                   placeholderTextColor="#94A3B8"
                   style={styles.input}
+                  onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 250)}
                 />
               </View>
             )}
@@ -489,13 +501,21 @@ export default function ScheduleInterviewModal({
               </Pressable>
             </View>
           </ScrollView>
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoider: {
+    flex: 1,
+  },
+
+  scrollContent: {
+    paddingBottom: 8,
+  },
   overlay: {
     flex: 1,
     backgroundColor: "rgba(15, 23, 42, 0.55)",

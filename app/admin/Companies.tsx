@@ -37,7 +37,9 @@ import {
   BriefcaseBusiness,
   Eye,
   ChevronDown,
+  Download,
 } from "lucide-react-native";
+import { downloadAdminExcel, excelExportErrorMessage, shareExcelFile } from "../../lib/downloadExcel";
 
 type Company = {
   id: number;
@@ -133,6 +135,8 @@ export default function AdminCompanies() {
   const [showFilter, setShowFilter] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [downloadedFileUri, setDownloadedFileUri] = useState<string | null>(null);
 
   const [updatingId, setUpdatingId] = useState<number | null>(null);
 
@@ -238,6 +242,22 @@ export default function AdminCompanies() {
       await loadCompanies(false);
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  const exportCompanies = async () => {
+    try {
+      setExporting(true);
+      const uri = await downloadAdminExcel("/admin/companies/export", "companies.xlsx", {
+        status: statusFilter || undefined,
+        search: query.trim() || undefined,
+      });
+      setDownloadedFileUri(uri);
+      Alert.alert("Success", "Excel file downloaded successfully.");
+    } catch (requestError: any) {
+      Alert.alert("Export failed", excelExportErrorMessage(requestError));
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -868,6 +888,16 @@ export default function AdminCompanies() {
             color={C.textMuted}
           />
         </Pressable>
+
+        <Pressable style={[styles.filterButton, exporting && { opacity: 0.6 }]} onPress={exportCompanies} disabled={exporting}>
+          {exporting ? <ActivityIndicator size="small" color={C.text} /> : <Download size={15} color={C.text} />}
+          <Text style={styles.filterButtonText}>Export Excel</Text>
+        </Pressable>
+        {downloadedFileUri ? (
+          <Pressable style={styles.filterButton} onPress={() => void shareExcelFile(downloadedFileUri).catch((shareError) => Alert.alert("Error", shareError.message))}>
+            <Text style={styles.filterButtonText}>Open / Share</Text>
+          </Pressable>
+        ) : null}
 
         <Text style={styles.resultsText}>
           {filteredCompanies.length}{" "}

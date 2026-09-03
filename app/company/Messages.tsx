@@ -16,6 +16,7 @@ import {
   Platform,
   Linking,
 } from "react-native";
+import { Image as ExpoImage } from "expo-image";
 
 import {
   Search,
@@ -32,6 +33,8 @@ import {
   Square,
   Plus,
   ArrowLeft,
+  Play,
+  Pause,
 } from "lucide-react-native";
 
 import * as DocumentPicker from "expo-document-picker";
@@ -39,6 +42,10 @@ import {
   AudioModule,
   RecordingPresets,
   useAudioRecorder,
+  useAudioRecorderState,
+  useAudioPlayer,
+  useAudioPlayerStatus,
+  setAudioModeAsync,
 } from "expo-audio";
 
 import { C, F } from "../../constants/tokens";
@@ -83,12 +90,88 @@ function normalizeFileUrl(url: string | null) {
   if (!url) return null;
 
   const markdownMatch = url.match(/^\[.*?\]\((.*?)\)$/);
+  const value = markdownMatch ? markdownMatch[1] : url;
+  return resolveMediaUrl(value);
+}
 
-  if (markdownMatch) {
-    return markdownMatch[1];
+function ChatMessageImage({ uri }: { uri: string }) {
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return <View style={[styles.messageImage, styles.messageImageFallback]}><ImageIcon size={28} color={C.textMuted} /><Text style={styles.messageImageError}>Image unavailable</Text></View>;
   }
 
-  return url;
+  return (
+    <View style={styles.messageImageContainer}>
+      {loading ? <View style={styles.messageImageLoader}><ActivityIndicator size="small" color={C.accent} /></View> : null}
+      <ExpoImage
+        source={{ uri }}
+        style={styles.messageImage}
+        contentFit="cover"
+        cachePolicy="memory-disk"
+        priority="high"
+        transition={120}
+        recyclingKey={uri}
+        onLoadStart={() => setLoading(true)}
+        onLoad={() => setLoading(false)}
+        onError={() => { setLoading(false); setFailed(true); }}
+      />
+    </View>
+  );
+}
+
+function formatAudioTime(seconds?: number) {
+  const total = Math.max(0, Math.floor(Number(seconds) || 0));
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}
+
+function VoiceMessagePlayer({ uri, isMe }: { uri: string; isMe: boolean }) {
+  const player = useAudioPlayer(uri, { updateInterval: 250, downloadFirst: true });
+  const status = useAudioPlayerStatus(player);
+  const color = isMe ? "#FFFFFF" : C.accentHover;
+  const progress = status.duration > 0 ? Math.min(1, status.currentTime / status.duration) : 0;
+
+  useEffect(() => {
+    player.volume = 1;
+    player.muted = false;
+  }, [player]);
+
+  const toggle = async () => {
+    await setAudioModeAsync({
+      allowsRecording: false,
+      playsInSilentMode: true,
+      shouldPlayInBackground: false,
+      interruptionMode: "doNotMix",
+    });
+    player.volume = 1;
+    player.muted = false;
+
+    if (status.playing) {
+      player.pause();
+      return;
+    }
+    if (status.duration > 0 && status.currentTime >= status.duration - 0.1) {
+      void player.seekTo(0);
+    }
+    player.play();
+  };
+
+  return (
+    <TouchableOpacity onPress={() => void toggle()} style={styles.audioMessage} activeOpacity={0.75}>
+      <View style={[styles.audioPlayButton, { borderColor: color }]}>
+        {status.playing ? <Pause size={15} color={color} fill={color} /> : <Play size={15} color={color} fill={color} />}
+      </View>
+      <View style={styles.audioBody}>
+        <View style={[styles.audioTrack, { backgroundColor: isMe ? "rgba(255,255,255,0.35)" : C.divider }]}>
+          <View style={[styles.audioProgress, { width: `${progress * 100}%`, backgroundColor: color }]} />
+        </View>
+        <Text style={[styles.audioDuration, { color: isMe ? "rgba(255,255,255,0.9)" : C.textSec }]}>
+          {formatAudioTime(status.currentTime)} / {formatAudioTime(status.duration)}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
 }
 
 export function MessagesView({
@@ -163,19 +246,11 @@ export function MessagesView({
   const [recording, setRecording] =
     useState(false);
 
-  const [recordingTime, setRecordingTime] =
-    useState(0);
-
   const [confirmDialog, setConfirmDialog] =
     useState<ConfirmType | null>(null);
 
   const [confirmLoading, setConfirmLoading] =
     useState(false);
-
-  const recordingTimerRef =
-    useRef<ReturnType<typeof setInterval> | null>(
-      null
-    );
 
   const currentUserIdRef =
     useRef<number | null>(null);
@@ -187,6 +262,11 @@ export function MessagesView({
     useAudioRecorder(
       RecordingPresets.HIGH_QUALITY
     );
+  const audioRecorderState =
+    useAudioRecorderState(audioRecorder, 250);
+  const recordingTime = Math.floor(
+    audioRecorderState.durationMillis / 1000
+  );
 
   /* -----------------------------
      Refs
@@ -585,22 +665,6 @@ export function MessagesView({
   }, [activeUserId, syncRevision]);
 
   /* -----------------------------
-     Recording timer
-  ----------------------------- */
-
-  useEffect(() => {
-    return () => {
-      if (
-        recordingTimerRef.current
-      ) {
-        clearInterval(
-          recordingTimerRef.current
-        );
-      }
-    };
-  }, []);
-
-  /* -----------------------------
      Helpers
   ----------------------------- */
 
@@ -975,23 +1039,20 @@ export function MessagesView({
           return;
         }
 
+        await setAudioModeAsync({
+          allowsRecording: true,
+          playsInSilentMode: true,
+        });
+
         await audioRecorder.prepareToRecordAsync();
 
         audioRecorder.record();
 
         setRecording(true);
-        setRecordingTime(0);
-
-        recordingTimerRef.current =
-          setInterval(() => {
-            setRecordingTime(
-              (prev) => prev + 1
-            );
-          }, 1000);
-      } catch {
+      } catch (error: any) {
         Alert.alert(
           "Error",
-          "Could not start recording."
+          error?.message ?? "Could not start recording."
         );
       }
     };
@@ -1001,23 +1062,20 @@ export function MessagesView({
       if (!recording) return;
 
       try {
+        const recordedDuration =
+          audioRecorderState.durationMillis;
+
         await audioRecorder.stop();
+
+        await setAudioModeAsync({
+          allowsRecording: false,
+          playsInSilentMode: true,
+        });
 
         const uri =
           audioRecorder.uri;
 
         setRecording(false);
-
-        if (
-          recordingTimerRef.current
-        ) {
-          clearInterval(
-            recordingTimerRef.current
-          );
-
-          recordingTimerRef.current =
-            null;
-        }
 
         if (
           !uri ||
@@ -1026,10 +1084,18 @@ export function MessagesView({
           return;
         }
 
+        if (recordedDuration < 500) {
+          Alert.alert(
+            "Recording is too short",
+            "Hold the microphone and record for at least one second."
+          );
+          return;
+        }
+
         const audioFile = {
           uri,
           name: `voice-${Date.now()}.m4a`,
-          type: "audio/m4a",
+          type: "audio/mp4",
         };
 
         setSending(true);
@@ -1056,12 +1122,26 @@ export function MessagesView({
         );
 
         await refreshMessages();
-      } catch {
+      } catch (error: any) {
+        const data = error?.response?.data;
+        const firstValidationError = data?.errors
+          ? Object.values(data.errors).flat()[0]
+          : null;
+
         Alert.alert(
-          "Error",
-          "Could not send voice message."
+          "Could not send voice message",
+          String(
+            firstValidationError ??
+              data?.message ??
+              error?.message ??
+              "Please try again."
+          )
         );
       } finally {
+        void setAudioModeAsync({
+          allowsRecording: false,
+          playsInSilentMode: true,
+        });
         setSending(false);
       }
     };
@@ -1787,51 +1867,12 @@ export function MessagesView({
                             )
                           }
                         >
-                          <Image
-                            source={{
-                              uri: fileUrl,
-                            }}
-                            style={
-                              styles.messageImage
-                            }
-                          />
+                          <ChatMessageImage uri={fileUrl} />
                         </TouchableOpacity>
                       ) : item.type ===
                           "audio" &&
                         fileUrl ? (
-                        <TouchableOpacity
-                          onPress={() =>
-                            Linking.openURL(
-                              fileUrl
-                            )
-                          }
-                          style={
-                            styles.audioMessage
-                          }
-                        >
-                          <Mic
-                            size={18}
-                            color={
-                              isMe
-                                ? "#fff"
-                                : C.accent
-                            }
-                          />
-
-                          <Text
-                            style={[
-                              styles.audioText,
-                              {
-                                color:
-                                  isMe
-                                    ? "#fff"
-                                    : C.text,
-                              },
-                            ]}
-                          >
-                            Voice message
-                          </Text>
-                        </TouchableOpacity>
+                        <VoiceMessagePlayer uri={fileUrl} isMe={isMe} />
                       ) : fileUrl ? (
                         <TouchableOpacity
                           onPress={() =>
@@ -2842,11 +2883,70 @@ const styles = StyleSheet.create({
     borderRadius: 11,
   },
 
+  messageImageContainer: {
+    width: 210,
+    height: 210,
+    borderRadius: 11,
+    overflow: "hidden",
+    backgroundColor: C.bg,
+  },
+
+  messageImageLoader: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  messageImageFallback: {
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: C.bg,
+  },
+
+  messageImageError: {
+    color: C.textMuted,
+    fontSize: 11,
+    fontFamily: F,
+  },
+
   audioMessage: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 9,
-    minWidth: 150,
+    gap: 10,
+    width: 210,
+    minHeight: 48,
+  },
+
+  audioPlayButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  audioBody: {
+    flex: 1,
+    gap: 6,
+  },
+
+  audioTrack: {
+    height: 4,
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+
+  audioProgress: {
+    height: "100%",
+    borderRadius: 2,
+  },
+
+  audioDuration: {
+    fontSize: 10,
+    fontWeight: "600",
+    fontFamily: F,
   },
 
   audioText: {

@@ -40,6 +40,7 @@ export interface UiApplicant {
   avatar: string | null;
   job: string;
   status: string;
+  interview_status?: string | null;
   match: number;
   skills: string[];
   email: string;
@@ -71,8 +72,41 @@ export interface ResumeData {
 export interface CompanyNote {
   id: number;
   note: string;
-  created_at?: string;
-  updated_at?: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export function normalizeCompanyNote(value: any): CompanyNote | null {
+  if (!value || typeof value !== "object") return null;
+
+  const id = Number(value.id);
+  const rawText = value.note ?? value.content ?? value.text ?? value.body ?? "";
+  const note = typeof rawText === "string" ? rawText.trim() : "";
+
+  if (!Number.isInteger(id) || value.id == null || !note) return null;
+
+  return {
+    id,
+    note,
+    createdAt: value.createdAt ?? value.created_at ?? null,
+    updatedAt: value.updatedAt ?? value.updated_at ?? null,
+  };
+}
+
+function normalizeCompanyNotesResponse(payload: any): CompanyNote[] {
+  const items = Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.data)
+      ? payload.data
+      : Array.isArray(payload?.notes)
+        ? payload.notes
+        : Array.isArray(payload?.data?.notes)
+          ? payload.data.notes
+          : [];
+
+  return items
+    .map(normalizeCompanyNote)
+    .filter((note: CompanyNote | null): note is CompanyNote => note !== null);
 }
 
 export type ApplicantDetails = {
@@ -325,7 +359,7 @@ export async function fetchApplicantDetails(
       source: matchAnalysis?.source ?? data?.match_source,
     },
 
-    notes: Array.isArray(data?.notes) ? data.notes : [],
+    notes: normalizeCompanyNotesResponse(data?.notes),
 
     timeline: Array.isArray(data?.timeline) ? data.timeline : [],
   };
@@ -346,39 +380,39 @@ export async function fetchApplicantAISummary(id: number): Promise<string> {
 export async function fetchApplicantNotes(
   applicationId: number,
 ): Promise<CompanyNote[]> {
-  const response = await API.get<CompanyNote[]>(
+  const response = await API.get(
     `/company/applicants/${applicationId}/notes`,
   );
 
-  return response.data;
+  return normalizeCompanyNotesResponse(response.data);
 }
 
 export async function addApplicantNote(
   applicationId: number,
   note: string,
-): Promise<CompanyNote> {
-  const response = await API.post<{
-    message: string;
-    note: CompanyNote;
-  }>(`/company/applicants/${applicationId}/notes`, {
+): Promise<CompanyNote | null> {
+  const response = await API.post(`/company/applicants/${applicationId}/notes`, {
     note,
   });
 
-  return response.data.note;
+  const payload = response.data;
+  return normalizeCompanyNote(
+    payload?.note ?? payload?.data?.note ?? payload?.data,
+  );
 }
 
 export async function updateApplicantNote(
   id: number,
   note: string,
-): Promise<CompanyNote> {
-  const response = await API.put<{
-    message: string;
-    note: CompanyNote;
-  }>(`/company/notes/${id}`, {
+): Promise<CompanyNote | null> {
+  const response = await API.put(`/company/notes/${id}`, {
     note,
   });
 
-  return response.data.note;
+  const payload = response.data;
+  return normalizeCompanyNote(
+    payload?.note ?? payload?.data?.note ?? payload?.data,
+  );
 }
 
 export function deleteApplicantNote(id: number) {

@@ -1,5 +1,4 @@
 import { Ionicons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useCallback, useEffect, useState } from "react";
 import {
     ActivityIndicator,
@@ -21,8 +20,6 @@ import {
     resolveAdminAbuseReport,
 } from "../../imports/api";
 import { useSyncRefresh } from "../../context/SyncContext";
-
-const CACHE_KEY = "careerbridge:admin-reports";
 
 type AbuseReport = {
   id: number;
@@ -51,11 +48,20 @@ type AbuseReport = {
   };
 };
 
+type ReportStatistics = {
+  total?: number;
+  pending?: number;
+  resolved?: number;
+  dismissed?: number;
+};
+
 export default function AdminReports() {
   const [reports, setReports] = useState<AbuseReport[]>([]);
+  const [statistics, setStatistics] = useState<ReportStatistics>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [error, setError] = useState("");
 
   const loadReports = useCallback(async (showLoading = true) => {
     try {
@@ -63,57 +69,19 @@ export default function AdminReports() {
         setLoading(true);
       }
 
-      /*
-       * Load cached reports first.
-       */
       try {
-        const cached = await AsyncStorage.getItem(CACHE_KEY);
+        const response: any = await getAdminAbuseReports({
+          status: "Pending",
+          limit: 50,
+          _: Date.now(),
+        });
 
-        if (cached) {
-          const parsed = JSON.parse(cached);
-
-          if (Array.isArray(parsed?.abuseReports)) {
-            setReports(parsed.abuseReports);
-
-            /*
-             * If cached data exists, don't keep showing
-             * the loading state while fetching fresh data.
-             */
-            if (showLoading) {
-              setLoading(false);
-            }
-          }
-        }
-      } catch (cacheError) {
-        console.log("Failed to read cached reports:", cacheError);
-
-        try {
-          await AsyncStorage.removeItem(CACHE_KEY);
-        } catch {}
-      }
-
-      /*
-       * Get fresh reports from Laravel.
-       */
-      try {
-        const response = await getAdminAbuseReports();
-
-        const data = response?.data ?? response;
-
-        const next: AbuseReport[] = Array.isArray(data)
-          ? data
-          : (data?.recent_reports ?? data?.reports ?? data?.data ?? []);
-
-        setReports(next);
-
-        await AsyncStorage.setItem(
-          CACHE_KEY,
-          JSON.stringify({
-            abuseReports: next,
-          }),
-        );
-      } catch (error) {
-        console.error("Failed to load abuse reports:", error);
+        setReports(Array.isArray(response?.recent_reports) ? response.recent_reports : []);
+        setStatistics(response?.statistics ?? {});
+        setError("");
+      } catch (requestError: any) {
+        setReports([]);
+        setError(requestError?.response?.data?.message ?? "Failed to load abuse reports.");
       }
     } finally {
       if (showLoading) {
@@ -136,36 +104,36 @@ export default function AdminReports() {
     }
   }, [loadReports]);
 
-  const handleAction = async (id: number, action: "resolve" | "dismiss") => {
+  const handleAction = async (report: AbuseReport, action: "resolve" | "dismiss") => {
     try {
-      setUpdatingId(id);
+      setUpdatingId(report.id);
 
       if (action === "resolve") {
-        await resolveAdminAbuseReport(id);
+        await resolveAdminAbuseReport(report.id, null);
       } else {
-        await dismissAdminAbuseReport(id);
+        await dismissAdminAbuseReport(report.id, null);
       }
 
-      setReports((current) => {
-        const next = current.filter((item) => item.id !== id);
-
-        AsyncStorage.setItem(
-          CACHE_KEY,
-          JSON.stringify({
-            abuseReports: next,
-          }),
-        ).catch((error) => {
-          console.log("Failed to update cached reports:", error);
-        });
-
-        return next;
-      });
-    } catch (error) {
-      console.error(`Failed to ${action} abuse report:`, error);
-
+      setReports((current) => current.filter((item) => item.id !== report.id));
+      await loadReports(false);
+      Alert.alert(
+        "Success",
+        action === "resolve"
+          ? "Report resolved successfully."
+          : "Report dismissed successfully.",
+      );
+    } catch (requestError: any) {
+      const status = requestError?.response?.status;
+      const serverMessage = requestError?.response?.data?.message;
+      if (status === 404 || status === 422) {
+        await loadReports(false);
+      }
       Alert.alert(
         "Error",
-        `Failed to ${action === "resolve" ? "resolve" : "dismiss"} the report. Please try again.`,
+        serverMessage ??
+          (action === "resolve"
+            ? "Failed to resolve report."
+            : "Failed to dismiss report."),
       );
     } finally {
       setUpdatingId(null);
@@ -188,7 +156,7 @@ export default function AdminReports() {
       {
         text: action === "resolve" ? "Resolve" : "Dismiss",
         style: action === "dismiss" ? "destructive" : "default",
-        onPress: () => handleAction(item.id, action),
+        onPress: () => handleAction(item, action),
       },
     ]);
   };
@@ -215,6 +183,7 @@ export default function AdminReports() {
         reported={reported}
         risk={risk}
         status={status}
+        canAct={status === "Pending"}
         isUpdating={isUpdating}
         onResolve={() => confirmAction(item, "resolve")}
         onDismiss={() => confirmAction(item, "dismiss")}
@@ -231,9 +200,21 @@ export default function AdminReports() {
           <Text style={styles.subtitle}>
             Review and manage user-submitted safety reports
           </Text>
+
+          <Text style={styles.statisticsText}>
+            Pending: {statistics.pending ?? reports.length} · Total: {statistics.total ?? reports.length}
+          </Text>
         </View>
 
-        {loading && reports.length === 0 ? (
+        {error ? (
+          <View style={styles.loadingContainer}>
+            <Ionicons name="alert-circle-outline" size={34} color={C.error} />
+            <Text style={styles.loadingText}>{error}</Text>
+            <Pressable style={styles.retryButton} onPress={() => loadReports(true)}>
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </Pressable>
+          </View>
+        ) : loading && reports.length === 0 ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={C.accent} />
 
@@ -295,6 +276,7 @@ type ReportCardProps = {
   reported: string;
   risk: string;
   status: string;
+  canAct: boolean;
   isUpdating: boolean;
   onResolve: () => void;
   onDismiss: () => void;
@@ -306,6 +288,7 @@ function ReportCard({
   reported,
   risk,
   status,
+  canAct,
   isUpdating,
   onResolve,
   onDismiss,
@@ -386,7 +369,7 @@ function ReportCard({
       </View>
 
       {/* Actions */}
-      <View style={styles.actions}>
+      {canAct ? <View style={styles.actions}>
         <Pressable
           disabled={isUpdating}
           onPress={onDismiss}
@@ -430,7 +413,7 @@ function ReportCard({
             </>
           )}
         </Pressable>
-      </View>
+      </View> : null}
     </View>
   );
 }
@@ -577,6 +560,14 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 6,
     lineHeight: 19,
+  },
+
+  statisticsText: {
+    fontFamily: F,
+    color: C.textSec,
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 9,
   },
 
   listContent: {
@@ -842,6 +833,24 @@ const styles = StyleSheet.create({
     color: C.textSec,
     fontSize: 13,
     marginTop: 12,
+    textAlign: "center",
+  },
+
+  retryButton: {
+    marginTop: 14,
+    minHeight: 40,
+    paddingHorizontal: 18,
+    borderRadius: 9,
+    backgroundColor: C.accent,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  retryButtonText: {
+    fontFamily: F,
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "700",
   },
 
   emptyScrollContent: {

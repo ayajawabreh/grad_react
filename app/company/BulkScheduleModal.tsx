@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   View,
   Text,
@@ -7,8 +7,9 @@ import {
   StyleSheet,
   Modal,
   ActivityIndicator,
-  Alert,
   Platform,
+  KeyboardAvoidingView,
+  ScrollView,
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
@@ -44,6 +45,7 @@ export default function BulkScheduleModal({
   onClose,
   onSuccess,
 }: Props) {
+  const scrollRef = useRef<ScrollView>(null);
   const [selectedDate, setSelectedDate] =
     useState<Date | null>(null);
 
@@ -277,8 +279,21 @@ export default function BulkScheduleModal({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
-        <View style={styles.modal}>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoider}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 12 : 0}
+      >
+        <View style={styles.overlay}>
+          <View style={styles.modal}>
+            <ScrollView
+              ref={scrollRef}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+              automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+              contentContainerStyle={styles.scrollContent}
+            >
 
           {/* --------------------------------------- */}
           {/* Header */}
@@ -613,6 +628,7 @@ export default function BulkScheduleModal({
                   autoCapitalize="none"
                   keyboardType="url"
                   style={styles.textInputFull}
+                  onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 250)}
                 />
               </>
             ) : (
@@ -634,6 +650,7 @@ export default function BulkScheduleModal({
                     COLORS.textMuted
                   }
                   style={styles.textInputFull}
+                  onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 250)}
                 />
               </>
             )}
@@ -698,8 +715,10 @@ export default function BulkScheduleModal({
 
           </View>
 
+            </ScrollView>
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -709,6 +728,13 @@ export default function BulkScheduleModal({
 // ======================================================
 
 const styles = StyleSheet.create({
+  keyboardAvoider: {
+    flex: 1,
+  },
+
+  scrollContent: {
+    paddingBottom: 8,
+  },
   overlay: {
     flex: 1,
     backgroundColor:

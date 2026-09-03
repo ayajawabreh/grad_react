@@ -35,7 +35,6 @@ type Stats = {
   applications: string;
   interviews: string;
   saved: string;
-  views: string;
 };
 
 type Job = {
@@ -51,6 +50,9 @@ type Job = {
   employment_type?: string;
   salary?: string;
   description?: string;
+  match_percentage?: number | string;
+  match_score?: number | string;
+  match?: number | string;
 };
 
 const trendData = [
@@ -69,7 +71,6 @@ export default function Dashboard() {
     applications: "0",
     interviews: "0",
     saved: "0",
-    views: "0",
   });
 
   const [recommendedJobs, setRecommendedJobs] = useState<Job[]>([]);
@@ -117,8 +118,6 @@ export default function Dashboard() {
 
       let applications = "0";
       let interviews = "0";
-      let views = "0";
-
       if (dashboardData?.stats) {
         const s = dashboardData.stats;
 
@@ -134,11 +133,6 @@ export default function Dashboard() {
             "0"
         );
 
-        views = String(
-          s.views ??
-            s.profile_views_count ??
-            "0"
-        );
       } else if (dashboardData) {
         applications = String(
           dashboardData.applications_count ??
@@ -152,18 +146,12 @@ export default function Dashboard() {
             "0"
         );
 
-        views = String(
-          dashboardData.profile_views_count ??
-            dashboardData.views ??
-            "0"
-        );
       }
 
       setStats({
         applications,
         interviews,
         saved: String(savedJobs.length),
-        views,
       });
 
       if (Array.isArray(jobsData)) {
@@ -215,6 +203,16 @@ export default function Dashboard() {
       },
     });
   };
+
+  const jobMatchesCount = recommendedJobs.filter(
+    (job) =>
+      Number(
+        job.match_percentage ??
+          job.match_score ??
+          job.match ??
+          0
+      ) >= 70
+  ).length;
 
   if (loading) {
     return (
@@ -273,11 +271,12 @@ export default function Dashboard() {
           />
 
           <StatCard
-            label="Profile Views"
-            value={stats.views}
-            trend="+22%"
-            icon="eye-outline"
-            iconColor={COLORS.success}
+            label="Job Matches"
+            value={String(jobMatchesCount)}
+            subtitle="Jobs matching your skills"
+            icon="sparkles-outline"
+            iconColor="#7C3AED"
+            onPress={() => router.push("/(student)/Recommended")}
           />
         </View>
 
@@ -455,15 +454,23 @@ function StatCard({
   trend,
   icon,
   iconColor,
+  subtitle,
+  onPress,
 }: {
   label: string;
   value: string;
   trend?: string;
   icon: keyof typeof Ionicons.glyphMap;
   iconColor: string;
+  subtitle?: string;
+  onPress?: () => void;
 }) {
   return (
-    <View style={styles.statCard}>
+    <Pressable
+      disabled={!onPress}
+      onPress={onPress}
+      style={({ pressed }) => [styles.statCard, pressed && onPress && styles.statCardPressed]}
+    >
       <View
         style={[
           styles.statIcon,
@@ -501,7 +508,8 @@ function StatCard({
           </Text>
         )}
       </View>
-    </View>
+      {subtitle ? <Text style={[styles.statSubtitle, { color: iconColor }]}>{subtitle}</Text> : null}
+    </Pressable>
   );
 }
 
@@ -726,6 +734,11 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
 
+  statCardPressed: {
+    opacity: 0.78,
+    transform: [{ scale: 0.985 }],
+  },
+
   statIcon: {
     width: 42,
     height: 42,
@@ -758,6 +771,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
     marginBottom: 4,
+  },
+
+  statSubtitle: {
+    marginTop: 7,
+    fontSize: 9.5,
+    fontWeight: "700",
   },
 
   section: {

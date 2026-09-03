@@ -7,13 +7,15 @@ import {
   ScrollView,
   Pressable,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Svg, { Circle, G, Line, Path, Text as SvgText } from "react-native-svg";
 
 import { C, F } from "../../constants/tokens";
-import { getCompanyDashboard } from "../../imports/api";
+import { getCompanyDashboard, resolveMediaUrl } from "../../imports/api";
 import { useSyncRefresh } from "../../context/SyncContext";
 
 export default function CompanyDashboard() {
@@ -25,6 +27,7 @@ export default function CompanyDashboard() {
 
   const [loading, setLoading] =
     useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadDashboard = async () => {
     try {
@@ -34,6 +37,7 @@ export default function CompanyDashboard() {
       console.log("Failed to load company dashboard:", error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -52,17 +56,21 @@ export default function CompanyDashboard() {
     void loadDashboard();
   }, []);
 
-  const activityData =
-    dashboard?.activity?.length
-      ? dashboard.activity.map((item: any) => ({
-          month: item.month,
-          value: Number(item.value) || 0,
-        }))
-      : [
-          { month: "May", value: 0 },
-          { month: "Jun", value: 0 },
-          { month: "Jul", value: 0 },
-        ];
+  const activityFromApi = Array.isArray(dashboard?.activity)
+    ? dashboard.activity.map((item: any) => ({
+        month: String(item.month || ""),
+        value: Number(item.value) || 0,
+      }))
+    : [];
+
+  // A path made from one point is invisible. The web chart starts at zero,
+  // so keep that same baseline and make a single returned month visible.
+  const activityData = activityFromApi.length
+    ? [{ month: "Start", value: 0 }, ...activityFromApi.slice(-6)]
+    : [
+        { month: "Start", value: 0 },
+        { month: "Now", value: 0 },
+      ];
 
   const pipelineData =
     Array.isArray(dashboard?.pipeline)
@@ -97,6 +105,16 @@ export default function CompanyDashboard() {
       style={styles.container}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          tintColor={C.accent}
+          onRefresh={() => {
+            setRefreshing(true);
+            void loadDashboard();
+          }}
+        />
+      }
     >
       <View style={styles.header}>
         <Text style={styles.greeting}>
@@ -154,67 +172,7 @@ export default function CompanyDashboard() {
           Applications Over Time
         </Text>
 
-        <View style={styles.chartContainer}>
-          <View style={styles.yAxis}>
-            <Text style={styles.axisText}>
-              {maxActivity}
-            </Text>
-
-            <Text style={styles.axisText}>
-              {Math.round(maxActivity / 2)}
-            </Text>
-
-            <Text style={styles.axisText}>
-              0
-            </Text>
-          </View>
-
-          <View style={styles.chart}>
-            <View style={styles.chartGridLine} />
-            <View style={styles.chartGridLine} />
-            <View style={styles.chartGridLine} />
-
-            <View style={styles.barsContainer}>
-              {activityData.map(
-                (item: any, index: number) => {
-                  const height =
-                    item.value === 0
-                      ? 4
-                      : Math.max(
-                          8,
-                          (item.value /
-                            maxActivity) *
-                            125
-                        );
-
-                  return (
-                    <View
-                      key={`${item.month}-${index}`}
-                      style={styles.barColumn}
-                    >
-                      <View
-                        style={[
-                          styles.activityBar,
-                          {
-                            height,
-                          },
-                        ]}
-                      />
-
-                      <Text
-                        style={styles.monthText}
-                      >
-                        {formatMonth(
-                          item.month
-                        )}
-                      </Text>
-                    </View>
-                  );
-                }
-              )}
-            </View>
-          </View>
-        </View>
+        <ApplicationsLineChart data={activityData} maxValue={maxActivity} />
       </View>
 
       <View style={styles.card}>
@@ -224,6 +182,7 @@ export default function CompanyDashboard() {
 
         {pipelineData.length > 0 ? (
           <View style={styles.pipelineContainer}>
+            <PipelineDonut data={pipelineData} />
             {pipelineData.map(
               (item: any, index: number) => {
                 const total =
@@ -499,6 +458,113 @@ export default function CompanyDashboard() {
   );
 }
 
+function ApplicationsLineChart({
+  data,
+  maxValue,
+}: {
+  data: { month: string; value: number }[];
+  maxValue: number;
+}) {
+  const width = Math.max(330, data.length * 82);
+  const height = 210;
+  const left = 34;
+  const right = 14;
+  const top = 12;
+  const bottom = 30;
+  const plotWidth = width - left - right;
+  const plotHeight = height - top - bottom;
+  const yMax = Math.max(4, Math.ceil(maxValue / 4) * 4);
+  const points = data.map((item, index) => ({
+    ...item,
+    x: left + (data.length > 1 ? (index * plotWidth) / (data.length - 1) : plotWidth / 2),
+    y: top + plotHeight - (item.value / yMax) * plotHeight,
+  }));
+  const line = points.map((point, index) => `${index ? "L" : "M"} ${point.x} ${point.y}`).join(" ");
+  const baseline = top + plotHeight;
+  const area = points.length
+    ? `${line} L ${points.at(-1)!.x} ${baseline} L ${points[0].x} ${baseline} Z`
+    : "";
+
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <Svg width={width} height={height}>
+        {Array.from({ length: 5 }, (_, index) => {
+          const y = top + (plotHeight / 4) * index;
+          return (
+            <G key={index}>
+              <Line x1={left} y1={y} x2={width - right} y2={y} stroke="#E7E5E4" strokeDasharray="4 4" />
+              <SvgText x={left - 7} y={y + 3} textAnchor="end" fill="#78716C" fontSize={9}>
+                {Math.round(yMax - (yMax / 4) * index)}
+              </SvgText>
+            </G>
+          );
+        })}
+        {points.map((point, index) => (
+          <G key={`${point.month}-${index}`}>
+            <Line x1={point.x} y1={top} x2={point.x} y2={baseline} stroke="#F0EEEB" strokeDasharray="4 4" />
+            <SvgText x={point.x} y={height - 9} textAnchor="middle" fill="#78716C" fontSize={9}>
+              {formatMonth(point.month)}
+            </SvgText>
+          </G>
+        ))}
+        <Path d={area} fill="#2563EB" opacity={0.08} />
+        <Path d={line} fill="none" stroke="#2563EB" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
+        {points.map((point, index) => (
+          <Circle
+            key={`activity-point-${index}`}
+            cx={point.x}
+            cy={point.y}
+            r={3.5}
+            fill="#FFFFFF"
+            stroke="#2563EB"
+            strokeWidth={2}
+          />
+        ))}
+      </Svg>
+    </ScrollView>
+  );
+}
+
+function PipelineDonut({ data }: { data: any[] }) {
+  const total = data.reduce((sum, item) => sum + Number(item.value || 0), 0);
+  const radius = 39;
+  const circumference = 2 * Math.PI * radius;
+  let consumed = 0;
+
+  return (
+    <View style={styles.donutWrap}>
+      <Svg width={112} height={112} viewBox="0 0 112 112">
+        <Circle cx={56} cy={56} r={radius} fill="none" stroke="#F1F0EE" strokeWidth={16} />
+        <G rotation="-90" origin="56, 56">
+          {data.map((item, index) => {
+            const fraction = total ? Number(item.value || 0) / total : 0;
+            const length = fraction * circumference;
+            const offset = -consumed * circumference;
+            consumed += fraction;
+            return (
+              <Circle
+                key={`${item.name}-${index}`}
+                cx={56}
+                cy={56}
+                r={radius}
+                fill="none"
+                stroke={item.color || C.accent}
+                strokeWidth={16}
+                strokeDasharray={`${length} ${circumference - length}`}
+                strokeDashoffset={offset}
+              />
+            );
+          })}
+        </G>
+      </Svg>
+      <View style={styles.donutCenter}>
+        <Text style={styles.donutValue}>{total}</Text>
+        <Text style={styles.donutLabel}>Candidates</Text>
+      </View>
+    </View>
+  );
+}
+
 function StatCardMobile({
   label,
   value,
@@ -570,9 +636,26 @@ function ApplicantCard({
     "Candidate";
 
   const headline =
+    candidate?.job_title ||
     candidate?.student?.headline ||
     candidate?.headline ||
     "No headline provided";
+
+  const status = String(candidate?.status || "Applied");
+  const statusStyle =
+    status === "Rejected"
+      ? { text: "#DC2626", background: "#FEE2E2" }
+      : status === "Accepted" || status === "Hired"
+        ? { text: "#15803D", background: "#DCFCE7" }
+        : status === "Interview"
+          ? { text: "#6D28D9", background: "#EDE9FE" }
+          : status === "Shortlisted"
+            ? { text: "#B7791F", background: "#FEF3C7" }
+            : { text: "#2563EB", background: "#DBEAFE" };
+
+  const skills = Array.isArray(candidate?.skills)
+    ? candidate.skills.slice(0, 4)
+    : [];
 
   const match =
     Number(
@@ -583,8 +666,7 @@ function ApplicantCard({
     ) || 0;
 
   const avatar =
-    candidate?.student?.avatar ||
-    candidate?.avatar ||
+    resolveMediaUrl(candidate?.student?.avatar || candidate?.avatar) ||
     `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
       name
     )}`;
@@ -600,12 +682,12 @@ function ApplicantCard({
       />
 
       <View style={styles.applicantInfo}>
-        <Text
-          style={styles.applicantName}
-          numberOfLines={1}
-        >
-          {name}
-        </Text>
+        <View style={styles.applicantNameRow}>
+          <Text style={styles.applicantName} numberOfLines={1}>{name}</Text>
+          <View style={[styles.applicantStatus, { backgroundColor: statusStyle.background }]}>
+            <Text style={[styles.applicantStatusText, { color: statusStyle.text }]}>{status}</Text>
+          </View>
+        </View>
 
         <Text
           style={styles.applicantHeadline}
@@ -613,6 +695,20 @@ function ApplicantCard({
         >
           {headline}
         </Text>
+
+        <Text style={styles.applicantLocation} numberOfLines={1}>
+          {candidate?.location || candidate?.univ || "Location not provided"}
+        </Text>
+
+        {skills.length ? (
+          <View style={styles.skillsRow}>
+            {skills.map((skill: any, index: number) => (
+              <View key={`${String(skill)}-${index}`} style={styles.skillChip}>
+                <Text style={styles.skillText}>✓ {typeof skill === "string" ? skill : skill?.name}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
 
         <View style={styles.applicantBottom}>
           <View style={styles.matchBadge}>
@@ -861,6 +957,33 @@ const styles = StyleSheet.create({
     gap: 15,
   },
 
+  donutWrap: {
+    width: 112,
+    height: 112,
+    alignSelf: "center",
+    marginBottom: 5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  donutCenter: {
+    position: "absolute",
+    alignItems: "center",
+  },
+
+  donutValue: {
+    fontFamily: F,
+    fontSize: 19,
+    fontWeight: "800",
+    color: C.text,
+  },
+
+  donutLabel: {
+    fontFamily: F,
+    fontSize: 8.5,
+    color: C.textSec,
+  },
+
   pipelineRow: {
     width: "100%",
   },
@@ -969,10 +1092,29 @@ const styles = StyleSheet.create({
   },
 
   applicantName: {
+    flex: 1,
     fontFamily: F,
     fontSize: 14,
     fontWeight: "700",
     color: C.text,
+  },
+
+  applicantNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+
+  applicantStatus: {
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 99,
+  },
+
+  applicantStatusText: {
+    fontFamily: F,
+    fontSize: 8.5,
+    fontWeight: "700",
   },
 
   applicantHeadline: {
@@ -981,6 +1123,33 @@ const styles = StyleSheet.create({
     color: C.textSec,
     marginTop: 3,
     lineHeight: 16,
+  },
+
+  applicantLocation: {
+    fontFamily: F,
+    fontSize: 9.5,
+    color: C.textMuted,
+    marginTop: 3,
+  },
+
+  skillsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 5,
+    marginTop: 8,
+  },
+
+  skillChip: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: "#ECFDF5",
+  },
+
+  skillText: {
+    fontFamily: F,
+    fontSize: 8,
+    color: "#15803D",
   },
 
   applicantBottom: {

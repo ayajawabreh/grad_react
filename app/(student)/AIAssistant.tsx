@@ -108,6 +108,18 @@ interface AttemptHistory {
 type AssistantPhase = "idle" | "checking_saved_job" | "generating_questions" |
   "quiz_open" | "submitting" | "completed" | "retaking" | "loading_history" | "error";
 
+function assistantErrorMessage(error: any, fallback: string) {
+  if (error?.response?.status === 503) {
+    return "The AI service is temporarily unavailable. Please try again in a moment.";
+  }
+
+  if (!error?.response && error?.request) {
+    return "Could not reach the server. Check your connection and try again.";
+  }
+
+  return error?.response?.data?.message || error?.message || fallback;
+}
+
 const TOOLS = [
   {
     type: "cv",
@@ -448,13 +460,7 @@ export default function AIAssistant() {
         setShowJobSelection(true);
       }
     } catch (err: any) {
-      console.error(err);
-
-      setError(
-        err?.response?.data?.message ||
-          err?.message ||
-          "Something went wrong. Please try again."
-      );
+      setError(assistantErrorMessage(err, "Something went wrong. Please try again."));
     } finally {
       setLoading(false);
     }
@@ -499,13 +505,7 @@ export default function AIAssistant() {
       setPhase("quiz_open");
       void loadHistory(jobId);
     } catch (err: any) {
-      console.error(err);
-
-      setError(
-        err?.response?.data?.message ||
-          err?.message ||
-          "Failed to generate interview questions."
-      );
+      setError(assistantErrorMessage(err, "Failed to generate interview questions."));
 
       setShowJobSelection(true);
       setPhase("error");
@@ -543,10 +543,16 @@ export default function AIAssistant() {
       return;
     }
 
-    if (
-      Object.keys(selectedAnswers).length !==
-      interview.questions.length
-    ) {
+    const unansweredCount = interview.questions.filter(
+      (question) => !selectedAnswers[question.id]
+    ).length;
+
+    if (unansweredCount > 0) {
+      setError(
+        `Please answer all questions before submitting. ${unansweredCount} ${
+          unansweredCount === 1 ? "question remains" : "questions remain"
+        }.`
+      );
       return;
     }
 
@@ -597,10 +603,9 @@ export default function AIAssistant() {
     }
   };
 
-  const answeredCount =
-    Object.keys(
-      selectedAnswers
-    ).length;
+  const answeredCount = interview?.questions?.filter(
+    (question) => Boolean(selectedAnswers[question.id])
+  ).length ?? 0;
 
   const questionCount =
     interview?.questions?.length || 0;
@@ -1210,9 +1215,7 @@ export default function AIAssistant() {
                 }
                 loading={phase === "submitting"}
                 disabled={
-                  loading ||
-                  answeredCount !==
-                  questionCount
+                  loading
                 }
               />
             ) : (

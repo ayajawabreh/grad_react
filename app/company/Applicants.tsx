@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   View,
   Text,
@@ -8,6 +9,7 @@ import {
   FlatList,
   ActivityIndicator,
   Alert,
+  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -18,7 +20,8 @@ import {
   updateApplicationStatus,
 } from "../../imports/applicants";
 
-import { shortlistApplicant } from "../../imports/api";
+import { resolveMediaUrl, shortlistApplicant } from "../../imports/api";
+import { fetchInterviews } from "../../imports/interviews";
 
 import ScheduleInterviewModal from "./ScheduleInterviewModal";
 import BulkScheduleModal from "./BulkScheduleModal";
@@ -46,6 +49,33 @@ const COLORS = {
   purple: "#C8A46A",
 };
 
+function ApplicantAvatar({ applicant }: { applicant: UiApplicant }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const avatarUri = resolveMediaUrl(applicant.avatar);
+  const initial = applicant.name?.trim()?.charAt(0)?.toUpperCase() || "?";
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [avatarUri]);
+
+  if (!avatarUri || imageFailed) {
+    return (
+      <View style={styles.avatarFallback}>
+        <Text style={styles.avatarText}>{initial}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <Image
+      source={{ uri: avatarUri }}
+      style={styles.avatar}
+      resizeMode="cover"
+      onError={() => setImageFailed(true)}
+    />
+  );
+}
+
 export default function Applicants() {
   const [query, setQuery] = useState("");
   const [jobFilter, setJobFilter] = useState("All");
@@ -68,10 +98,28 @@ export default function Applicants() {
   const [showBulkSchedule, setShowBulkSchedule] = useState(false);
   const [bulkLoading, setBulkLoading] = useState(false);
 
+  const loadApplicants = useCallback(async () => {
+    const [applicants, interviewsResponse] = await Promise.all([
+      fetchApplicants(),
+      fetchInterviews(),
+    ]);
+    const interviews = Array.isArray(interviewsResponse.data) ? interviewsResponse.data : [];
+    const withInterviewStatuses = applicants.map((applicant) => {
+      const related = interviews
+        .filter((interview: any) =>
+          String(interview.candidate_name ?? "").trim().toLowerCase() === applicant.name.trim().toLowerCase() &&
+          String(interview.job_title ?? "").trim().toLowerCase() === applicant.job.trim().toLowerCase()
+        )
+        .sort((first: any, second: any) => Number(second.id ?? 0) - Number(first.id ?? 0))[0];
+      return { ...applicant, interview_status: related?.status ?? null };
+    });
+    setCandidates(withInterviewStatuses);
+    setError(null);
+  }, []);
+
   useSyncRefresh(["applications", "interviews", "student", "resume"], async () => {
     try {
-      setCandidates(await fetchApplicants());
-      setError(null);
+      await loadApplicants();
     } catch (err) {
       console.error(err);
     }
@@ -93,15 +141,10 @@ export default function Applicants() {
   // Load applicants
   // --------------------------------------------------
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     let mounted = true;
 
-    fetchApplicants()
-      .then((data) => {
-        if (mounted) {
-          setCandidates(data);
-        }
-      })
+    loadApplicants()
       .catch((err) => {
         console.error(err);
 
@@ -118,7 +161,7 @@ export default function Applicants() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [loadApplicants]));
 
   // --------------------------------------------------
   // Filter
@@ -383,14 +426,14 @@ export default function Applicants() {
       );
 
       showToast(
-        `${candidate.name} has been rejected.`
+        `${candidate.name} has been rejected. Candidate notification processed.`
       );
 
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
 
       showToast(
-        "Failed to reject candidate."
+        error?.response?.data?.message ?? "Failed to reject candidate."
       );
     }
   };
@@ -469,6 +512,9 @@ export default function Applicants() {
     const selected = selectedIds.has(
       item.application_id
     );
+    const displayedStatus = ["Accepted", "Rejected"].includes(item.status)
+      ? item.status
+      : item.interview_status || item.status;
 
     return (
       <View style={styles.card}>
@@ -509,13 +555,7 @@ export default function Applicants() {
           }
           style={styles.candidateInfo}
         >
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>
-              {item.name
-                .substring(0, 2)
-                .toUpperCase()}
-            </Text>
-          </View>
+          <ApplicantAvatar applicant={item} />
 
           <View style={styles.infoContainer}>
             <Text
@@ -547,23 +587,23 @@ export default function Applicants() {
           <View
             style={[
               styles.statusBadge,
-              item.status === "Shortlisted" &&
+              displayedStatus === "Shortlisted" &&
                 styles.shortlistedBadge,
-              item.status === "Rejected" &&
+              ["Rejected", "Cancelled"].includes(displayedStatus) &&
                 styles.rejectedBadge,
             ]}
           >
             <Text
               style={[
                 styles.statusText,
-                item.status ===
+                displayedStatus ===
                   "Shortlisted" &&
                   styles.shortlistedText,
-                item.status === "Rejected" &&
+                ["Rejected", "Cancelled"].includes(displayedStatus) &&
                   styles.rejectedText,
               ]}
             >
-              {item.status}
+              {displayedStatus}
             </Text>
           </View>
         </View>
@@ -934,7 +974,7 @@ export default function Applicants() {
             }}
             onSuccess={() => {
               showToast(
-                "Interview scheduled successfully"
+                "Interview scheduled successfully. Candidate notification processed."
               );
             }}
           />
@@ -1152,18 +1192,25 @@ const styles = StyleSheet.create({
   },
 
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: COLORS.accentLight,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "#F1F5F9",
+  },
+
+  avatarFallback: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "#EDE9FE",
     alignItems: "center",
     justifyContent: "center",
   },
 
   avatarText: {
-    fontSize: 15,
-    fontWeight: "900",
-    color: COLORS.accentDark,
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#6D28D9",
   },
 
   infoContainer: {

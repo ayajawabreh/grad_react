@@ -9,6 +9,7 @@ import { getStudentProfile } from "../../imports/api";
 import { useSyncRefresh } from "../../context/SyncContext";
 import { useAuth } from "../../context/AuthContext";
 import { C, F } from "../../constants/tokens";
+import { DeleteAccountSection } from "../../components/DeleteAccountSection";
 
 type TabKey = "account" | "security" | "notifications" | "privacy";
 
@@ -166,6 +167,7 @@ export default function StudentSettings() {
           <SettingRow title="Contact Details" description="Show your contact details on your profile." value={privacy.contact_visibility} disabled={saving === "p-contact_visibility"} onPress={() => void updatePrivacy("contact_visibility")} />
           <SettingRow title="AI Resume Analysis" description="Use AI for resume recommendations." value={privacy.ai_resume_analysis} disabled={saving === "p-ai_resume_analysis"} onPress={() => void updatePrivacy("ai_resume_analysis")} last />
         </View>
+        <DeleteAccountSection />
       </View>}
     </ScrollView>
   </View>;

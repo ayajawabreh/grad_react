@@ -62,6 +62,8 @@ export default function CreateJob() {
     maxExperienceYears: "",
     deadline: "",
     description: "",
+    responsibilities: "",
+    requirements: "",
     skills: [] as string[],
     benefits: [] as string[],
   });
@@ -196,6 +198,11 @@ export default function CreateJob() {
     setSubmitting(true);
     setError(null);
 
+    const pendingSkill = skillInput.trim();
+    const submittedSkills = pendingSkill && !formData.skills.includes(pendingSkill)
+      ? [...formData.skills, pendingSkill]
+      : formData.skills;
+
     const payload = {
       title: formData.title.trim(),
       department: formData.dept.trim(),
@@ -215,27 +222,59 @@ export default function CreateJob() {
       max_experience_years: maxExperience,
       deadline: formData.deadline || null,
       description: formData.description.trim(),
-      skills: formData.skills,
+      responsibilities: formData.responsibilities.trim() || null,
+      requirements: formData.requirements.trim() || null,
+      skills: submittedSkills,
       benefits: formData.benefits,
+      status: "Pending Review",
     };
 
     try {
-      await api.post("/company/jobs", payload);
+      const response = await api.post("/company/jobs", payload);
 
-      Alert.alert(
-        "Success",
-        "Job position created successfully!",
-        [
-          {
-            text: "OK",
-            onPress: () =>
-              router.replace("/company/ManageJobs"),
-          },
-        ]
+      if (response.status < 200 || response.status >= 300) {
+        throw new Error("Failed to create job.");
+      }
+
+      await api.get("/company/jobs", {
+        params: { _: Date.now() },
+      });
+
+      const createdStatus = response.data?.job?.status ?? "Pending Review";
+      const successMessage = response.data?.message ?? (
+        createdStatus === "Open"
+          ? "Job passed automatic validation and was published successfully."
+          : "Job was created and sent to admin moderation."
       );
+      const moderationIssues = Array.isArray(response.data?.moderation_issues)
+        ? response.data.moderation_issues
+            .map((issue: any) => issue?.message)
+            .filter(Boolean)
+            .join(" ")
+        : "";
+      const qualityScore = response.data?.quality_score;
+
+      router.replace({
+        pathname: "/company/ManageJobs",
+        params: {
+          notice: successMessage,
+          noticeStatus: createdStatus,
+          noticeDetails: createdStatus === "Open"
+            ? "Your job is now visible to students."
+            : [qualityScore != null ? `Quality score: ${qualityScore}.` : "", moderationIssues]
+                .filter(Boolean)
+                .join(" "),
+          refreshKey: String(Date.now()),
+        },
+      });
     } catch (error: any) {
       console.log(
-        "Create job error:",
+        "Create status:",
+        error?.response?.status
+      );
+
+      console.log(
+        "Create response:",
         error?.response?.data
       );
 
@@ -244,17 +283,17 @@ export default function CreateJob() {
         error?.response?.data?.errors
       );
 
-      const validationErrors =
-        Object.values(
-          error?.response?.data?.errors || {}
-        )
-          .flat()
-          .join(" ");
+      const firstValidationError = error?.response?.data?.errors
+        ? Object.values(error.response.data.errors).flat()[0]
+        : null;
 
       setError(
-        error?.response?.data?.message ||
-          validationErrors ||
-          "Failed to publish the job. Please check the entered information."
+        String(
+          firstValidationError ??
+            error?.response?.data?.message ??
+            error?.message ??
+            "Failed to create job."
+        )
       );
     } finally {
       setSubmitting(false);
@@ -517,6 +556,39 @@ export default function CreateJob() {
               styles.descriptionInput,
             ]}
           />
+          <Text style={styles.helperText}>Use at least 120 characters for automatic publishing.</Text>
+
+          <Text style={[styles.label, { marginTop: 18 }]}>Key Responsibilities</Text>
+          <TextInput
+            value={formData.responsibilities}
+            onChangeText={(value) =>
+              setFormData((previous) => ({ ...previous, responsibilities: value }))
+            }
+            placeholder="Enter each responsibility on a separate line"
+            placeholderTextColor={C.textSec}
+            multiline
+            numberOfLines={5}
+            textAlignVertical="top"
+            style={[styles.input, styles.multiLineInput]}
+          />
+          <Text style={styles.helperText}>Enter each responsibility on a separate line.</Text>
+
+          <Text style={[styles.label, { marginTop: 16 }]}>Candidate Requirements</Text>
+          <TextInput
+            value={formData.requirements}
+            onChangeText={(value) =>
+              setFormData((previous) => ({ ...previous, requirements: value }))
+            }
+            placeholder="Enter each qualification or requirement on a separate line"
+            placeholderTextColor={C.textSec}
+            multiline
+            numberOfLines={5}
+            textAlignVertical="top"
+            style={[styles.input, styles.multiLineInput]}
+          />
+          <Text style={styles.helperText}>
+            Qualifications and experience required from the candidate, one per line. Use at least 60 characters for automatic publishing.
+          </Text>
         </View>
 
         <View style={styles.card}>
@@ -929,6 +1001,12 @@ const styles = StyleSheet.create({
 
   descriptionInput: {
     minHeight: 145,
+    lineHeight: 19,
+  },
+
+  multiLineInput: {
+    minHeight: 112,
+    paddingTop: 12,
     lineHeight: 19,
   },
 

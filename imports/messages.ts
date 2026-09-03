@@ -341,8 +341,6 @@ export const sendMessage =
           formData,
           {
             headers: {
-              "Content-Type":
-                "multipart/form-data",
               Accept:
                 "application/json",
             },

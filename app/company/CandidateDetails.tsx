@@ -58,6 +58,10 @@ export default function CandidateDetails() {
 
   const [notes, setNotes] = useState<CompanyNote[]>([]);
   const [loading, setLoading] = useState(true);
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [notesError, setNotesError] = useState<string | null>(null);
+  const [addingNote, setAddingNote] = useState(false);
+  const [deletingNoteId, setDeletingNoteId] = useState<number | null>(null);
 
   const [tab, setTab] =
     useState<(typeof TABS)[number]>("Profile");
@@ -75,35 +79,45 @@ export default function CandidateDetails() {
   const [aiSummaryError, setAiSummaryError] =
     useState<string | null>(null);
   const [showMatchSheet, setShowMatchSheet] = useState(false);
+  const [avatarFailed, setAvatarFailed] = useState(false);
+
+  const loadNotes = useCallback(async (showLoading = true) => {
+    if (!id) return false;
+    if (showLoading) setNotesLoading(true);
+    setNotesError(null);
+
+    try {
+      const notesData = await fetchApplicantNotes(Number(id));
+      setNotes(notesData);
+      return true;
+    } catch {
+      setNotesError("Failed to load notes. Please try again.");
+      return false;
+    } finally {
+      if (showLoading) setNotesLoading(false);
+    }
+  }, [id]);
 
   const loadCandidate = useCallback(async () => {
     if (!id) return;
 
     const applicantId = Number(id);
     try {
-      const [applicant, notesData] = await Promise.all([
+      const [applicant] = await Promise.all([
         fetchApplicantDetails(applicantId),
-        fetchApplicantNotes(applicantId).catch(() => []),
+        loadNotes(),
       ]);
         setCandidate(applicant);
-
-        setNotes(
-          Array.isArray(notesData)
-            ? notesData
-            : notesData
-            ? [notesData]
-            : []
-        );
 
         if (applicant?.status) {
           setStatus(applicant.status);
         }
-    } catch (err) {
-      console.error("Failed to load applicant details:", err);
+    } catch {
+      Alert.alert("Error", "Failed to load applicant details.");
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, loadNotes]);
 
   useSyncRefresh(["applications", "student", "resume", "interviews"], loadCandidate);
   useEffect(() => { void loadCandidate(); }, [loadCandidate]);
@@ -230,42 +244,44 @@ export default function CandidateDetails() {
   };
 
   const handleAddNote = async () => {
-    if (!newNote.trim() || !id) return;
+    const noteText = newNote.trim();
+    if (!noteText || !id || addingNote) return;
 
     try {
-      const added = await addApplicantNote(
-        Number(id),
-        newNote.trim()
-      );
-
-      setNotes((prev) => [added, ...prev]);
+      setAddingNote(true);
+      await addApplicantNote(Number(id), noteText);
       setNewNote("");
-    } catch (e) {
-      console.error(e);
-
+      const refreshed = await loadNotes(false);
       Alert.alert(
-        "Error",
-        "Failed to add the note."
+        refreshed ? "Success" : "Note saved",
+        refreshed
+          ? "Note added successfully."
+          : "The note was saved, but the list could not be refreshed. Please retry."
       );
+    } catch (error: any) {
+      Alert.alert("Error", error?.response?.data?.message || "Failed to add the note.");
+      await loadNotes(false);
+    } finally {
+      setAddingNote(false);
     }
   };
 
   const handleDeleteNote = async (
     noteId: number
   ) => {
+    if (deletingNoteId !== null) return;
+
     try {
+      setDeletingNoteId(noteId);
       await deleteApplicantNote(noteId);
 
       setNotes((prev) =>
         prev.filter((note) => note.id !== noteId)
       );
-    } catch (e) {
-      console.error(e);
-
-      Alert.alert(
-        "Error",
-        "Failed to delete the note."
-      );
+    } catch (error: any) {
+      Alert.alert("Error", error?.response?.data?.message || "Failed to delete the note.");
+    } finally {
+      setDeletingNoteId(null);
     }
   };
 
@@ -275,7 +291,7 @@ export default function CandidateDetails() {
     if (!candidate?.application_id) return;
 
     try {
-      await API.put(
+      const response = await API.put(
         `/company/applicants/${candidate.application_id}/status`,
         {
           status: newStatus,
@@ -292,7 +308,11 @@ export default function CandidateDetails() {
             }
           : prev
       );
-    } catch (error) {
+      Alert.alert(
+        "Status updated",
+        `${response.data?.message ?? `Application marked as ${newStatus}.`}\nCandidate notification processed.`
+      );
+    } catch (error: any) {
       console.error(
         "Failed to update status:",
         error
@@ -300,7 +320,7 @@ export default function CandidateDetails() {
 
       Alert.alert(
         "Error",
-        "Failed to update candidate status."
+        error?.response?.data?.message ?? "Failed to update candidate status."
       );
     }
   };
@@ -387,11 +407,8 @@ export default function CandidateDetails() {
       ? (candidate as any).experiences
       : [];
 
-  const avatar =
-    candidate.student.avatar ||
-    `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(
-      candidate.student.name
-    )}`;
+  const avatar = resolveMediaUrl(candidate.student.avatar);
+  const avatarInitial = candidate.student.name?.trim()?.charAt(0)?.toUpperCase() || "?";
 
   return (
     <ScrollView
@@ -447,10 +464,11 @@ export default function CandidateDetails() {
       {/* PROFILE HEADER */}
       <View style={styles.profileCard}>
         <View style={styles.profileTop}>
-          <Image
-            source={{ uri: avatar }}
-            style={styles.avatar}
-          />
+          {avatar && !avatarFailed ? (
+            <Image source={{ uri: avatar }} style={styles.avatar} resizeMode="cover" onError={() => setAvatarFailed(true)} />
+          ) : (
+            <View style={[styles.avatar, styles.avatarFallback]}><Text style={styles.avatarInitial}>{avatarInitial}</Text></View>
+          )}
 
           <View style={styles.profileIdentity}>
             <Text style={styles.candidateName}>
@@ -1204,28 +1222,42 @@ export default function CandidateDetails() {
               placeholderTextColor={C.textSec}
               style={styles.noteInput}
               multiline
+              editable={!addingNote}
             />
 
             <Pressable
               onPress={handleAddNote}
-              style={styles.addNoteButton}
+              disabled={!newNote.trim() || addingNote}
+              style={[
+                styles.addNoteButton,
+                (!newNote.trim() || addingNote) && styles.noteActionDisabled,
+              ]}
             >
-              <Ionicons
-                name="add"
-                size={18}
-                color="#FFFFFF"
-              />
-
-              <Text
-                style={styles.addNoteText}
-              >
-                Add
-              </Text>
+              {addingNote ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="add" size={18} color="#FFFFFF" />
+                  <Text style={styles.addNoteText}>Add</Text>
+                </>
+              )}
             </Pressable>
           </View>
 
           <View style={styles.notesContainer}>
-            {notes.length > 0 ? (
+            {notesLoading ? (
+              <View style={styles.notesState}>
+                <ActivityIndicator color={C.accent} />
+                <Text style={styles.emptyText}>Loading notes...</Text>
+              </View>
+            ) : notesError ? (
+              <View style={styles.notesState}>
+                <Text style={styles.notesErrorText}>{notesError}</Text>
+                <Pressable style={styles.notesRetryButton} onPress={() => void loadNotes()}>
+                  <Text style={styles.notesRetryText}>Retry</Text>
+                </Pressable>
+              </View>
+            ) : notes.length > 0 ? (
               notes.map((note) => (
                 <View
                   key={note.id}
@@ -1243,15 +1275,17 @@ export default function CandidateDetails() {
                         note.id
                       )
                     }
-                    style={
-                      styles.deleteNoteButton
-                    }
+                    disabled={deletingNoteId !== null}
+                    style={[
+                      styles.deleteNoteButton,
+                      deletingNoteId !== null && styles.noteActionDisabled,
+                    ]}
                   >
-                    <Ionicons
-                      name="trash-outline"
-                      size={17}
-                      color={C.textSec}
-                    />
+                    {deletingNoteId === note.id ? (
+                      <ActivityIndicator size="small" color={C.textSec} />
+                    ) : (
+                      <Ionicons name="trash-outline" size={17} color={C.textSec} />
+                    )}
                   </Pressable>
                 </View>
               ))
@@ -1552,6 +1586,19 @@ const styles = StyleSheet.create({
     width: 58,
     height: 58,
     borderRadius: 29,
+  },
+
+  avatarFallback: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EDE9FE",
+  },
+
+  avatarInitial: {
+    color: "#6D28D9",
+    fontSize: 20,
+    fontWeight: "700",
+    fontFamily: F,
   },
 
   candidateName: {
@@ -2218,8 +2265,42 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
   },
 
+  noteActionDisabled: {
+    opacity: 0.5,
+  },
+
   notesContainer: {
     gap: 8,
+  },
+
+  notesState: {
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 24,
+  },
+
+  notesErrorText: {
+    fontFamily: F,
+    fontSize: 12,
+    lineHeight: 18,
+    color: C.danger,
+    textAlign: "center",
+  },
+
+  notesRetryButton: {
+    minHeight: 38,
+    paddingHorizontal: 18,
+    borderRadius: 8,
+    backgroundColor: C.accent,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  notesRetryText: {
+    fontFamily: F,
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
 
   noteCard: {

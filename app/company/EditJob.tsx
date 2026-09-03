@@ -15,7 +15,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 
 import { C, F } from "../../constants/tokens";
 import {
-  getCompanyJobs,
+  getCompanyJobForEdit,
   updateJob,
   generateJobDescription,
 } from "../../imports/api";
@@ -46,6 +46,8 @@ export default function EditJob() {
     maxExperienceYears: "",
     deadline: "",
     description: "",
+    responsibilities: "",
+    requirements: "",
     skills: [] as string[],
     benefits: [] as string[],
   });
@@ -88,11 +90,9 @@ export default function EditJob() {
   useEffect(() => {
     const fetchJob = async () => {
       try {
-        const jobs = await getCompanyJobs();
-
-        const currentJob = jobs.find(
-          (j: any) => String(j.id) === String(id)
-        );
+        if (!id) return;
+        const response = await getCompanyJobForEdit(id);
+        const currentJob = response?.job ?? response;
 
         if (currentJob) {
           setFormData({
@@ -134,6 +134,12 @@ export default function EditJob() {
 
             description:
               currentJob.description || "",
+
+            responsibilities:
+              currentJob.responsibilities || response?.responsibilities || "",
+
+            requirements:
+              currentJob.requirements || response?.requirements || "",
 
             skills:
               Array.isArray(currentJob.skills)
@@ -392,24 +398,29 @@ export default function EditJob() {
 
       description: formData.description,
 
+      responsibilities: formData.responsibilities.trim() || null,
+
+      requirements: formData.requirements.trim() || null,
+
       skills: formData.skills,
 
       benefits: formData.benefits,
     };
 
     try {
-      if (id) {
-        await updateJob(id, payload);
-      }
+      const response = id ? await updateJob(id, payload) : null;
+      const updatedStatus = response?.job?.status ?? "Pending Review";
+      const successMessage =
+        response?.message ?? "Job position updated successfully!";
 
-      setNotification({
-        type: "success",
-        message: "Job position updated successfully!",
+      router.replace({
+        pathname: "/company/ManageJobs",
+        params: {
+          notice: successMessage,
+          noticeStatus: updatedStatus,
+          refreshKey: String(Date.now()),
+        },
       });
-
-      setTimeout(() => {
-        router.replace("/company/ManageJobs");
-      }, 1200);
     } catch (e: any) {
       console.log("Update job error:", e);
       console.log(
@@ -821,6 +832,34 @@ export default function EditJob() {
               styles.textArea,
             ]}
           />
+
+          <Text style={[styles.label, { marginTop: 18 }]}>Key Responsibilities</Text>
+          <TextInput
+            value={formData.responsibilities}
+            onChangeText={(value) => updateField("responsibilities", value)}
+            placeholder="Enter each responsibility on a separate line"
+            placeholderTextColor={C.textSec}
+            multiline
+            numberOfLines={5}
+            textAlignVertical="top"
+            style={[styles.input, styles.textArea]}
+          />
+          <Text style={styles.helperText}>Enter each responsibility on a separate line.</Text>
+
+          <Text style={[styles.label, { marginTop: 16 }]}>Candidate Requirements</Text>
+          <TextInput
+            value={formData.requirements}
+            onChangeText={(value) => updateField("requirements", value)}
+            placeholder="Enter each qualification or requirement on a separate line"
+            placeholderTextColor={C.textSec}
+            multiline
+            numberOfLines={5}
+            textAlignVertical="top"
+            style={[styles.input, styles.textArea]}
+          />
+          <Text style={styles.helperText}>
+            Qualifications and experience required from the candidate, one per line.
+          </Text>
         </View>
 
         {/* =========================
@@ -1134,6 +1173,14 @@ const styles = StyleSheet.create({
   textArea: {
     minHeight: 140,
     paddingTop: 12,
+  },
+
+  helperText: {
+    marginTop: 6,
+    fontFamily: F,
+    fontSize: 11,
+    lineHeight: 16,
+    color: C.textSec,
   },
 
   // =========================

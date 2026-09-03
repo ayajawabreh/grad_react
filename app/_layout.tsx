@@ -5,6 +5,7 @@ import {
 } from "@react-navigation/native";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { LogBox } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import "react-native-reanimated";
 
@@ -16,8 +17,12 @@ import { SavedJobsProvider } from "@/context/SavedJobsContext";
 import { ApplicationsProvider } from "@/context/ApplicationsContext";
 import { ProfileSyncBridge } from "@/context/ProfileSyncBridge";
 
+if (__DEV__) {
+  LogBox.ignoreLogs(["AxiosError: Request failed with status code 422"]);
+}
+
 export const unstable_settings = {
-  anchor: "(student)",
+  initialRouteName: "index",
 };
 
 export default function RootLayout() {

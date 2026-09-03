@@ -30,10 +30,6 @@ export function updateInterview(id: number, data: any) {
   return API.put(`/company/interviews/${id}`, data);
 }
 
-export function deleteInterview(id: number) {
-  return API.delete(`/company/interviews/${id}`);
-}
-
 export function cancelInterview(id: number) {
   return API.patch(`/company/interviews/${id}/cancel`);
 }

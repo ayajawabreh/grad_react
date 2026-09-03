@@ -38,7 +38,7 @@ import {
 
 import { C, F } from "../../constants/tokens";
 import { API } from "../../imports/api";
-import { downloadCsv } from "../../lib/download";
+import { downloadAdminExcel, excelExportErrorMessage, shareExcelFile } from "../../lib/downloadExcel";
 
 type Student = {
   id: number;
@@ -85,6 +85,8 @@ export default function AdminStudents() {
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
   const [error, setError] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [downloadedFileUri, setDownloadedFileUri] = useState<string | null>(null);
 
   const loadStudents = useCallback(async (showLoading = true) => {
     try {
@@ -159,28 +161,19 @@ export default function AdminStudents() {
   };
 
   const exportStudents = async () => {
-    if (!students.length) {
-      Alert.alert("No data", "There are no students to export.");
-      return;
+    try {
+      setExporting(true);
+      const uri = await downloadAdminExcel("/admin/students/export", "students.xlsx", {
+        status: statusFilter || undefined,
+        search: query.trim() || undefined,
+      });
+      setDownloadedFileUri(uri);
+      Alert.alert("Success", "Excel file downloaded successfully.");
+    } catch (requestError: any) {
+      Alert.alert("Export failed", excelExportErrorMessage(requestError));
+    } finally {
+      setExporting(false);
     }
-    await downloadCsv(
-      students.map((student, index) => ({
-        No: index + 1,
-        Name: student.name ?? "Unknown Student",
-        Email: student.email ?? "",
-        University: student.university ?? "",
-        Major: student.major ?? "",
-        "Graduation Year": student.graduation_year ?? "",
-        "Verification Status": student.verification_status ?? "Pending",
-        "Account Status": student.account_status ?? "Active",
-        "Verification Score": student.verification_score ?? "",
-        "Email Verified": student.email_verified ? "Yes" : "No",
-        Phone: student.phone ?? "",
-        "Profile Completion": student.profile_completion == null ? "" : `${student.profile_completion}%`,
-        Joined: student.joined ?? student.created_at ?? "",
-      })),
-      "CareerBridge_Students_Report.csv"
-    );
   };
 
   return (
@@ -193,10 +186,15 @@ export default function AdminStudents() {
             <Filter size={17} color={C.text} />
             <Text style={styles.toolText}>{statusFilter || "Filter"}</Text>
           </Pressable>
-          <Pressable style={styles.toolButton} onPress={exportStudents}>
-            <Download size={17} color={C.text} />
+          <Pressable style={[styles.toolButton, exporting && { opacity: 0.6 }]} onPress={exportStudents} disabled={exporting}>
+            {exporting ? <ActivityIndicator size="small" color={C.text} /> : <Download size={17} color={C.text} />}
             <Text style={styles.toolText}>Export Excel</Text>
           </Pressable>
+          {downloadedFileUri ? (
+            <Pressable style={styles.toolButton} onPress={() => void shareExcelFile(downloadedFileUri).catch((shareError) => Alert.alert("Error", shareError.message))}>
+              <Text style={styles.toolText}>Open / Share</Text>
+            </Pressable>
+          ) : null}
         </View>
         <View style={styles.searchBox}>
           <Search size={18} color={C.textMuted} />

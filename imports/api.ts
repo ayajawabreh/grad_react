@@ -5,14 +5,52 @@ import { router } from "expo-router";
 // مهم:
 // 10.0.0.8 هو IP جهاز الكمبيوتر الذي يشغل Laravel.
 // إذا تغير IP الكمبيوتر، غيّريه هنا.
-const API_URL = "http://10.0.0.8:8000/api";
+export const API_URL =
+  process.env.EXPO_PUBLIC_API_URL || "http://10.0.0.8:8000/api";
 export const API_ORIGIN = API_URL.replace(/\/api\/?$/, "");
+
+export class PublicApiError extends Error {
+  status: number;
+  body: unknown;
+
+  constructor(status: number, body: unknown) {
+    const message =
+      body && typeof body === "object" && "message" in body
+        ? String((body as { message?: unknown }).message)
+        : `Request failed with status ${status}.`;
+    super(message);
+    this.name = "PublicApiError";
+    this.status = status;
+    this.body = body;
+  }
+}
+
+export async function postPublicJson<T>(path: string, payload: Record<string, unknown>): Promise<T> {
+  const url = `${API_URL}${path.startsWith("/") ? path : `/${path}`}`;
+  console.log("API URL:", url);
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const rawBody = await response.text();
+  let body: unknown = null;
+  try { body = rawBody ? JSON.parse(rawBody) : null; } catch { body = rawBody; }
+  console.log("API STATUS:", response.status);
+  console.log("API RESPONSE:", body);
+  if (!response.ok) throw new PublicApiError(response.status, body);
+  return body as T;
+}
 
 export function resolveMediaUrl(value?: string | null) {
   if (!value) return null;
 
   const url = String(value).trim();
   if (!url) return null;
+
+  if (url.startsWith("data:image/")) {
+    return url;
+  }
 
   if (/^https?:\/\//i.test(url)) {
     return url.replace(
@@ -31,13 +69,28 @@ export const API = createAxios({
   baseURL: API_URL,
   headers: {
     Accept: "application/json",
-    "Content-Type": "application/json",
   },
 });
 
 // إضافة الـ Token تلقائياً لكل Request
 API.interceptors.request.use(
   async (config) => {
+    // Let Axios/React Native add the multipart boundary for native files.
+    // A global JSON content type makes Laravel receive the URI as text
+    // instead of an uploaded file.
+    if (
+      typeof FormData !== "undefined" &&
+      config.data instanceof FormData
+    ) {
+      const headers = config.headers as any;
+      if (typeof headers?.delete === "function") {
+        headers.delete("Content-Type");
+      } else if (headers) {
+        delete headers["Content-Type"];
+        delete headers["content-type"];
+      }
+    }
+
     try {
       const token =
         (await AsyncStorage.getItem("cb_token")) ||
@@ -344,6 +397,12 @@ export const deleteInterviewFeedback = async (
   );
 };
 
+export const getCompanyJobForEdit = async (id: string | number) => {
+  return apiRequest(`/company/jobs/${id}/edit`, {
+    method: "GET",
+  });
+};
+
 // =====================================================
 // ADMIN
 // =====================================================
@@ -351,14 +410,25 @@ export const deleteInterviewFeedback = async (
 export const getAdminDashboard = () =>
   apiRequest("/admin/dashboard", { method: "GET" });
 
-export const getAdminAnalytics = () =>
-  apiRequest("/admin/analytics", { method: "GET" });
+export const getAdminAnalytics = (period?: "week" | "month" | "year") =>
+  apiRequest("/admin/analytics", { method: "GET", params: period ? { period } : undefined });
 
 export const getAdminPlatformReport = (period = "month") =>
   apiRequest("/admin/reports/platform", { method: "GET", params: { period } });
 
-export const getAdminJobsModeration = () =>
-  apiRequest("/admin/jobs/moderation", { method: "GET" });
+export const getAdminJobsModeration = (params?: {
+  search?: string;
+  status?: string;
+  company_id?: number;
+  category_id?: number;
+  date?: string;
+  page?: number;
+  per_page?: number;
+}) => apiRequest("/admin/jobs/moderation", {
+  method: "GET",
+  params,
+  headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+});
 
 export const getAdminJobApplicants = (
   jobId: string | number,
@@ -424,14 +494,23 @@ export const updateAdminPrivacy = (data: { profile_visibility: boolean }) =>
 export const deleteAdminAccount = () =>
   apiRequest("/admin/settings/account", { method: "DELETE" });
 
-export const getAdminAbuseReports = () =>
-  apiRequest("/admin/reports/abuse", { method: "GET" });
+export const getAdminAbuseReports = (params?: {
+  status?: string;
+  limit?: number;
+  _?: number;
+}) => apiRequest("/admin/reports/abuse", { method: "GET", params });
 
-export const resolveAdminAbuseReport = (id: string | number) =>
-  apiRequest(`/admin/reports/abuse/${id}/resolve`, { method: "PATCH" });
+export const resolveAdminAbuseReport = (id: string | number, adminNote?: string | null) =>
+  apiRequest(`/admin/reports/abuse/${id}/resolve`, {
+    method: "PATCH",
+    data: { admin_note: adminNote || null },
+  });
 
-export const dismissAdminAbuseReport = (id: string | number) =>
-  apiRequest(`/admin/reports/abuse/${id}/dismiss`, { method: "PATCH" });
+export const dismissAdminAbuseReport = (id: string | number, adminNote?: string | null) =>
+  apiRequest(`/admin/reports/abuse/${id}/dismiss`, {
+    method: "PATCH",
+    data: { admin_note: adminNote || null },
+  });
 
 export const getAdminSystemLogs = () =>
   apiRequest("/admin/system-logs", { method: "GET" });

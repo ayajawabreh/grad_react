@@ -1,8 +1,9 @@
 import { router } from "expo-router";
-import { ArrowRight, Briefcase, Building2, Shield, Sparkles, User } from "lucide-react-native";
-import { ReactNode } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { ArrowRight, BadgeCheck, Briefcase, Building2, MapPin, Shield, Sparkles, User } from "lucide-react-native";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Animated, Easing, Image, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { API_ORIGIN, resolveMediaUrl } from "../imports/api";
 
 const GOLD = "#C4A066";
 const BG = "#FAFAFB";
@@ -11,6 +12,15 @@ const TEXT = "#1F242D";
 const MUTED = "#6C757D";
 const BORDER = "#E2E8F0";
 const WHITE = "#FFFFFF";
+
+type LandingCompany = {
+  id?: number | string;
+  logo?: string | null;
+  company_name?: string | null;
+  industry?: string | null;
+  location?: string | null;
+  is_verified?: boolean | number;
+};
 
 export default function LandingPage() {
   const { width } = useWindowDimensions();
@@ -63,12 +73,7 @@ export default function LandingPage() {
           </View>
         </View>
 
-        <View style={styles.stats}>
-          <Stat value="50,000+" label="Graduate Profiles" />
-          <Stat value="500+" label="Partner Companies" />
-          <Stat value="12,000+" label="Successful Hires" />
-          <Stat value="94%" label="Satisfaction Rate" />
-        </View>
+        <CompaniesCarousel width={width} />
 
         <View style={[styles.section, mobile && styles.sectionMobile]}>
           <Text style={styles.sectionLabel}>WHY CAREERBRIDGE</Text>
@@ -98,8 +103,135 @@ export default function LandingPage() {
   );
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
-  return <View style={styles.stat}><Text style={styles.statValue}>{value}</Text><Text style={styles.statLabel}>{label}</Text></View>;
+function CompaniesCarousel({ width }: { width: number }) {
+  const [companies, setCompanies] = useState<LandingCompany[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const marqueeOffset = useRef(new Animated.Value(0)).current;
+  const cardWidth = Math.min(280, width - 48);
+  const itemStride = cardWidth + 14;
+  const marqueeCompanies = useMemo(() => {
+    if (!companies.length) return [];
+    const minimumCount = Math.max(
+      companies.length,
+      Math.ceil((width + itemStride) / itemStride) + 1
+    );
+    return Array.from(
+      { length: minimumCount },
+      (_, index) => companies[index % companies.length]
+    );
+  }, [companies, itemStride, width]);
+  const marqueeWidth = marqueeCompanies.length * itemStride;
+
+  useEffect(() => {
+    if (!marqueeWidth) return;
+    marqueeOffset.setValue(0);
+    const animation = Animated.loop(
+      Animated.timing(marqueeOffset, {
+        toValue: -marqueeWidth,
+        duration: marqueeWidth * 20,
+        easing: Easing.linear,
+        useNativeDriver: true,
+        isInteraction: false,
+      })
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [marqueeOffset, marqueeWidth]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadCompanies() {
+      setLoading(true);
+      setError(false);
+      try {
+        const response = await fetch(`${API_ORIGIN}/api/landing/companies`, {
+          headers: { Accept: "application/json" },
+        });
+        if (!response.ok) throw new Error(`Companies request failed: ${response.status}`);
+        const body = await response.json();
+        if (active) setCompanies(Array.isArray(body?.companies) ? body.companies : []);
+      } catch (requestError) {
+        if (active) setError(true);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    void loadCompanies();
+    return () => { active = false; };
+  }, [reloadKey]);
+
+  return (
+    <View style={styles.companiesSection}>
+      <Text style={styles.companiesEyebrow}>OUR PARTNER COMPANIES</Text>
+      <Text style={styles.companiesTitle}>Trusted by leading companies</Text>
+      {loading ? (
+        <View style={styles.companiesState}>
+          <ActivityIndicator color={GOLD} />
+          <Text style={styles.companiesStateText}>Loading companies...</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.companiesState}>
+          <Text style={styles.companiesStateText}>Could not load companies.</Text>
+          <Pressable style={styles.retryButton} onPress={() => setReloadKey((value) => value + 1)}>
+            <Text style={styles.retryText}>Try again</Text>
+          </Pressable>
+        </View>
+      ) : companies.length === 0 ? (
+        <Text style={styles.companiesStateText}>No companies are available yet.</Text>
+      ) : (
+        <View style={styles.marqueeViewport} pointerEvents="none">
+          <Animated.View
+            style={[
+              styles.marqueeTrack,
+              { transform: [{ translateX: marqueeOffset }] },
+            ]}
+          >
+            {[...marqueeCompanies, ...marqueeCompanies].map((company, index) => (
+              <CompanyCard
+                key={`${company.id ?? company.company_name ?? "company"}-${index}`}
+                company={company}
+                width={cardWidth}
+              />
+            ))}
+          </Animated.View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function CompanyCard({ company, width }: { company: LandingCompany; width: number }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const name = company.company_name?.trim() || "Company";
+  const logo = resolveMediaUrl(company.logo);
+
+  return (
+    <View style={[styles.companyCard, { width }]}>
+      {logo && !imageFailed ? (
+        <Image source={{ uri: logo }} style={styles.companyLogo} resizeMode="contain" onError={() => setImageFailed(true)} />
+      ) : (
+        <View style={styles.companyLogoFallback}>
+          <Text style={styles.companyLogoLetter}>{name.charAt(0).toUpperCase()}</Text>
+        </View>
+      )}
+      <View style={styles.companyNameRow}>
+        <Text style={styles.companyName} numberOfLines={1}>{name}</Text>
+        {!!company.is_verified && <BadgeCheck size={18} color="#3B82F6" fill="#DBEAFE" />}
+      </View>
+      <View style={styles.companyMetaRow}>
+        <Briefcase size={14} color={MUTED} />
+        <Text style={styles.companyMeta} numberOfLines={1}>{company.industry || "Industry not specified"}</Text>
+      </View>
+      <View style={styles.companyMetaRow}>
+        <MapPin size={14} color={MUTED} />
+        <Text style={styles.companyMeta} numberOfLines={1}>{company.location || "Location not specified"}</Text>
+      </View>
+    </View>
+  );
 }
 
 function Feature({ icon, title, text }: { icon: ReactNode; title: string; text: string }) {
@@ -142,10 +274,23 @@ const styles = StyleSheet.create({
   postJob: { flexDirection: "row", gap: 8 },
   secondaryText: { color: WHITE, fontWeight: "700" },
   full: { width: "100%" },
-  stats: { backgroundColor: WHITE, paddingHorizontal: 18, paddingVertical: 30, flexDirection: "row", flexWrap: "wrap", justifyContent: "space-around", gap: 20, borderBottomWidth: 1, borderBottomColor: BORDER },
-  stat: { minWidth: 135, alignItems: "center" },
-  statValue: { color: TEXT, fontSize: 29, fontWeight: "900" },
-  statLabel: { color: MUTED, fontSize: 12, marginTop: 3 },
+  companiesSection: { backgroundColor: WHITE, paddingVertical: 34, borderBottomWidth: 1, borderBottomColor: BORDER },
+  companiesEyebrow: { color: GOLD, fontSize: 10, fontWeight: "800", letterSpacing: 1.4, textAlign: "center" },
+  companiesTitle: { color: TEXT, fontSize: 23, fontWeight: "900", textAlign: "center", marginTop: 7, marginBottom: 24 },
+  marqueeViewport: { width: "100%", overflow: "hidden", paddingLeft: 18 },
+  marqueeTrack: { flexDirection: "row" },
+  companiesState: { minHeight: 150, alignItems: "center", justifyContent: "center", gap: 10 },
+  companiesStateText: { color: MUTED, fontSize: 13, textAlign: "center" },
+  retryButton: { minHeight: 39, paddingHorizontal: 18, borderRadius: 9, backgroundColor: GOLD, alignItems: "center", justifyContent: "center" },
+  retryText: { color: WHITE, fontSize: 12, fontWeight: "800" },
+  companyCard: { minHeight: 190, marginRight: 14, padding: 18, backgroundColor: BG, borderWidth: 1, borderColor: BORDER, borderRadius: 16 },
+  companyLogo: { width: 58, height: 58, borderRadius: 13, backgroundColor: WHITE, marginBottom: 15 },
+  companyLogoFallback: { width: 58, height: 58, borderRadius: 13, backgroundColor: "#C4A06620", alignItems: "center", justifyContent: "center", marginBottom: 15 },
+  companyLogoLetter: { color: GOLD, fontSize: 24, fontWeight: "900" },
+  companyNameRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 12 },
+  companyName: { flexShrink: 1, color: TEXT, fontSize: 17, fontWeight: "900" },
+  companyMetaRow: { flexDirection: "row", alignItems: "center", gap: 7, marginTop: 7 },
+  companyMeta: { flex: 1, color: MUTED, fontSize: 12 },
   section: { width: "100%", maxWidth: 1180, alignSelf: "center", paddingHorizontal: 36, paddingVertical: 60 },
   sectionMobile: { paddingHorizontal: 18, paddingVertical: 42 },
   rolesSection: { paddingTop: 20 },
