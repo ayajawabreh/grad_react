@@ -4,7 +4,7 @@ import {
   DrawerContentScrollView,
   DrawerItem,
   DrawerItemList,
-} from "@react-navigation/drawer";
+} from "expo-router/drawer";
 import { StyleSheet, View } from "react-native";
 
 import { useAuth } from "../context/AuthContext";

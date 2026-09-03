@@ -1,5 +1,6 @@
 import { Drawer } from "expo-router/drawer";
 import { Ionicons } from "@expo/vector-icons";
+import type { ColorValue } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppDrawerContent } from "../../components/AppDrawerContent";
 
@@ -10,7 +11,7 @@ const COLORS = {
 };
 
 type DrawerIconProps = {
-  color: string;
+  color: ColorValue;
   size: number;
 };
 

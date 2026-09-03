@@ -51,7 +51,7 @@ const asTextList = (value: unknown): string[] =>
     .filter(Boolean);
 
 export default function CandidateDetails() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, from } = useLocalSearchParams<{ id: string; from?: string }>();
 
   const [candidate, setCandidate] =
     useState<ApplicantDetails | null>(null);
@@ -144,30 +144,30 @@ export default function CandidateDetails() {
     return value ?? fallback;
   };
 
-  const resumeSkills = parseResumeField<any[]>(resume?.skills, []);
+  const resumeSkills = parseResumeField<any[]>(candidate?.skills ?? resume?.skills, []);
 
   const resumeExperience = parseResumeField<any[]>(
-    resume?.experience,
+    candidate?.experience ?? resume?.experience,
     []
   );
 
   const resumeEducation = parseResumeField<any[]>(
-    resume?.education,
+    candidate?.education ?? resume?.education,
     []
   );
 
   const resumeProjects = parseResumeField<any[]>(
-    resume?.projects,
+    candidate?.projects ?? resume?.projects,
     []
   );
 
   const resumeCertificates = parseResumeField<any[]>(
-    resume?.certificates,
+    candidate?.certificates ?? resume?.certificates,
     []
   );
 
   const resumeLanguages = parseResumeField<any[]>(
-    resume?.languages,
+    candidate?.languages ?? resume?.languages,
     []
   );
 
@@ -177,7 +177,6 @@ export default function CandidateDetails() {
   const matchingSkills = asTextList(candidate?.match?.matching_skills);
   const missingSkills = asTextList(candidate?.match?.missing_skills);
   const matchReasons = asTextList(candidate?.match?.reasons);
-  const matchWarnings = asTextList(candidate?.match?.warnings);
   const applicableItems = Object.entries(candidate?.match?.breakdown ?? {}).filter(
     ([, item]) => Boolean(item && typeof item === "object" && (item as any).applicable === true)
   ) as [string, { score?: number; max_weight?: number; applicable?: boolean }][];
@@ -392,8 +391,6 @@ export default function CandidateDetails() {
 
   const resumeUrl = resolveMediaUrl(resumeFilePath);
 
-  const displaySkills = matchingSkills;
-
   const experiencesList =
     resumeExperience.length > 0
       ? resumeExperience
@@ -418,9 +415,9 @@ export default function CandidateDetails() {
     >
       {/* BACK */}
       <Pressable
-        onPress={() =>
-          router.replace("/company/Applicants")
-        }
+        onPress={() => router.replace(
+          from === "shortlist" ? "/company/Shortlisted" : "/company/Applicants"
+        )}
         style={styles.backButton}
       >
         <Ionicons
@@ -430,7 +427,7 @@ export default function CandidateDetails() {
         />
 
         <Text style={styles.backText}>
-          Back to Applicants
+          {from === "shortlist" ? "Back to Shortlist" : "Back to Applicants"}
         </Text>
       </Pressable>
 
@@ -618,11 +615,11 @@ export default function CandidateDetails() {
             )}
           </Pressable>
 
-          {/* SKILLS */}
-          <Section title="Matching Skills">
-            {displaySkills.length > 0 ? (
+          {/* STUDENT SKILLS */}
+          <Section title="Student Skills">
+            {resumeSkills.length > 0 ? (
               <View style={styles.chipsContainer}>
-                {displaySkills.map(
+                {resumeSkills.map(
                   (skill: any, index: number) => {
                     const skillName =
                       typeof skill === "string"
@@ -651,39 +648,35 @@ export default function CandidateDetails() {
                 No skills provided.
               </Text>
             )}
+          </Section>
 
-            {missingSkills.length > 0 && (
-              <>
-                <Text
-                  style={[
-                    styles.sectionTitle,
-                    { marginTop: 20 },
-                  ]}
-                >
-                  Missing Skills
-                </Text>
+          {/* MATCHING SKILLS */}
+          <Section title="Matching Skills">
+            {matchingSkills.length > 0 ? (
+              <View style={styles.chipsContainer}>
+                {matchingSkills.map((skill, index) => (
+                  <View key={`${skill}-${index}`} style={styles.skillChip}>
+                    <Text style={styles.skillChipText}>{skill}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.emptyText}>No matching skills identified.</Text>
+            )}
+          </Section>
 
-                <View
-                  style={styles.chipsContainer}
-                >
-                  {missingSkills.map((skill) => (
-                    <View
-                      key={skill}
-                      style={
-                        styles.missingSkillChip
-                      }
-                    >
-                      <Text
-                        style={
-                          styles.missingSkillText
-                        }
-                      >
-                        {skill}
-                      </Text>
-                    </View>
-                  ))}
+          {/* MISSING SKILLS */}
+          <Section title="Missing Skills">
+            {missingSkills.length > 0 ? (
+              <View style={styles.chipsContainer}>
+                {missingSkills.map((skill) => (
+                  <View key={skill} style={styles.missingSkillChip}>
+                    <Text style={styles.missingSkillText}>{skill}</Text>
+                  </View>
+                ))}
                 </View>
-              </>
+            ) : (
+              <Text style={styles.emptyText}>No missing skills identified.</Text>
             )}
           </Section>
 
@@ -718,14 +711,6 @@ export default function CandidateDetails() {
                 No match details available.
               </Text>
             )}
-
-            {matchWarnings.map((warning, idx) => (
-              <View key={`warning-${idx}`} style={styles.reasonRow}>
-                <Ionicons name="warning-outline" size={15} color="#D97706" />
-                <Text style={styles.reasonText}>{warning}</Text>
-              </View>
-            ))}
-
           </Section>
         </View>
       )}

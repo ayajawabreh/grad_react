@@ -53,6 +53,17 @@ export function resolveMediaUrl(value?: string | null) {
   }
 
   if (/^https?:\/\//i.test(url)) {
+    try {
+      const parsed = new URL(url);
+      const storageIndex = parsed.pathname.indexOf("/storage/");
+
+      if (storageIndex >= 0) {
+        return `${API_ORIGIN}${parsed.pathname.slice(storageIndex)}${parsed.search}${parsed.hash}`;
+      }
+    } catch {
+      // Fall through to the legacy localhost replacement below.
+    }
+
     return url.replace(
       /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i,
       API_ORIGIN

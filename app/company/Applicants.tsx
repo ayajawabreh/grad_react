@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect } from "expo-router";
 import {
   View,
   Text,
@@ -354,20 +354,21 @@ export default function Applicants() {
   const handleViewCandidate = (
     candidate: UiApplicant
   ) => {
-    router.push(
-      `/company/CandidateDetails?id=${candidate.id}`
-    );
+    router.push({
+      pathname: "/company/CandidateDetails",
+      params: { id: String(candidate.application_id) },
+    });
   };
 
   const handleShortlist = async (
     candidate: UiApplicant
   ) => {
     try {
-      await shortlistApplicant(candidate.id);
+      await shortlistApplicant(candidate.application_id);
 
       setCandidates((prev) =>
         prev.map((c) =>
-          c.id === candidate.id
+          c.application_id === candidate.application_id
             ? {
                 ...c,
                 status: "Shortlisted",

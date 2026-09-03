@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect } from "expo-router";
 import { ActivityIndicator, Alert, Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { C, F } from "../../constants/tokens";
@@ -127,7 +127,10 @@ export default function Shortlisted() {
               <Pressable style={styles.removeButton} onPress={() => remove(item)}><Ionicons name="bookmark-outline" size={14} color={C.error} /><Text style={styles.removeText}>Remove</Text></Pressable>
               <Pressable
                 style={styles.viewButton}
-                onPress={() => router.push({ pathname: "/company/CandidateDetails", params: { id: String(item.id) } })}
+                onPress={() => router.push({
+                  pathname: "/company/CandidateDetails",
+                  params: { id: String(item.id), from: "shortlist" },
+                })}
               >
                 <Text style={styles.viewText}>View Profile</Text><Ionicons name="arrow-forward" size={15} color="#FFFFFF" />
               </Pressable>

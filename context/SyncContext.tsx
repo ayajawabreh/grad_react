@@ -66,7 +66,12 @@ const SyncContext = createContext<{
   subscribe: (subscriber: Subscriber) => () => void;
 } | null>(null);
 
-const POLL_MS = 200;
+// Polling every 200ms flooded the local Laravel server with five requests per
+// second and delayed the real page requests. A short, bounded interval keeps
+// cross-device updates responsive without starving navigation requests.
+const POLL_MS = 3000;
+const MIN_POLL_MS = 2000;
+const MAX_POLL_MS = 10000;
 const RETRY_MS = 2000;
 const BATCH_MS = 30;
 
@@ -173,7 +178,6 @@ export function SyncProvider({ children }: PropsWithChildren) {
       if (disposed || stopped.current || inFlight.current || !foreground.current) return;
       inFlight.current = true;
       try {
-        if (__DEV__) console.log("[Sync] current cursor:", cursor.current);
         const response = await API.get<SyncResponse>("/sync/events", {
           params: { after_id: cursor.current },
           headers: { Authorization: `Bearer ${activeToken}`, Accept: "application/json" },
@@ -197,10 +201,10 @@ export function SyncProvider({ children }: PropsWithChildren) {
         if (Number.isFinite(Number(data.cursor))) {
           cursor.current = Number(data.cursor);
         }
-        // Keep cross-device updates perceptibly instant. The backend hint is
-        // respected when it asks us to poll sooner, while 200ms is our ceiling.
+        // Respect slower backend hints, but never poll fast enough to compete
+        // with page navigation and data-loading requests.
         const serverPollMs = Number(data.poll_after_ms) || POLL_MS;
-        schedule(Math.max(100, Math.min(serverPollMs, POLL_MS)));
+        schedule(Math.max(MIN_POLL_MS, Math.min(serverPollMs, MAX_POLL_MS)));
       } catch (error: any) {
         const status = error?.response?.status;
 
@@ -236,7 +240,7 @@ export function SyncProvider({ children }: PropsWithChildren) {
       const online = state.isConnected === true && state.isInternetReachable !== false;
       if (online && foreground.current) {
         // Let any failed in-flight request finish before polling immediately.
-        schedule(50);
+        schedule(250);
       } else if (!online && timer.current) {
         clearTimeout(timer.current);
       }

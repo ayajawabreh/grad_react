@@ -46,6 +46,7 @@ import {
 
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
+import { useIsFocused } from "expo-router/react-navigation";
 import {
   AudioModule,
   RecordingPresets,
@@ -112,10 +113,10 @@ function normalizeFileUrl(url: string | null | undefined) {
   const markdownMatch = url.match(/^\[.*?\]\((.*?)\)$/);
 
   if (markdownMatch) {
-    return markdownMatch[1];
+    return resolveMediaUrl(markdownMatch[1]);
   }
 
-  return url;
+  return resolveMediaUrl(url);
 }
 
 function formatMessageTime(date?: string | null) {
@@ -136,6 +137,7 @@ export function MessagesView({
   meAvatar,
   onUnreadCountChange,
 }: MessagesViewProps) {
+  const isFocused = useIsFocused();
   const { width } = useWindowDimensions();
   const isMobile = width < 700;
   const [conversations, setConversations] = useState<ApiConversation[]>(
@@ -926,6 +928,8 @@ export function MessagesView({
   };
 
   useEffect(() => {
+    if (!isFocused) return;
+
     const syncConversations = async () => {
       try {
         const data = await getConversations();
@@ -954,25 +958,17 @@ export function MessagesView({
       )
       .subscribe();
 
-    const conversationInterval = setInterval(
-      () => void refreshMessages(),
-      2500,
-    );
-    const conversationsInterval = setInterval(
-      () => void syncConversations(),
-      5000,
-    );
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") void syncAll();
     });
+    const refreshInterval = setInterval(() => void syncAll(), 3000);
 
     return () => {
-      clearInterval(conversationInterval);
-      clearInterval(conversationsInterval);
+      clearInterval(refreshInterval);
       subscription.remove();
       void supabase.removeChannel(channel);
     };
-  }, [activeUserId, currentUserId]);
+  }, [activeUserId, currentUserId, isFocused]);
 
   /*
    * ----------------------------------------

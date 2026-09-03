@@ -205,26 +205,6 @@ export default function AdminCompanies() {
   }, [loadCompanies]);
 
   /*
-   * Refresh every 5 seconds
-   *
-   * Web had:
-   * window.setInterval()
-   *
-   * In React Native:
-   * setInterval()
-   */
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      loadCompanies(false);
-    }, 5000);
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, [loadCompanies]);
-
-  /*
    * Pending mode
    */
 
@@ -2219,7 +2199,7 @@ const styles = StyleSheet.create({
   },
 
   modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0,0,0,.48)",
   },
 

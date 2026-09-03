@@ -171,10 +171,6 @@ export default function Skills() {
       )
       .subscribe();
 
-    const interval = setInterval(() => {
-      void loadSkills();
-    }, 5000);
-
     const appStateSubscription = AppState.addEventListener(
       "change",
       (state) => {
@@ -186,7 +182,6 @@ export default function Skills() {
 
     return () => {
       mountedRef.current = false;
-      clearInterval(interval);
       appStateSubscription.remove();
       void supabase.removeChannel(channel);
     };

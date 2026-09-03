@@ -141,16 +141,11 @@ export function NotificationsView() {
   useEffect(() => {
     loadNotifications();
 
-    const interval = setInterval(() => {
-      void loadNotifications();
-    }, 10000);
-
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") void loadNotifications();
     });
 
     return () => {
-      clearInterval(interval);
       subscription.remove();
     };
   }, []);

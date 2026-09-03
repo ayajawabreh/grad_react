@@ -9,8 +9,10 @@ import {
   ScrollView,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
+import { fetch as expoFetch } from "expo/fetch";
+import { File as ExpoFile } from "expo-file-system";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useRouter } from "expo-router";
 import {
   Upload,
   FileText,
@@ -23,7 +25,6 @@ import {
   Eye,
 } from "lucide-react-native";
 
-import { useRouter } from "expo-router";
 import { API } from "../../imports/api";
 import { openUploadedResumeFile } from "../../imports/resumePdf";
 
@@ -177,16 +178,8 @@ export default function ResumeUpload() {
       });
 
       const formData = new FormData();
-
-      formData.append("file", {
-        uri: file.uri,
-        name: file.name,
-        type:
-          file.mimeType ||
-          (file.name.toLowerCase().endsWith(".pdf")
-            ? "application/pdf"
-            : "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
-      } as any);
+      const uploadFile = new ExpoFile(file.uri);
+      formData.append("file", uploadFile, file.name);
 
       const token =
         (await AsyncStorage.getItem("cb_token")) ||
@@ -201,7 +194,7 @@ export default function ResumeUpload() {
       let uploadResponse: Response;
 
       try {
-        uploadResponse = await fetch(
+        uploadResponse = await expoFetch(
           `${API.defaults.baseURL}/student/resume/upload`,
           {
             method: "POST",

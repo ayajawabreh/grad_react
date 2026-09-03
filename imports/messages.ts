@@ -1,3 +1,7 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { fetch as expoFetch } from "expo/fetch";
+import { File as ExpoFile } from "expo-file-system";
+
 import { API } from "./api";
 
 export type MessageType =
@@ -167,10 +171,12 @@ export const getConversations =
         ...conversation,
         id,
         conversation_id: id,
+        // This is always the other participant's User ID. All message routes
+        // use a user ID as receiver_id, never an application/profile ID.
         user_id: Number(
-          conversation.user_id ??
+          participant.id ??
             conversation.recipient_id ??
-            participant.id,
+            conversation.user_id,
         ),
         name: conversation.name ?? participant.name ?? "User",
         participant_email: participant.email ?? conversation.email ?? null,
@@ -326,28 +332,40 @@ export const sendMessage =
         type
       );
 
-      formData.append(
-        "file",
-        {
-          uri: file.uri,
-          name: file.name,
-          type: file.type,
-        } as any
-      );
+      formData.append("file", new ExpoFile(file.uri), file.name);
 
-      const response =
-        await API.post<SendMessageResponse>(
-          "/messages",
-          formData,
-          {
-            headers: {
-              Accept:
-                "application/json",
-            },
-          }
+      const token =
+        (await AsyncStorage.getItem("cb_token")) ||
+        (await AsyncStorage.getItem("token"));
+
+      const response = await expoFetch(`${API.defaults.baseURL}/messages`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: formData,
+      });
+
+      const rawBody = await response.text();
+      let responseBody: any = null;
+
+      try {
+        responseBody = rawBody ? JSON.parse(rawBody) : null;
+      } catch {
+        responseBody = rawBody;
+      }
+
+      if (!response.ok) {
+        const uploadError: any = new Error(
+          responseBody?.message || "Could not send attachment."
         );
+        uploadError.status = response.status;
+        uploadError.data = responseBody;
+        throw uploadError;
+      }
 
-      return response.data;
+      return responseBody as SendMessageResponse;
     }
 
     const text = message.trim();

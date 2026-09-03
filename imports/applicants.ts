@@ -301,17 +301,17 @@ export async function fetchApplicantDetails(
 
   const resume = normalizeResume(data?.resume);
 
-  const resumeSkills = normalizeSkills(resume?.skills);
+  const resumeSkills = normalizeSkills(data?.skills ?? resume?.skills);
 
   const resumeExperience = parseResumeField(data?.experience ?? resume?.experience, []);
 
-  const resumeEducation = normalizeArray(resume?.education);
+  const resumeEducation = normalizeArray(data?.education ?? resume?.education);
 
-  const resumeProjects = normalizeArray(resume?.projects);
+  const resumeProjects = normalizeArray(data?.projects ?? resume?.projects);
 
-  const resumeCertificates = normalizeArray(resume?.certificates);
+  const resumeCertificates = normalizeArray(data?.certificates ?? resume?.certificates);
 
-  const resumeLanguages = normalizeArray(resume?.languages);
+  const resumeLanguages = normalizeArray(data?.languages ?? resume?.languages);
 
   const normalizedData: ApplicantDetails = {
     ...data,

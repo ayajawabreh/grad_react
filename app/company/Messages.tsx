@@ -17,6 +17,7 @@ import {
   Linking,
 } from "react-native";
 import { Image as ExpoImage } from "expo-image";
+import { useIsFocused } from "expo-router/react-navigation";
 
 import {
   Search,
@@ -179,6 +180,7 @@ export function MessagesView({
   meAvatar,
   onUnreadCountChange,
 }: MessagesViewProps) {
+  const isFocused = useIsFocused();
   const [conversations, setConversations] = useState<
     ApiConversation[]
   >([]);
@@ -823,6 +825,8 @@ export function MessagesView({
   };
 
   useEffect(() => {
+    if (!isFocused) return;
+
     const syncConversations = async () => {
       try {
         const data = await getConversations();
@@ -851,25 +855,17 @@ export function MessagesView({
       )
       .subscribe();
 
-    const conversationInterval = setInterval(
-      () => void refreshMessages(),
-      2500,
-    );
-    const conversationsInterval = setInterval(
-      () => void syncConversations(),
-      5000,
-    );
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") void syncAll();
     });
+    const refreshInterval = setInterval(() => void syncAll(), 3000);
 
     return () => {
-      clearInterval(conversationInterval);
-      clearInterval(conversationsInterval);
+      clearInterval(refreshInterval);
       subscription.remove();
       void supabase.removeChannel(channel);
     };
-  }, [activeUserId, currentUserId]);
+  }, [activeUserId, currentUserId, isFocused]);
 
   /* -----------------------------
      New Message
@@ -2892,7 +2888,7 @@ const styles = StyleSheet.create({
   },
 
   messageImageLoader: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "center",
   },

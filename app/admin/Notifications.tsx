@@ -216,10 +216,6 @@ export default function AdminNotifications() {
   ======================================================= */
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      loadNotifications(false);
-    }, 10000);
-
     const subscription = AppState.addEventListener(
       "change",
       (nextState) => {
@@ -237,7 +233,6 @@ export default function AdminNotifications() {
     );
 
     return () => {
-      clearInterval(interval);
       subscription.remove();
     };
   }, []);
